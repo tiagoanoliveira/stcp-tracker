@@ -30,7 +30,7 @@ function getBusIcon(line) {
   let color = colorMap[prefix] || '#000000';
 
   const svg = `
-  <svg width="12" height="7" xmlns="http://www.w3.org/2000/svg">
+  <svg width="17" height="8" xmlns="http://www.w3.org/2000/svg">
   <!-- Contorno exterior do autocarro que contorna as rodas -->
   <path d="M 1.2 1
         	H 15
