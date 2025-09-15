@@ -69,9 +69,9 @@ function getBusIcon(line) {
 
 const icon = L.icon({
     iconUrl: url,
-    iconSize: [20, 14],
-    iconAnchor: [10, 7],
-    popupAnchor: [0, -10]
+    iconSize: [40, 28],
+    iconAnchor: [20, 14],
+    popupAnchor: [0, -20]
   });
 
   iconCache[prefix] = icon;
