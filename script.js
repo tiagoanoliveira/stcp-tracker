@@ -33,36 +33,36 @@ function getBusIcon(line) {
   <svg width="12" height="7" xmlns="http://www.w3.org/2000/svg">
   <!-- Contorno exterior do autocarro que contorna as rodas -->
   <path d="M 1.2 1
-        	H 10.5
-            A 1 1 0 0 1 11.5 2
-    V 5.5
-    H 9
-    A 0.5 0.5 0 0 1 8 5.5
-    H 4
-    A 0.5 0.5 0 0 1 3 5.5
+        	H 15
+            A 1 1 0 0 1 16 2
+    V 6.5
+    H 12.5
+    A 0.7 0.7 0 0 1 10.5 6.5
+    H 6
+    A 0.7 0.7 0 0 1 4 6.5
     H 0.5
     V 1.7
     A 0.7 0.7 0 0 1 1.2 1"
     
-        stroke="#18d8d0" stroke-width="0.3" fill="${color}"/>
+        stroke="#18d8d0" stroke-width="0.7" fill="none"/>
 
     <!-- Contorno branco interior que contorna as rodas -->
-  <path d="M 1.2 1.5
-        	H 10.5
-            A 0.5 0.5 0 0 1 11 2
-    V 5
-    H 1
-    V 1.8
-    A 0.2 0.3 0 0 1 1.2 1.5" 
-       stroke="#fff" stroke-width="0.2"  fill="none"/>
+  <path d="M 1.7 2
+        	H 14.5
+            A 0.5 0.5 0 0 1 15 2.5
+    V 5.5
+    H 1.5
+    V 2.3
+    A 0.2 0.3 0 0 1 1.7 2" 
+       stroke="#fff" stroke-width="0.6"  fill="${color}"/>
 
     <!-- Detalhes no teto -->
-    <rect x="3" y="0.6" width="1.8" height="0.35" rx="0.1" stroke="#18d8d0" stroke-width="0.2"  fill="none"/>
-      <rect x="7.5" y="0.6" width="1.8" height="0.35" rx="0.1" stroke="#18d8d0" stroke-width="0.2"  fill="none"/>
+    <rect x="3.5" y="0.3" width="3" height="0.6" rx="0.1" stroke="#18d8d0" stroke-width="0.4"  fill="none"/>
+      <rect x="10" y="0.3" width="3" height="0.6" rx="0.1" stroke="#18d8d0" stroke-width="0.4"  fill="none"/>
 
   <!-- Rodas -->
-  <circle cx="8.5" cy="5.5" r="0.5" stroke="#18d8d0" stroke-width="0.3"  fill="none"/>
-    <circle cx="3.5" cy="5.5" r="0.5" stroke="#18d8d0" stroke-width="0.3"  fill="none"/>
+  <circle cx="5" cy="6.5" r="1" stroke="#18d8d0" stroke-width="0.7"  fill="none"/>
+    <circle cx="11.5" cy="6.5" r="1" stroke="#18d8d0" stroke-width="0.7"  fill="none"/>
 </svg>`;
 
   const url = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
