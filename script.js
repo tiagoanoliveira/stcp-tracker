@@ -11,25 +11,57 @@ let refreshInterval = null;
 // Ícones personalizados com cor conforme linha
 function getBusIcon(line) {
   const colorMap = {
-    '2': '#0000FF',  // azul
-    '3': '#0000FF',
-    '4': '#0000FF',
-    '5': '#FFD700',  // amarelo (gold)
-    '6': '#008000',  // verde
+    '2': '#187ec2',  // azul
+    '3': '#187ec2',
+    '4': '#187ec2',
+    '5': '#fcd116',  // amarelo (gold)
+    '6': '#00ac00',  // verde
     '7': '#FF0000',  // vermelho
-    '8': '#800080',  // roxo
-    '9': '#FFA500'   // laranja
+    '8': '#a347ff',  // roxo
+    '9': '#FF7900'   // laranja
   };
 
   let color = (line && line.length > 0) ? (colorMap[line[0]] || '#0000FF') : '#0000FF';
 
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 64 64">
-      <rect x="8" y="16" width="48" height="32" fill="${color}" stroke="black" stroke-width="2" />
-      <circle cx="20" cy="52" r="6" fill="black"/>
-      <circle cx="44" cy="52" r="6" fill="black"/>
-      <rect x="20" y="24" width="24" height="16" fill="white" />
-    </svg>`;
+    <svg width="10" height="7" xmlns="http://www.w3.org/2000/svg">
+    <!-- Fundo de cor da linha -->
+  <rect width="10" height="7" fill="${color}"/>
+  <!-- Contorno exterior do autocarro que contorna as rodas -->
+  <path d="M 2.3 2
+        	L 7 2
+            A 1 1 0 0 1 8 3
+    L 8 5
+    L 7 5
+    M 6 5
+    L 4 5
+    M 3 5
+    L 1.7 5
+    L 1.7 3
+    A 0.6 1 0 0 1 2.3 2"
+    
+        stroke="#18d8d0" stroke-width="0.3" fill="none"/>
+
+    <!-- Contorno branco interior que contorna as rodas -->
+  <path d="M 2.3 2.5
+        	L 7 2.5
+            A 0.5 0.5 0 0 1 7.5 3
+    L 7.5 4.5
+    L 2.2 4.5
+    L 2.2 3
+    A 0.1 0.5 0 0 1 2.3 2.5" 
+       stroke="#fff" stroke-width="0.2"  fill="none"/>
+
+    <!-- Detalhes no teto -->
+    <rect x="3" y="1.7" width="1.2" height="0.3" rx="0.1" stroke="#18d8d0" stroke-width="0.2"  fill="none"/>
+      <rect x="5.5" y="1.7" width="1.2" height="0.3" rx="0.1" stroke="#18d8d0" stroke-width="0.2"  fill="none"/>
+
+  
+  <!-- Rodas -->
+  <circle cx="6.5" cy="5" r="0.5" stroke="#18d8d0" stroke-width="0.3"  fill="none"/>
+    <circle cx="3.5" cy="5" r="0.5" stroke="#18d8d0" stroke-width="0.3"  fill="none"/>
+
+</svg>`;
 
   const url = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
 
