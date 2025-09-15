@@ -30,15 +30,40 @@ function getBusIcon(line) {
   let color = colorMap[prefix] || '#000000';
 
   const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="14" viewBox="0 0 10 7">
-    <rect width="10" height="7" fill="${color}"/>
-    <path d="M 2.3 2 L 7 2 A 1 1 0 0 1 8 3 L 8 5 L 7 5 M 6 5 L 4 5 M 3 5 L 1.7 5 L 1.7 3 A 0.6 1 0 0 1 2.3 2" stroke="#18d8d0" stroke-width="0.3" fill="none"/>
-    <path d="M 2.3 2.5 L 7 2.5 A 0.5 0.5 0 0 1 7.5 3 L 7.5 4.5 L 2.2 4.5 L 2.2 3 A 0.1 0.5 0 0 1 2.3 2.5" stroke="#fff" stroke-width="0.2" fill="none"/>
-    <rect x="3" y="1.7" width="1.2" height="0.3" rx="0.1" stroke="#18d8d0" stroke-width="0.2" fill="none"/>
-    <rect x="5.5" y="1.7" width="1.2" height="0.3" rx="0.1" stroke="#18d8d0" stroke-width="0.2" fill="none"/>
-    <circle cx="6.5" cy="5" r="0.5" stroke="#18d8d0" stroke-width="0.3" fill="none"/>
-    <circle cx="3.5" cy="5" r="0.5" stroke="#18d8d0" stroke-width="0.3" fill="none"/>
-  </svg>`;
+  <svg width="12" height="7" xmlns="http://www.w3.org/2000/svg">
+  <!-- Contorno exterior do autocarro que contorna as rodas -->
+  <path d="M 1.2 1
+        	H 10.5
+            A 1 1 0 0 1 11.5 2
+    V 5.5
+    H 9
+    A 0.5 0.5 0 0 1 8 5.5
+    H 4
+    A 0.5 0.5 0 0 1 3 5.5
+    H 0.5
+    V 1.7
+    A 0.7 0.7 0 0 1 1.2 1"
+    
+        stroke="#18d8d0" stroke-width="0.3" fill="${color}"/>
+
+    <!-- Contorno branco interior que contorna as rodas -->
+  <path d="M 1.2 1.5
+        	H 10.5
+            A 0.5 0.5 0 0 1 11 2
+    V 5
+    H 1
+    V 1.8
+    A 0.2 0.3 0 0 1 1.2 1.5" 
+       stroke="#fff" stroke-width="0.2"  fill="none"/>
+
+    <!-- Detalhes no teto -->
+    <rect x="3" y="0.6" width="1.8" height="0.35" rx="0.1" stroke="#18d8d0" stroke-width="0.2"  fill="none"/>
+      <rect x="7.5" y="0.6" width="1.8" height="0.35" rx="0.1" stroke="#18d8d0" stroke-width="0.2"  fill="none"/>
+
+  <!-- Rodas -->
+  <circle cx="8.5" cy="5.5" r="0.5" stroke="#18d8d0" stroke-width="0.3"  fill="none"/>
+    <circle cx="3.5" cy="5.5" r="0.5" stroke="#18d8d0" stroke-width="0.3"  fill="none"/>
+</svg>`;
 
   const url = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
 
