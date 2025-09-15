@@ -8,6 +8,8 @@ let userPosition = null;
 let userMarker = null;
 let refreshInterval = null;
 
+const iconCache = {};
+
 // Ícones personalizados com cor conforme linha
 function getBusIcon(line) {
   const colorMap = {
@@ -21,56 +23,34 @@ function getBusIcon(line) {
     '9': '#FF7900'   // laranja
   };
 
-  let color = (line && line.length > 0) ? (colorMap[line[0]] || '#0000FF') : '#0000FF';
+  const prefix = (line && line.length > 0) ? line[0] : '';
+
+  if (iconCache[prefix]) return iconCache[prefix];
+
+  let color = colorMap[prefix] || '#000000';
 
   const svg = `
-    <svg width="10" height="7" xmlns="http://www.w3.org/2000/svg">
-    <!-- Fundo de cor da linha -->
-  <rect width="10" height="7" fill="${color}"/>
-  <!-- Contorno exterior do autocarro que contorna as rodas -->
-  <path d="M 2.3 2
-        	L 7 2
-            A 1 1 0 0 1 8 3
-    L 8 5
-    L 7 5
-    M 6 5
-    L 4 5
-    M 3 5
-    L 1.7 5
-    L 1.7 3
-    A 0.6 1 0 0 1 2.3 2"
-    
-        stroke="#18d8d0" stroke-width="0.3" fill="none"/>
-
-    <!-- Contorno branco interior que contorna as rodas -->
-  <path d="M 2.3 2.5
-        	L 7 2.5
-            A 0.5 0.5 0 0 1 7.5 3
-    L 7.5 4.5
-    L 2.2 4.5
-    L 2.2 3
-    A 0.1 0.5 0 0 1 2.3 2.5" 
-       stroke="#fff" stroke-width="0.2"  fill="none"/>
-
-    <!-- Detalhes no teto -->
-    <rect x="3" y="1.7" width="1.2" height="0.3" rx="0.1" stroke="#18d8d0" stroke-width="0.2"  fill="none"/>
-      <rect x="5.5" y="1.7" width="1.2" height="0.3" rx="0.1" stroke="#18d8d0" stroke-width="0.2"  fill="none"/>
-
-  
-  <!-- Rodas -->
-  <circle cx="6.5" cy="5" r="0.5" stroke="#18d8d0" stroke-width="0.3"  fill="none"/>
-    <circle cx="3.5" cy="5" r="0.5" stroke="#18d8d0" stroke-width="0.3"  fill="none"/>
-
-</svg>`;
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="14" viewBox="0 0 10 7">
+    <rect width="10" height="7" fill="${color}"/>
+    <path d="M 2.3 2 L 7 2 A 1 1 0 0 1 8 3 L 8 5 L 7 5 M 6 5 L 4 5 M 3 5 L 1.7 5 L 1.7 3 A 0.6 1 0 0 1 2.3 2" stroke="#18d8d0" stroke-width="0.3" fill="none"/>
+    <path d="M 2.3 2.5 L 7 2.5 A 0.5 0.5 0 0 1 7.5 3 L 7.5 4.5 L 2.2 4.5 L 2.2 3 A 0.1 0.5 0 0 1 2.3 2.5" stroke="#fff" stroke-width="0.2" fill="none"/>
+    <rect x="3" y="1.7" width="1.2" height="0.3" rx="0.1" stroke="#18d8d0" stroke-width="0.2" fill="none"/>
+    <rect x="5.5" y="1.7" width="1.2" height="0.3" rx="0.1" stroke="#18d8d0" stroke-width="0.2" fill="none"/>
+    <circle cx="6.5" cy="5" r="0.5" stroke="#18d8d0" stroke-width="0.3" fill="none"/>
+    <circle cx="3.5" cy="5" r="0.5" stroke="#18d8d0" stroke-width="0.3" fill="none"/>
+  </svg>`;
 
   const url = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
 
-  return L.icon({
+const icon = L.icon({
     iconUrl: url,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32]
+    iconSize: [20, 14],
+    iconAnchor: [10, 7],
+    popupAnchor: [0, -10]
   });
+
+  iconCache[prefix] = icon;
+  return icon;
 }
 
 function defaultIcon(){
