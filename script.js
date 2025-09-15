@@ -89,7 +89,7 @@ function defaultIcon(){
 
 function centerMapOnUser() {
   if (userPosition) {
-    map.setView(userPosition, 14);
+    map.setView(userPosition, 15);
     if (!userMarker) {
       userMarker = L.marker(userPosition, {
         title: "Você está aqui",
