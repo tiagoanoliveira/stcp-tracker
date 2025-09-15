@@ -9,6 +9,17 @@ let userMarker = null;
 let refreshInterval = null;
 
 const iconCache = {};
+let destinos = {};
+
+// Carregar destinos do ficheiro JSON
+async function carregarDestinos() {
+  try {
+    const response = await fetch('destinos.json');
+    destinos = await response.json();
+  } catch (error) {
+    console.error('Erro ao carregar destinos:', error);
+  }
+}
 
 function getBusIcon(line) {
   const colorMap = {
@@ -112,18 +123,22 @@ function extractLineNumber(bus) {
   return null;
 }
 
-function extractDirection(bus) {
-  if (!bus.annotations || !bus.annotations.value) return "Sentido Desconhecido";
+function extractDirectionRaw(bus) {
+  if (!bus.annotations || !bus.annotations.value) return null;
   for (const annotation of bus.annotations.value) {
     const decoded = decodeURIComponent(annotation);
     if (decoded.startsWith("stcp:sentido:")) {
-      const value = decoded.slice("stcp:sentido:".length);
-      if (value === '0') return "Sentido Normal";
-      else if (value === '1') return "Sentido Inverso";
-      else return "Sentido Desconhecido";
+      return decoded.slice("stcp:sentido:".length);
     }
   }
-  return "Sentido Desconhecido";
+  return null;
+}
+
+function obterDestino(line, sentido) {
+  if (destinos[line] && destinos[line][sentido]) {
+    return destinos[line][sentido];
+  }
+  return 'Destino Desconhecido';
 }
 
 async function fetchBusData() {
@@ -138,14 +153,15 @@ async function fetchBusData() {
     const validIDs = new Set();
     data.forEach(bus => {
       const line = extractLineNumber(bus);
-      const direction = extractDirection(bus);
+      const sentidoRaw = extractDirectionRaw(bus);
+      const destino = obterDestino(line, sentidoRaw);
       if (filterValue === '' || (line && line.startsWith(filterValue))) {
         validIDs.add(bus.id);
         const lat = bus.location?.value?.coordinates?.[1];
         const lon = bus.location?.value?.coordinates?.[0];
         if (lat == undefined || lon == undefined) return;
         const speed = bus.speed ? bus.speed.value : 'N/A';
-        const popupContent = `Linha: ${line}<br>Velocidade: ${speed} km/h<br>Direção: ${direction}`;
+        const popupContent = `Linha: ${line}<br>Velocidade: ${speed} km/h<br>Destino: ${destino}`;
         if (busMarkers[bus.id]) {
           busMarkers[bus.id].setLatLng([lat, lon]);
           busMarkers[bus.id].setIcon(getBusIcon(line));
@@ -182,5 +198,7 @@ function forceRefresh() {
 document.getElementById('apply-filter').addEventListener('click', applyFilter);
 document.getElementById('center-user').addEventListener('click', centerMapOnUser);
 document.getElementById('refresh-now').addEventListener('click', forceRefresh);
+
+window.onload = carregarDestinos;
 
 forceRefresh();
