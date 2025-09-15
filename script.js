@@ -89,12 +89,12 @@ function defaultIcon(){
 
 function centerMapOnUser() {
   if (userPosition) {
-    map.setView(userPosition, 16);
+    map.setView(userPosition, 17);
     if (!userMarker) {
       userMarker = L.marker(userPosition, {
         title: "Você está aqui",
         icon: defaultIcon()
-      }).addTo(map).bindPopup("Localização Atual").openPopup();
+      }).addTo(map).bindPopup("Localização Atual");
     } else {
       userMarker.setLatLng(userPosition);
     }
