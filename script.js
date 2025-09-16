@@ -62,7 +62,7 @@ function getBusIcon(line) {
     <rect x="10" y="0.3" width="3" height="0.6" rx="0.1" stroke="#18d8d0" stroke-width="0.4"  fill="none"/>
     <circle cx="5" cy="6.5" r="1" stroke="#18d8d0" stroke-width="0.7"  fill="none"/>
     <circle cx="11.5" cy="6.5" r="1" stroke="#18d8d0" stroke-width="0.7"  fill="none"/>
-    <text x="8.5" y="4.5" text-anchor="middle" alignment-baseline="middle" font-family="Arial" font-size="4" font-weight="bold" fill="#fff">${line}</text>
+    <text x="8.5" y="4.5" text-anchor="middle" alignment-baseline="middle" font-family="Palatino" font-size="3.5" font-weight="bold" fill="#fff">${line}</text>
   </svg>`;
   const url = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
   const icon = L.icon({
