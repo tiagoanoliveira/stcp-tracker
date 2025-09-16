@@ -32,9 +32,9 @@ function getBusIcon(line) {
     '8': '#a347ff',
     '9': '#FF7900'
   };
-  const prefix = (line && line.length > 0) ? line[0] : '';
-  if (iconCache[prefix]) return iconCache[prefix];
-  let color = colorMap[prefix] || '#000000';
+const key = line || '';
+if (iconCache[key]) return iconCache[key];
+let color = colorMap[key] || '#000000';
 
   const svg = `
   <svg width="17" height="8" xmlns="http://www.w3.org/2000/svg">
@@ -71,7 +71,7 @@ function getBusIcon(line) {
     iconAnchor: [20, 14],
     popupAnchor: [0, -20]
   });
-  iconCache[prefix] = icon;
+  iconCache[key] = icon;
   return icon;
 }
 
