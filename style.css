@@ -1,33 +1,36 @@
 /* Definição de variáveis CSS - PALETA DE CORES CENTRALIZADA */
 :root {
   /* Cores principais */
-  --color-primary: #6c63ff;
-  --color-primary-dark: #4a3aff;
-  --color-secondary: #71b7e6;
-  --color-secondary-alt: #9b59b6;
-  
+  --color-primary: #0072C6;
+  --color-primary-dark: #004A82;
+  /* tom mais escuro do primary para hover */
+  --color-secondary: #5EDDC1;
+
   /* Cores de texto */
   --color-text: #333;
   --color-text-light: #fff;
-  
+
   /* Cores de fundo */
-  --color-background-gradient-start: #71b7e6;
-  --color-background-gradient-end: #9b59b6;
-  --color-controls-bg: rgba(255, 255, 255, 0.95);
+  --color-background-gradient-start: var(--color-secondary);
+  --color-background-gradient-end: var(--color-primary);
+  --color-controls-bg: rgba(255, 255, 255, 0.9);
   --color-map-bg: white;
-  
-  /* Sombras e efeitos */
-  --color-button-shadow: rgba(108, 99, 255, 0.3);
-  --color-button-hover-shadow: rgba(74, 58, 255, 0.5);
-  --color-button-active-shadow: rgba(74, 58, 255, 0.4);
-  --color-input-focus-shadow: rgba(108, 99, 255, 0.6);
+
+  /* Sombras e efeitos atualizadas para coordenar com primárias */
+  --color-button-shadow: rgba(0, 114, 198, 0.3);
+  /* cor primária com opacidade */
+  --color-button-hover-shadow: rgba(0, 90, 158, 0.5);
+  /* cor primaria escura */
+  --color-button-active-shadow: rgba(0, 90, 158, 0.4);
+  --color-input-focus-shadow: rgba(94, 221, 193, 0.6);
+  /* cor secundária */
   --color-box-shadow: rgba(0, 0, 0, 0.1);
   --color-map-shadow: rgba(0, 0, 0, 0.25);
   --color-text-shadow: rgba(0, 0, 0, 0.3);
-  
+
   /* Bordas */
   --color-border-primary: var(--color-primary);
-  --color-border-focus: var(--color-primary-dark);
+  --color-border-focus: var(--color-secondary);
 }
 
 /* Reset básico */
@@ -49,16 +52,18 @@ body {
 }
 
 h1 {
+  font-size: clamp(1rem, 2vw + 1rem, 3rem);
   color: var(--color-text-light);
-  margin-bottom: 30px;
+  margin-top: 30px;
+  margin-bottom: 50px;
   font-weight: 500;
   text-shadow: 1px 1px 3px var(--color-text-shadow);
-  font-size: 2rem;
   letter-spacing: 1px;
   text-align: center;
-  max-width: 900px;
+  max-width: 1400px;
   width: 100%;
 }
+
 
 .container {
   width: 100%;
@@ -70,26 +75,37 @@ h1 {
 
 #controls {
   display: flex;
-  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
   background-color: var(--color-controls-bg);
   padding: 16px 24px;
   border-radius: 12px;
   box-shadow: 0 6px 15px var(--color-box-shadow);
   margin-bottom: 20px;
   flex-wrap: wrap;
-  justify-content: center;
+}
+
+.controls-left,
+.controls-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 #line-filter {
-  flex: 1 1 180px;
+  width: 137px;
+  min-width: 60px;
+  max-width: 250px;
   padding: 10px 14px;
   border-radius: 8px;
   border: 2px solid var(--color-border-primary);
   font-size: 1rem;
   transition: border-color 0.3s ease;
-  min-width: 150px;
   max-height: 40px;
+  flex: 0 1 auto;
 }
+
 
 #line-filter:focus {
   border-color: var(--color-border-focus);
@@ -133,18 +149,30 @@ h1 {
 }
 
 /* Responsividade */
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   #controls {
     flex-direction: column;
+    gap: 10px;
     align-items: stretch;
   }
-  
-  #line-filter {
-    min-width: 100%;
-  }
-  
-  #controls button {
+  .controls-left,
+  .controls-right {
     width: 100%;
+    justify-content: flex-start;
+  }
+  .controls-right {
+    justify-content: flex-end;
     margin-top: 8px;
+  }
+  #line-filter {
+    width: 100%;
+    min-width: 80px;
+    max-width: 100%;
+    margin-bottom: 8px;
+  }
+  #controls button {
+    width: auto;
+    min-width: 120px;
+    margin-top: 0;
   }
 }

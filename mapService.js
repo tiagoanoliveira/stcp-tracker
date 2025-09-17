@@ -1,6 +1,6 @@
 // mapService.js - Responsável pela visualização e elementos do mapa
-import { createBusIcon } from './busIcon.js';
-import { BUS_COLORS, CUSTOM_LINE_TEXTS } from './busColors.js';
+import { createBusIcon } from './busDesign/busIcon.js';
+import { BUS_COLORS, CUSTOM_LINE_TEXTS } from './busDesign/busColors.js';
 
 class MapService {
   constructor() {
@@ -47,7 +47,7 @@ class MapService {
 
     busData.forEach(bus => {
       validIDs.add(bus.id);
-      
+
       const popupContent = `Linha: ${bus.line}<br>Velocidade: ${bus.speed} km/h<br>Destino: ${bus.destino}<br>Veículo nº ${bus.busNumber}`;
 
       if (this.busMarkers[bus.id]) {
@@ -57,8 +57,8 @@ class MapService {
         this.busMarkers[bus.id].bindPopup(popupContent);
       } else {
         // Criar novo marcador
-        const marker = L.marker([bus.latitude, bus.longitude], { 
-          icon: this.getBusIcon(bus.line) 
+        const marker = L.marker([bus.latitude, bus.longitude], {
+          icon: this.getBusIcon(bus.line)
         }).addTo(this.map);
         marker.bindPopup(popupContent);
         this.busMarkers[bus.id] = marker;
