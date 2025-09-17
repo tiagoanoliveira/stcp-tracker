@@ -54,8 +54,8 @@ body {
 h1 {
   font-size: clamp(1rem, 2vw + 1rem, 3rem);
   color: var(--color-text-light);
-  margin-top: 30px;
-  margin-bottom: 50px;
+  margin-top: clamp(10px, 2vw, 30px);
+  margin-bottom: clamp(10px, 3vw, 50px);
   font-weight: 500;
   text-shadow: 1px 1px 3px var(--color-text-shadow);
   letter-spacing: 1px;
