@@ -34,7 +34,7 @@
 }
 
 /* Reset básico */
-* {
+*{
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -54,7 +54,7 @@ body {
 h1 {
   font-size: clamp(1rem, 2vw + 1rem, 3rem);
   color: var(--color-text-light);
-  margin-top: clamp(10px, 2vw, 30px);
+  margin-top: clamp(5px, 1vw, 30px);
   margin-bottom: clamp(10px, 3vw, 50px);
   font-weight: 500;
   text-shadow: 1px 1px 3px var(--color-text-shadow);
@@ -116,7 +116,7 @@ h1 {
 #controls button {
   background-color: var(--color-primary);
   color: var(--color-text-light);
-  padding: 11px 20px;
+  padding: 10px 15px;
   border: none;
   border-radius: 10px;
   cursor: pointer;
@@ -149,7 +149,7 @@ h1 {
 }
 
 /* Responsividade */
-@media (max-width: 700px) {
+@media (max-width: 1200px) {
   #controls {
     flex-direction: column;
     gap: 10px;
@@ -174,4 +174,20 @@ h1 {
     min-width: 120px;
     margin-top: 0;
   }
+  #map {
+    height: 65vh; /* ligeiramente menor para tablets e telas médias */
+  }
 }
+
+@media (max-width: 600px) {
+  #map {
+    height: 55vh; /* menor para dispositivos móveis */
+  }
+}
+
+@media (max-width: 400px) {
+  #map {
+    height: 45vh; /* mais pequeno para telemóveis muito pequenos */
+  }
+}
+
