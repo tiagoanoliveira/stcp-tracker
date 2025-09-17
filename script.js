@@ -16,7 +16,6 @@ async function carregarDestinos() {
   try {
     const response = await fetch('destinos.json');
     destinos = await response.json();
-    console.log('Destinos carregados:', destinos);
   } catch (error) {
     console.error('Erro ao carregar destinos:', error);
   }
