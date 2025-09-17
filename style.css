@@ -1,30 +1,150 @@
+/* Definição de variáveis CSS - PALETA DE CORES CENTRALIZADA */
+:root {
+  /* Cores principais */
+  --color-primary: #6c63ff;
+  --color-primary-dark: #4a3aff;
+  --color-secondary: #71b7e6;
+  --color-secondary-alt: #9b59b6;
+  
+  /* Cores de texto */
+  --color-text: #333;
+  --color-text-light: #fff;
+  
+  /* Cores de fundo */
+  --color-background-gradient-start: #71b7e6;
+  --color-background-gradient-end: #9b59b6;
+  --color-controls-bg: rgba(255, 255, 255, 0.95);
+  --color-map-bg: white;
+  
+  /* Sombras e efeitos */
+  --color-button-shadow: rgba(108, 99, 255, 0.3);
+  --color-button-hover-shadow: rgba(74, 58, 255, 0.5);
+  --color-button-active-shadow: rgba(74, 58, 255, 0.4);
+  --color-input-focus-shadow: rgba(108, 99, 255, 0.6);
+  --color-box-shadow: rgba(0, 0, 0, 0.1);
+  --color-map-shadow: rgba(0, 0, 0, 0.25);
+  --color-text-shadow: rgba(0, 0, 0, 0.3);
+  
+  /* Bordas */
+  --color-border-primary: var(--color-primary);
+  --color-border-focus: var(--color-primary-dark);
+}
+
+/* Reset básico */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 body {
-  font-family: Arial, sans-serif;
-  margin: 10px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, var(--color-background-gradient-start), var(--color-background-gradient-end));
+  color: var(--color-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+
+h1 {
+  color: var(--color-text-light);
+  margin-bottom: 30px;
+  font-weight: 500;
+  text-shadow: 1px 1px 3px var(--color-text-shadow);
+  font-size: 2rem;
+  letter-spacing: 1px;
+  text-align: center;
+  max-width: 900px;
+  width: 100%;
+}
+
+.container {
+  width: 100%;
+  max-width: 1400px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+#controls {
+  display: flex;
+  gap: 12px;
+  background-color: var(--color-controls-bg);
+  padding: 16px 24px;
+  border-radius: 12px;
+  box-shadow: 0 6px 15px var(--color-box-shadow);
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+#line-filter {
+  flex: 1 1 180px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 2px solid var(--color-border-primary);
+  font-size: 1rem;
+  transition: border-color 0.3s ease;
+  min-width: 150px;
+  max-height: 40px;
+}
+
+#line-filter:focus {
+  border-color: var(--color-border-focus);
+  outline: none;
+  box-shadow: 0 0 8px var(--color-input-focus-shadow);
+}
+
+#controls button {
+  background-color: var(--color-primary);
+  color: var(--color-text-light);
+  padding: 11px 20px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 3px 8px var(--color-button-shadow);
+  flex: 0 1 auto;
+  white-space: nowrap;
+}
+
+#controls button:hover {
+  background-color: var(--color-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px var(--color-button-hover-shadow);
+}
+
+#controls button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px var(--color-button-active-shadow);
 }
 
 #map {
   height: 600px;
   width: 100%;
-  margin-top: 12px;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px var(--color-map-shadow);
+  border: 3px solid var(--color-border-primary);
+  background-color: var(--color-map-bg);
 }
 
-#controls {
-  margin-bottom: 10px;
-}
-
-#controls label {
-  margin-right: 6px;
-}
-
-#controls input {
-  padding: 4px 8px;
-  width: 150px;
-  margin-right: 8px;
-}
-
-#controls button {
-  margin-right: 6px;
-  padding: 5px 10px;
-  cursor: pointer;
+/* Responsividade */
+@media (max-width: 600px) {
+  #controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  #line-filter {
+    min-width: 100%;
+  }
+  
+  #controls button {
+    width: 100%;
+    margin-top: 8px;
+  }
 }

@@ -3,26 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Localização STCP</title>
+  <title>Live location STCP</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 </head>
 <body>
 
-  <h2>Localização em Tempo Real dos Autocarros STCP</h2>
+  <header role="banner">
+    <h1>Localização em Tempo Real dos Autocarros STCP</h1>
+  </header>
 
-  <div id="controls">
-    <label for="line-filter">Filtrar linha:</label>
-    <input type="text" id="line-filter" placeholder="Escreva o nº da linha" />
-    <button id="apply-filter">Aplicar filtro</button>
-    <button id="center-user">Recentrar na localização atual</button>
-    <button id="refresh-now">Atualizar Agora</button>
-  </div>
+  <main role="main" class="container">
+    <section aria-label="Controles de filtro e navegação no mapa">
+      <form id="controls">
+        <input type="text" id="line-filter" name="line-filter" placeholder="Escreva o nº da linha" aria-label="Filtrar linha" />
+        <button type="button" id="apply-filter">Aplicar filtro</button>
+        <button type="button" id="center-user">Recentrar na localização atual</button>
+        <button type="button" id="refresh-now">Atualizar Agora</button>
+      </form>
+    </section>
 
-  <div id="map"></div>
+    <section aria-label="Mapa dos autocarros em tempo real" aria-live="polite">
+      <div id="map" tabindex="0" role="region"></div>
+    </section>
+  </main>
+
+  <footer role="contentinfo" class="footer">
+    <p>© 2025 STCP Live Map • Desenvolvido por Tiago Oliveira com tecnologia Leaflet</p>
+  </footer>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="script.js"></script>
-
+  <script type="module" src="app.js"></script>
 </body>
 </html>
