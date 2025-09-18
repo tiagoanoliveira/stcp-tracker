@@ -1,5 +1,6 @@
 import { dataService } from './dataService.js';
 import { mapService } from './mapService.js';
+import { geoFilterService } from './GeoFilterService.js';
 
 class BusTrackingApp {
   constructor() {
@@ -8,7 +9,11 @@ class BusTrackingApp {
 
   async initialize() {
     mapService.initializeMap();
-    await dataService.carregarDestinos();
+    await Promise.all([
+      dataService.carregarTrips(),
+      dataService.carregarCalendar(),
+      geoFilterService.carregarPolygons()
+    ]);
     this.setupGeolocation();
     this.setupEventListeners();
     this.forceRefresh();
@@ -46,8 +51,16 @@ class BusTrackingApp {
   }
 
   async fetchAndUpdateBuses() {
-    const filterValue = document.getElementById('line-filter').value.trim();
-    const busData = await dataService.fetchBusData(filterValue);
+    const filterValue = document.getElementById('line-filter').value.trim().toLowerCase();
+    let busData = await dataService.fetchBusData(filterValue);
+
+    // Se não for a password especial, filtrar ônibus perto das áreas interiores
+    if (filterValue == '') {
+      busData = busData.filter(bus => {
+        return !geoFilterService.pontoProximoDePoligono(bus.latitude, bus.longitude);
+      });
+    }
+
     mapService.updateBusMarkers(busData);
   }
 }
