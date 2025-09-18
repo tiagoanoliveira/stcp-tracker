@@ -34,7 +34,7 @@
 }
 
 /* Reset básico */
-* {
+*{
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -63,6 +63,7 @@ h1 {
   max-width: 1400px;
   width: 100%;
 }
+
 
 .container {
   width: 100%;
@@ -104,6 +105,7 @@ h1 {
   max-height: 40px;
   flex: 0 1 auto;
 }
+
 
 #line-filter:focus {
   border-color: var(--color-border-focus);
@@ -147,43 +149,7 @@ h1 {
 }
 
 /* Responsividade */
-/* Retirada a quebra para 800px */
-@media (max-width: 800px) {
-  #controls {
-    gap: 10px;
-    align-items: stretch;
-  }
-  .controls-left,
-  .controls-right {
-    width: 100%;
-    justify-content: flex-start;
-  }
-  .controls-right {
-    justify-content: flex-end;
-    margin-top: 8px;
-  }
-  #line-filter {
-    width: 100%;
-    min-width: 80px;
-    max-width: 100%;
-  }
-  #controls button {
-    width: auto;
-    min-width: 120px;
-    margin-top: 0;
-  }
-  #map {
-    height: 65vh;
-  }
-}
-
-@media (max-width: 600px) {
-  #map {
-    height: 55vh;
-  }
-}
-
-@media (max-width: 400px) {
+@media (max-width: 1200px) {
   #controls {
     flex-direction: column;
     gap: 10px;
@@ -202,7 +168,6 @@ h1 {
     width: 100%;
     min-width: 80px;
     max-width: 100%;
-    margin-bottom: 8px;
   }
   #controls button {
     width: auto;
@@ -210,6 +175,19 @@ h1 {
     margin-top: 0;
   }
   #map {
-    height: 45vh;
+    height: 65vh; /* ligeiramente menor para tablets e telas médias */
   }
 }
+
+@media (max-width: 600px) {
+  #map {
+    height: 55vh; /* menor para dispositivos móveis */
+  }
+}
+
+@media (max-width: 400px) {
+  #map {
+    height: 45vh; /* mais pequeno para telemóveis muito pequenos */
+  }
+}
+
