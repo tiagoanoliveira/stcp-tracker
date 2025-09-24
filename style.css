@@ -149,7 +149,7 @@ h1 {
 }
 
 /* Responsividade */
-@media (max-width: 1200px) {
+@media (max-width: 720px) {
   #controls {
     flex-direction: column;
     gap: 10px;
@@ -158,16 +158,14 @@ h1 {
   .controls-left,
   .controls-right {
     width: 100%;
-    justify-content: flex-start;
+    justify-content: center;
   }
   .controls-right {
-    justify-content: flex-end;
     margin-top: 8px;
   }
   #line-filter {
     width: 100%;
-    min-width: 80px;
-    max-width: 100%;
+    max-width: 190px;
   }
   #controls button {
     width: auto;
@@ -179,7 +177,7 @@ h1 {
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 500px) {
   #map {
     height: 55vh; /* menor para dispositivos móveis */
   }

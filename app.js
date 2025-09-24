@@ -1,6 +1,6 @@
 import { dataService } from './dataService.js';
 import { mapService } from './mapService.js';
-import { geoFilterService } from './GeoFilterService.js';
+import { geoFilterService } from './spam_filter/GeoFilterService.js';
 
 class BusTrackingApp {
   constructor() {
