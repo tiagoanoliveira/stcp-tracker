@@ -3,7 +3,7 @@ class GhostBusService {
     constructor() {
         this.vehicleHistory = new Map(); // Armazena histórico de cada veículo
         this.ghostVehicles = new Set(); // IDs de veículos fantasma
-        this.STATIONARY_THRESHOLD = 30 * 1000; // 30 minutos em milissegundos
+        this.STATIONARY_THRESHOLD = 3 * 60 * 1000; // 30 minutos em milissegundos
         this.POSITION_TOLERANCE = 0.0001; // ~11 metros de tolerância
         this.SPEED_TOLERANCE = 1; // 1 km/h de tolerância
     }
