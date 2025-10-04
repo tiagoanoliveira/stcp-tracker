@@ -9,7 +9,7 @@ class DataService {
   // Carregar trips do ficheiro JSON
   async carregarTrips() {
     try {
-      const response = await fetch('trips.json');
+      const response = await fetch('./javascript/trips.json');
       const tripsArray = await response.json();
       this.trips = {};
       for (const trip of tripsArray) {
@@ -23,7 +23,7 @@ class DataService {
   // Carregar calendário do ficheiro JSON
   async carregarCalendar() {
     try {
-      const response = await fetch('calendar.json');
+      const response = await fetch('./javascript/calendar.json');
       const calendarArray = await response.json();
       this.calendar = {};
       for (const service of calendarArray) {

@@ -1,0 +1,44 @@
+name: Monitor Ghost Buses
+
+on:
+  schedule:
+    # Executa a cada 10 minutos
+    - cron: '*/10 * * * *'
+  workflow_dispatch:  # Permite execução manual
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests
+      
+      - name: Run ghost bus monitor
+        run: |
+          python scripts/monitor_ghost_buses.py
+      
+      - name: Check for changes
+        id: verify_diff
+        run: |
+          git diff --quiet spam_filter/ghost_bus.json spam_filter/bus_history.json || echo "changed=true" >> $GITHUB_OUTPUT
+      
+      - name: Commit and push changes
+        if: steps.verify_diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add spam_filter/ghost_bus.json spam_filter/bus_history.json
+          git commit -m "🤖 Atualização automática ghost buses - $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push

@@ -1,12 +1,11 @@
-import { dataService } from '../javascript/dataService.js';
-import { mapService } from '../javascript/mapService.js';
+import { dataService } from './dataService.js';
+import { mapService } from './mapService.js';
 import { geoFilterService } from '../spam_filter/GeoFilterService.js';
 import { ghostBusService } from '../spam_filter/GhostBusService.js';
 
 class BusTrackingApp {
   constructor() {
     this.refreshInterval = null;
-    this.cleanupInterval = null;
   }
 
   async initialize() {
@@ -17,14 +16,13 @@ class BusTrackingApp {
       geoFilterService.carregarPolygons(),
       ghostBusService.loadGhostBuses()
     ]);
+    
+    // Recarregar ghost buses automaticamente a cada 10 minutos
+    ghostBusService.startAutoReload(10);
+    
     this.setupGeolocation();
     this.setupEventListeners();
     this.forceRefresh();
-    
-    // Limpeza periódica de histórico antigo a cada 15 minutos
-    this.cleanupInterval = setInterval(() => {
-      ghostBusService.cleanupOldVehicles();
-    }, 15 * 60 * 1000);
   }
 
   setupGeolocation() {
@@ -62,17 +60,16 @@ class BusTrackingApp {
     const filterValue = document.getElementById('line-filter').value.trim().toLowerCase();
     let busData = await dataService.fetchBusData(filterValue);
 
-    // Filtrar ônibus perto das áreas interiores (geofencing)
+    // Filtrar geofencing
     if (filterValue == '') {
       busData = busData.filter(bus => {
         return !geoFilterService.pontoProximoDePoligono(bus.latitude, bus.longitude);
       });
     }
 
-    // Filtrar ghost buses - remover veículos estacionários há mais de 30 minutos
+    // Filtrar ghost buses usando lista atualizada pelo GitHub Actions
     busData = busData.filter(bus => {
-      const isGhost = ghostBusService.checkVehicleStatus(bus);
-      return !isGhost; // Excluir veículos fantasma do mapa
+      return !ghostBusService.isGhostVehicle(bus.id);
     });
 
     mapService.updateBusMarkers(busData);
