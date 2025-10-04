@@ -10,7 +10,7 @@ class GeoFilterService {
 
     async carregarPolygons() {
         try {
-            const response = await fetch('./spam_filter/recolha_stcp.json');
+            const response = await fetch('recolha_stcp.json');
             const data = await response.json();
             this.polygons = [];
             for (const key in data) {

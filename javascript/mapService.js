@@ -1,6 +1,6 @@
 // mapService.js - Responsável pela visualização e elementos do mapa
-import { createBusIcon } from './busDesign/busIcon.js';
-import { BUS_COLORS, CUSTOM_LINE_TEXTS } from './busDesign/busColors.js';
+import { createBusIcon } from '../busDesign/busIcon.js';
+import { BUS_COLORS, CUSTOM_LINE_TEXTS } from '../busDesign/busColors.js';
 
 class MapService {
   constructor() {
