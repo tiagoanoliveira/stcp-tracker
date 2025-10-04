@@ -1,10 +1,12 @@
-import { dataService } from './dataService.js';
-import { mapService } from './mapService.js';
+import { dataService } from '../javascript/dataService.js';
+import { mapService } from '../javascript/mapService.js';
 import { geoFilterService } from '../spam_filter/GeoFilterService.js';
+import { ghostBusService } from '../spam_filter/GhostBusService.js';
 
 class BusTrackingApp {
   constructor() {
     this.refreshInterval = null;
+    this.cleanupInterval = null;
   }
 
   async initialize() {
@@ -12,11 +14,17 @@ class BusTrackingApp {
     await Promise.all([
       dataService.carregarTrips(),
       dataService.carregarCalendar(),
-      geoFilterService.carregarPolygons()
+      geoFilterService.carregarPolygons(),
+      ghostBusService.loadGhostBuses()
     ]);
     this.setupGeolocation();
     this.setupEventListeners();
     this.forceRefresh();
+    
+    // Limpeza periódica de histórico antigo a cada 15 minutos
+    this.cleanupInterval = setInterval(() => {
+      ghostBusService.cleanupOldVehicles();
+    }, 15 * 60 * 1000);
   }
 
   setupGeolocation() {
@@ -54,12 +62,18 @@ class BusTrackingApp {
     const filterValue = document.getElementById('line-filter').value.trim().toLowerCase();
     let busData = await dataService.fetchBusData(filterValue);
 
-    // Se não for a password especial, filtrar ônibus perto das áreas interiores
+    // Filtrar ônibus perto das áreas interiores (geofencing)
     if (filterValue == '') {
       busData = busData.filter(bus => {
         return !geoFilterService.pontoProximoDePoligono(bus.latitude, bus.longitude);
       });
     }
+
+    // Filtrar ghost buses - remover veículos estacionários há mais de 30 minutos
+    busData = busData.filter(bus => {
+      const isGhost = ghostBusService.checkVehicleStatus(bus);
+      return !isGhost; // Excluir veículos fantasma do mapa
+    });
 
     mapService.updateBusMarkers(busData);
   }
