@@ -175,17 +175,26 @@ h1 {
   #map {
     height: 65vh; /* ligeiramente menor para tablets e telas médias */
   }
+  .advice p {
+    font-size: 0.9rem;
+  }
 }
 
 @media (max-width: 500px) {
   #map {
     height: 55vh; /* menor para dispositivos móveis */
   }
+  .advice p {
+    font-size: 0.8rem;
+  }
 }
 
 @media (max-width: 400px) {
   #map {
     height: 45vh; /* mais pequeno para telemóveis muito pequenos */
+  }
+  .advice p {
+    font-size: 0.7rem;
   }
 }
 
