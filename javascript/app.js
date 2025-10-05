@@ -1,5 +1,5 @@
-import { dataService } from './javascript/dataService.js';
-import { mapService } from './javascript/mapService.js';
+import { dataService } from './dataService.js';
+import { mapService } from './mapService.js';
 import { geoFilterService } from '../spam_filter/GeoFilterService.js';
 import { ghostBusService } from '../spam_filter/GhostBusService.js';
 
