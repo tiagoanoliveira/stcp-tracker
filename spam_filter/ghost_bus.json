@@ -1,15 +1,4 @@
 {
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3395": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3395",
-    "line": "705",
-    "busNumber": "3395",
-    "latitude": 41.192802429,
-    "longitude": -8.50222683,
-    "speed": 8,
-    "markedAt": "2025-10-05T16:51:58.739906",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3321": {
     "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3321",
     "line": "208",
@@ -18,39 +7,6 @@
     "longitude": -8.62215519,
     "speed": 0,
     "markedAt": "2025-10-05T16:51:58.739923",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3390": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3390",
-    "line": "604",
-    "busNumber": "3390",
-    "latitude": 41.190471649,
-    "longitude": -8.605856895,
-    "speed": 25,
-    "markedAt": "2025-10-05T16:51:58.739930",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3527": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3527",
-    "line": "508",
-    "busNumber": "3527",
-    "latitude": 41.158123016,
-    "longitude": -8.627886772,
-    "speed": 4,
-    "markedAt": "2025-10-05T16:51:58.739935",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1346": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:1346",
-    "line": "203",
-    "busNumber": "1346",
-    "latitude": 41.162696838,
-    "longitude": -8.610841751,
-    "speed": 0,
-    "markedAt": "2025-10-05T16:51:58.739939",
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
@@ -65,17 +21,6 @@
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3420": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3420",
-    "line": "604",
-    "busNumber": "3420",
-    "latitude": 41.231380463,
-    "longitude": -8.656909943,
-    "speed": 41,
-    "markedAt": "2025-10-05T16:51:58.739947",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3558": {
     "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3558",
     "line": "907",
@@ -84,39 +29,6 @@
     "longitude": -8.628602028,
     "speed": 36,
     "markedAt": "2025-10-05T16:51:58.739954",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3514": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3514",
-    "line": "502",
-    "busNumber": "3514",
-    "latitude": 41.153541565,
-    "longitude": -8.608744621,
-    "speed": 30,
-    "markedAt": "2025-10-05T16:51:58.739959",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3523": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3523",
-    "line": "600",
-    "busNumber": "3523",
-    "latitude": 41.223510742,
-    "longitude": -8.615157127,
-    "speed": 0,
-    "markedAt": "2025-10-05T16:51:58.739962",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1828": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:1828",
-    "line": "107",
-    "busNumber": "1828",
-    "latitude": 41.15486145,
-    "longitude": -8.574116707,
-    "speed": 0,
-    "markedAt": "2025-10-05T16:51:58.739968",
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
@@ -142,50 +54,6 @@
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3515": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3515",
-    "line": "503",
-    "busNumber": "3515",
-    "latitude": 41.186038971,
-    "longitude": -8.647730827,
-    "speed": 17,
-    "markedAt": "2025-10-05T16:51:58.739984",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1345": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:1345",
-    "line": "203",
-    "busNumber": "1345",
-    "latitude": 41.155117035,
-    "longitude": -8.67210865,
-    "speed": 27,
-    "markedAt": "2025-10-05T16:51:58.739993",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3397": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3397",
-    "line": "602",
-    "busNumber": "3397",
-    "latitude": 41.146400452,
-    "longitude": -8.615207672,
-    "speed": 0,
-    "markedAt": "2025-10-05T16:51:58.739997",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1207": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:1207",
-    "line": "600",
-    "busNumber": "1207",
-    "latitude": 41.203777313,
-    "longitude": -8.614325523,
-    "speed": 0,
-    "markedAt": "2025-10-05T16:51:58.740003",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3243": {
     "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3243",
     "line": "400",
@@ -194,17 +62,6 @@
     "longitude": -8.588996887,
     "speed": 0,
     "markedAt": "2025-10-05T16:51:58.740013",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3463": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3463",
-    "line": "502",
-    "busNumber": "3463",
-    "latitude": 41.165115356,
-    "longitude": -8.671590805,
-    "speed": 20,
-    "markedAt": "2025-10-05T16:51:58.740016",
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
@@ -252,17 +109,6 @@
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3383": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3383",
-    "line": "206",
-    "busNumber": "3383",
-    "latitude": 41.170547485,
-    "longitude": -8.638171196,
-    "speed": 12,
-    "markedAt": "2025-10-05T16:51:58.740045",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3360": {
     "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3360",
     "line": "905",
@@ -271,17 +117,6 @@
     "longitude": -8.61121273,
     "speed": 0,
     "markedAt": "2025-10-05T16:51:58.740050",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3409": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3409",
-    "line": "601",
-    "busNumber": "3409",
-    "latitude": 41.172374725,
-    "longitude": -8.648344994,
-    "speed": 11,
-    "markedAt": "2025-10-05T16:51:58.740056",
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
@@ -304,28 +139,6 @@
     "longitude": -8.682236671,
     "speed": 9,
     "markedAt": "2025-10-05T16:51:58.740070",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3306": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3306",
-    "line": "703",
-    "busNumber": "3306",
-    "latitude": 41.207538605,
-    "longitude": -8.567110062,
-    "speed": 0,
-    "markedAt": "2025-10-05T16:51:58.740073",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3225": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3225",
-    "line": "202",
-    "busNumber": "3225",
-    "latitude": 41.154090881,
-    "longitude": -8.67702198,
-    "speed": 20,
-    "markedAt": "2025-10-05T16:51:58.740081",
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
@@ -373,28 +186,6 @@
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3419": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3419",
-    "line": "700",
-    "busNumber": "3419",
-    "latitude": 41.158756256,
-    "longitude": -8.582240105,
-    "speed": 6,
-    "markedAt": "2025-10-05T16:51:58.740111",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1129": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:1129",
-    "line": "305",
-    "busNumber": "1129",
-    "latitude": 41.166557312,
-    "longitude": -8.588371277,
-    "speed": 34,
-    "markedAt": "2025-10-05T16:51:58.740116",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3468": {
     "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3468",
     "line": "902",
@@ -403,17 +194,6 @@
     "longitude": -8.631465912,
     "speed": 28,
     "markedAt": "2025-10-05T16:51:58.740127",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3336": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3336",
-    "line": "901",
-    "busNumber": "3336",
-    "latitude": 41.107631683,
-    "longitude": -8.638707161,
-    "speed": 17,
-    "markedAt": "2025-10-05T16:51:58.740131",
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
@@ -439,39 +219,6 @@
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3544": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3544",
-    "line": "508",
-    "busNumber": "3544",
-    "latitude": 41.192855835,
-    "longitude": -8.633745193,
-    "speed": 13,
-    "markedAt": "2025-10-05T16:51:58.740155",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3270": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3270",
-    "line": "305",
-    "busNumber": "3270",
-    "latitude": 41.148525238,
-    "longitude": -8.610713005,
-    "speed": 0,
-    "markedAt": "2025-10-05T16:51:58.740160",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3411": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3411",
-    "line": "800",
-    "busNumber": "3411",
-    "latitude": 41.157485962,
-    "longitude": -8.587381363,
-    "speed": 37,
-    "markedAt": "2025-10-05T16:51:58.740163",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:1823": {
     "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:1823",
     "line": "107",
@@ -483,17 +230,6 @@
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1208": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:1208",
-    "line": "600",
-    "busNumber": "1208",
-    "latitude": 41.226680756,
-    "longitude": -8.617939949,
-    "speed": 7,
-    "markedAt": "2025-10-05T16:51:58.740351",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3250": {
     "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3250",
     "line": "400",
@@ -502,39 +238,6 @@
     "longitude": -8.604434967,
     "speed": 0,
     "markedAt": "2025-10-05T16:51:58.740354",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3341": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3341",
-    "line": "201",
-    "busNumber": "3341",
-    "latitude": 41.145935059,
-    "longitude": -8.614247322,
-    "speed": 32,
-    "markedAt": "2025-10-05T16:51:58.740360",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3391": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3391",
-    "line": "804",
-    "busNumber": "3391",
-    "latitude": 41.159980774,
-    "longitude": -8.529277802,
-    "speed": 7,
-    "markedAt": "2025-10-05T16:51:58.740366",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3305": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3305",
-    "line": "305",
-    "busNumber": "3305",
-    "latitude": 41.147460938,
-    "longitude": -8.603137016,
-    "speed": 21,
-    "markedAt": "2025-10-05T16:51:58.740371",
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
@@ -571,17 +274,6 @@
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3355": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3355",
-    "line": "404",
-    "busNumber": "3355",
-    "latitude": 41.181877136,
-    "longitude": -8.597352982,
-    "speed": 0,
-    "markedAt": "2025-10-05T16:51:58.740396",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:1210": {
     "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:1210",
     "line": "200",
@@ -590,39 +282,6 @@
     "longitude": -8.673295021,
     "speed": 0,
     "markedAt": "2025-10-05T16:51:58.740399",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3387": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3387",
-    "line": "705",
-    "busNumber": "3387",
-    "latitude": 41.216693878,
-    "longitude": -8.55364418,
-    "speed": 0,
-    "markedAt": "2025-10-05T16:51:58.740413",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3367": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3367",
-    "line": "702",
-    "busNumber": "3367",
-    "latitude": 41.182102203,
-    "longitude": -8.582957268,
-    "speed": 15,
-    "markedAt": "2025-10-05T16:51:58.740418",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3267": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3267",
-    "line": "800",
-    "busNumber": "3267",
-    "latitude": 41.152809143,
-    "longitude": -8.530448914,
-    "speed": 31,
-    "markedAt": "2025-10-05T16:51:58.740423",
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
@@ -656,17 +315,6 @@
     "longitude": -8.600156784,
     "speed": 0,
     "markedAt": "2025-10-05T16:51:58.740438",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3546": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3546",
-    "line": "504",
-    "busNumber": "3546",
-    "latitude": 41.158439636,
-    "longitude": -8.628130913,
-    "speed": 29,
-    "markedAt": "2025-10-05T16:51:58.740441",
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
@@ -747,17 +395,6 @@
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1130": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:1130",
-    "line": "205",
-    "busNumber": "1130",
-    "latitude": 41.183998108,
-    "longitude": -8.643192291,
-    "speed": 0,
-    "markedAt": "2025-10-05T16:51:58.740483",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3511": {
     "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3511",
     "line": "504",
@@ -766,17 +403,6 @@
     "longitude": -8.627975464,
     "speed": 20,
     "markedAt": "2025-10-05T16:51:58.740496",
-    "stationaryDuration": 34,
-    "reason": "stationary_position_speed"
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3455": {
-    "id": "urn:ngsi-ld:Vehicle:porto:stcp:bus:3455",
-    "line": "508",
-    "busNumber": "3455",
-    "latitude": 41.208267212,
-    "longitude": -8.685821533,
-    "speed": 0,
-    "markedAt": "2025-10-05T16:51:58.740501",
     "stationaryDuration": 34,
     "reason": "stationary_position_speed"
   },
