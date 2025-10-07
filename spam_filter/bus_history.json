@@ -1,722 +1,83 @@
 {
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3390": {
-    "firstSeenAt": 1759681070.067395,
-    "lastSeenAt": 1759794005.332562,
-    "latitude": 41.168117523,
-    "longitude": -8.592148781,
-    "speed": 10,
-    "stationarySince": 1759794005.332562,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3278": {
-    "firstSeenAt": 1759681070.067411,
-    "lastSeenAt": 1759794826.952278,
-    "latitude": 41.205791473,
-    "longitude": -8.567725182,
-    "speed": 53,
-    "stationarySince": 1759794826.952278,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3515": {
-    "firstSeenAt": 1759681070.067418,
-    "lastSeenAt": 1759793034.101951,
-    "latitude": 41.127883911,
-    "longitude": -8.639690399,
-    "speed": 14,
-    "stationarySince": 1759793034.101951,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3340": {
-    "firstSeenAt": 1759681070.067419,
-    "lastSeenAt": 1759793034.101908,
-    "latitude": 41.189941406,
-    "longitude": -8.583144188,
-    "speed": 27,
-    "stationarySince": 1759793034.101908,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3240": {
-    "firstSeenAt": 1759681070.067612,
-    "lastSeenAt": 1759794005.332549,
-    "latitude": 41.1679039,
-    "longitude": -8.564982414,
-    "speed": 39,
-    "stationarySince": 1759794005.332549,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3221": {
-    "firstSeenAt": 1759681070.067614,
-    "lastSeenAt": 1759793034.101927,
-    "latitude": 41.158252716,
-    "longitude": -8.630242348,
-    "speed": 19,
-    "stationarySince": 1759793034.101927,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1373": {
-    "firstSeenAt": 1759681070.067618,
-    "lastSeenAt": 1759791497.962335,
-    "latitude": 41.167484283,
-    "longitude": -8.621536255,
-    "speed": 36,
-    "stationarySince": 1759791497.962335,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1115": {
-    "firstSeenAt": 1759681070.067632,
-    "lastSeenAt": 1759789554.876295,
-    "latitude": 41.149421692,
-    "longitude": -8.607481956,
-    "speed": 0,
-    "stationarySince": 1759789554.876295,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1102": {
-    "firstSeenAt": 1759681070.067635,
-    "lastSeenAt": 1759794005.332566,
-    "latitude": 41.166706085,
-    "longitude": -8.547660828,
-    "speed": 0,
-    "stationarySince": 1759794005.332566,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3345": {
-    "firstSeenAt": 1759681070.067641,
-    "lastSeenAt": 1759794005.332584,
-    "latitude": 41.160442352,
-    "longitude": -8.574792862,
-    "speed": 41,
-    "stationarySince": 1759794005.332584,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3414": {
-    "firstSeenAt": 1759681070.067651,
-    "lastSeenAt": 1759793034.101883,
-    "latitude": 41.215229034,
-    "longitude": -8.635335922,
-    "speed": 48,
-    "stationarySince": 1759793034.101883,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3285": {
-    "firstSeenAt": 1759681070.067663,
-    "lastSeenAt": 1759794005.332524,
-    "latitude": 41.162094116,
-    "longitude": -8.60383606,
-    "speed": 0,
-    "stationarySince": 1759794005.332524,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3553": {
-    "firstSeenAt": 1759681070.067663,
-    "lastSeenAt": 1759794826.95226,
-    "latitude": 41.153625488,
-    "longitude": -8.610973358,
-    "speed": 36,
-    "stationarySince": 1759794826.95226,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3363": {
-    "firstSeenAt": 1759681070.067672,
-    "lastSeenAt": 1759794005.33256,
-    "latitude": 41.159160614,
-    "longitude": -8.592974663,
-    "speed": 39,
-    "stationarySince": 1759794005.33256,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3510": {
-    "firstSeenAt": 1759681070.067682,
-    "lastSeenAt": 1759794005.332565,
-    "latitude": 41.18088913,
-    "longitude": -8.68245697,
-    "speed": 20,
-    "stationarySince": 1759794005.332565,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3411": {
-    "firstSeenAt": 1759681070.067684,
-    "lastSeenAt": 1759793034.101942,
-    "latitude": 41.218482971,
-    "longitude": -8.614010811,
-    "speed": 0,
-    "stationarySince": 1759793034.101942,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3323": {
-    "firstSeenAt": 1759681070.067726,
-    "lastSeenAt": 1759794005.332579,
-    "latitude": 41.136016846,
-    "longitude": -8.608320236,
-    "speed": 25,
-    "stationarySince": 1759794005.332579,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3387": {
-    "firstSeenAt": 1759681070.067737,
-    "lastSeenAt": 1759794005.332571,
-    "latitude": 41.157970428,
-    "longitude": -8.567882538,
-    "speed": 41,
-    "stationarySince": 1759794005.332571,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3267": {
-    "firstSeenAt": 1759681070.067741,
-    "lastSeenAt": 1759793034.101922,
-    "latitude": 41.182952881,
-    "longitude": -8.600715637,
-    "speed": 40,
-    "stationarySince": 1759793034.101922,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3462": {
-    "firstSeenAt": 1759681070.067742,
-    "lastSeenAt": 1759789554.876324,
-    "latitude": 41.16632843,
-    "longitude": -8.575072289,
-    "speed": 16,
-    "stationarySince": 1759789554.876324,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1372": {
-    "firstSeenAt": 1759681070.067757,
-    "lastSeenAt": 1759794005.332568,
-    "latitude": 41.170288086,
-    "longitude": -8.597346306,
-    "speed": 25,
-    "stationarySince": 1759794005.332568,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3289": {
-    "firstSeenAt": 1759681070.067769,
-    "lastSeenAt": 1759793034.101906,
-    "latitude": 41.16576767,
-    "longitude": -8.606480598,
-    "speed": 14,
-    "stationarySince": 1759793034.101906,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3330": {
-    "firstSeenAt": 1759681070.067824,
-    "lastSeenAt": 1759791497.962369,
-    "latitude": 41.128013611,
-    "longitude": -8.611322403,
-    "speed": 32,
-    "stationarySince": 1759791497.962369,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3304": {
-    "firstSeenAt": 1759681070.06783,
-    "lastSeenAt": 1759793034.101886,
-    "latitude": 41.234645844,
-    "longitude": -8.619814873,
-    "speed": 35,
-    "stationarySince": 1759793034.101886,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3385": {
-    "firstSeenAt": 1759681070.067834,
-    "lastSeenAt": 1759794826.952269,
-    "latitude": 41.239490509,
-    "longitude": -8.669522285,
-    "speed": 29,
-    "stationarySince": 1759794826.952269,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3369": {
-    "firstSeenAt": 1759681070.067868,
-    "lastSeenAt": 1759793034.101905,
-    "latitude": 41.212051392,
-    "longitude": -8.564667702,
-    "speed": 51,
-    "stationarySince": 1759793034.101905,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3301": {
-    "firstSeenAt": 1759681070.067874,
-    "lastSeenAt": 1759793034.101892,
-    "latitude": 41.192928314,
-    "longitude": -8.633410454,
-    "speed": 23,
-    "stationarySince": 1759793034.101892,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3402": {
-    "firstSeenAt": 1759681070.067945,
-    "lastSeenAt": 1759794005.332572,
-    "latitude": 41.194702148,
-    "longitude": -8.682426453,
-    "speed": 74,
-    "stationarySince": 1759794005.332572,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3458": {
-    "firstSeenAt": 1759681070.067946,
-    "lastSeenAt": 1759794005.332521,
-    "latitude": 41.216636658,
-    "longitude": -8.657500267,
-    "speed": 35,
-    "stationarySince": 1759794005.332521,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3534": {
-    "firstSeenAt": 1759681070.067964,
-    "lastSeenAt": 1759794005.332562,
-    "latitude": 41.161563873,
-    "longitude": -8.610359192,
-    "speed": 46,
-    "stationarySince": 1759794005.332562,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3357": {
-    "firstSeenAt": 1759681070.067991,
-    "lastSeenAt": 1759791497.962394,
-    "latitude": 41.193336487,
-    "longitude": -8.6167593,
-    "speed": 21,
-    "stationarySince": 1759791497.962394,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3339": {
-    "firstSeenAt": 1759681070.068006,
-    "lastSeenAt": 1759793034.101919,
-    "latitude": 41.153614044,
-    "longitude": -8.513337135,
-    "speed": 35,
-    "stationarySince": 1759793034.101919,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3464": {
-    "firstSeenAt": 1759747185.557565,
-    "lastSeenAt": 1759794005.332577,
-    "latitude": 41.180259705,
-    "longitude": -8.613761902,
-    "speed": 0,
-    "stationarySince": 1759794005.332577,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3548": {
-    "firstSeenAt": 1759747185.557576,
-    "lastSeenAt": 1759794826.952272,
-    "latitude": 41.11410141,
-    "longitude": -8.612903595,
-    "speed": 17,
-    "stationarySince": 1759794826.952272,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3524": {
-    "firstSeenAt": 1759747185.557611,
-    "lastSeenAt": 1759794005.332554,
-    "latitude": 41.147834778,
-    "longitude": -8.614548683,
-    "speed": 23,
-    "stationarySince": 1759794005.332554,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3535": {
-    "firstSeenAt": 1759750820.311252,
-    "lastSeenAt": 1759794005.33257,
-    "latitude": 41.166591644,
-    "longitude": -8.670953751,
-    "speed": 27,
-    "stationarySince": 1759794005.33257,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1348": {
-    "firstSeenAt": 1759757655.011421,
-    "lastSeenAt": 1759793034.101949,
-    "latitude": 41.164485931,
-    "longitude": -8.609181404,
-    "speed": 24,
-    "stationarySince": 1759793034.101949,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1366": {
-    "firstSeenAt": 1759757655.011505,
-    "lastSeenAt": 1759793034.10189,
-    "latitude": 41.156093597,
-    "longitude": -8.629648209,
-    "speed": 29,
-    "stationarySince": 1759793034.10189,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3405": {
-    "firstSeenAt": 1759757655.011628,
-    "lastSeenAt": 1759793034.101948,
-    "latitude": 41.160137177,
-    "longitude": -8.624711037,
-    "speed": 0,
-    "stationarySince": 1759793034.101948,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3324": {
-    "firstSeenAt": 1759758668.787531,
-    "lastSeenAt": 1759793034.101947,
-    "latitude": 41.156597137,
-    "longitude": -8.629517555,
-    "speed": 34,
-    "stationarySince": 1759793034.101947,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3506": {
-    "firstSeenAt": 1759760789.166591,
-    "lastSeenAt": 1759794826.952274,
-    "latitude": 41.122520447,
-    "longitude": -8.606115341,
-    "speed": 48,
-    "stationarySince": 1759794826.952274,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1360": {
-    "firstSeenAt": 1759761954.394224,
-    "lastSeenAt": 1759793034.101937,
-    "latitude": 41.170150757,
-    "longitude": -8.655029297,
-    "speed": 19,
-    "stationarySince": 1759793034.101937,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3353": {
-    "firstSeenAt": 1759761954.394283,
-    "lastSeenAt": 1759794005.332557,
-    "latitude": 41.168441772,
-    "longitude": -8.688897133,
-    "speed": 0,
-    "stationarySince": 1759794005.332557,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3335": {
-    "firstSeenAt": 1759761954.394373,
-    "lastSeenAt": 1759794005.332555,
-    "latitude": 41.138729095,
-    "longitude": -8.609692574,
-    "speed": 26,
-    "stationarySince": 1759794005.332555,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3511": {
-    "firstSeenAt": 1759761954.394451,
-    "lastSeenAt": 1759793034.101945,
-    "latitude": 41.175662994,
-    "longitude": -8.549013138,
-    "speed": 30,
-    "stationarySince": 1759793034.101945,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3381": {
-    "firstSeenAt": 1759762747.928995,
-    "lastSeenAt": 1759794005.332547,
-    "latitude": 41.148151398,
-    "longitude": -8.605689049,
-    "speed": 5,
-    "stationarySince": 1759794005.332547,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3406": {
-    "firstSeenAt": 1759762747.929214,
-    "lastSeenAt": 1759794005.332551,
-    "latitude": 41.183704376,
-    "longitude": -8.694104195,
-    "speed": 28,
-    "stationarySince": 1759794005.332551,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3227": {
-    "firstSeenAt": 1759764489.620384,
-    "lastSeenAt": 1759791497.96238,
-    "latitude": 41.170845032,
-    "longitude": -8.665487289,
-    "speed": 41,
-    "stationarySince": 1759791497.96238,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3211": {
-    "firstSeenAt": 1759766339.121056,
-    "lastSeenAt": 1759794005.332526,
-    "latitude": 41.201793671,
-    "longitude": -8.643047333,
-    "speed": 31,
-    "stationarySince": 1759794005.332526,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3410": {
-    "firstSeenAt": 1759768432.598668,
-    "lastSeenAt": 1759794005.332576,
-    "latitude": 41.112411499,
-    "longitude": -8.633030891,
-    "speed": 4,
-    "stationarySince": 1759794005.332576,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3460": {
-    "firstSeenAt": 1759769552.136922,
-    "lastSeenAt": 1759793034.101915,
-    "latitude": 41.157283783,
-    "longitude": -8.62825489,
-    "speed": 24,
-    "stationarySince": 1759793034.101915,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3533": {
-    "firstSeenAt": 1759769552.136936,
-    "lastSeenAt": 1759794005.33258,
-    "latitude": 41.105571747,
-    "longitude": -8.591062546,
-    "speed": 27,
-    "stationarySince": 1759794005.33258,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3418": {
-    "firstSeenAt": 1759775917.62372,
-    "lastSeenAt": 1759793034.101929,
-    "latitude": 41.189800262,
-    "longitude": -8.523913383,
-    "speed": 27,
-    "stationarySince": 1759793034.101929,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3207": {
-    "firstSeenAt": 1759775917.623725,
-    "lastSeenAt": 1759794005.332528,
-    "latitude": 41.152389526,
-    "longitude": -8.62742424,
-    "speed": 24,
-    "stationarySince": 1759794005.332528,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:2961": {
-    "firstSeenAt": 1759775917.623744,
-    "lastSeenAt": 1759793034.101917,
-    "latitude": 41.180648804,
-    "longitude": -8.691146851,
-    "speed": 40,
-    "stationarySince": 1759793034.101917,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3417": {
-    "firstSeenAt": 1759775917.62376,
-    "lastSeenAt": 1759793034.101872,
-    "latitude": 41.169307709,
-    "longitude": -8.560272217,
-    "speed": 0,
-    "stationarySince": 1759793034.101872,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3530": {
-    "firstSeenAt": 1759775917.62379,
-    "lastSeenAt": 1759794005.332543,
-    "latitude": 41.145172119,
-    "longitude": -8.638739586,
-    "speed": 39,
-    "stationarySince": 1759794005.332543,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3234": {
-    "firstSeenAt": 1759775917.6238,
-    "lastSeenAt": 1759794005.33255,
-    "latitude": 41.146015167,
-    "longitude": -8.596538544,
-    "speed": 32,
-    "stationarySince": 1759794005.33255,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3423": {
-    "firstSeenAt": 1759775917.623804,
-    "lastSeenAt": 1759794005.332545,
-    "latitude": 41.208522797,
-    "longitude": -8.566206932,
-    "speed": 33,
-    "stationarySince": 1759794005.332545,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3361": {
-    "firstSeenAt": 1759775917.623822,
-    "lastSeenAt": 1759794005.332574,
-    "latitude": 41.180122375,
-    "longitude": -8.573552132,
-    "speed": 31,
-    "stationarySince": 1759794005.332574,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:2963": {
-    "firstSeenAt": 1759775917.623833,
-    "lastSeenAt": 1759793034.101932,
-    "latitude": 41.140750885,
-    "longitude": -8.615391731,
-    "speed": 33,
-    "stationarySince": 1759793034.101932,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3540": {
-    "firstSeenAt": 1759780176.309163,
-    "lastSeenAt": 1759791497.962389,
-    "latitude": 41.205905914,
-    "longitude": -8.614631653,
-    "speed": 51,
-    "stationarySince": 1759791497.962389,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:1375": {
-    "firstSeenAt": 1759780176.309233,
-    "lastSeenAt": 1759789554.876332,
-    "latitude": 41.162288666,
-    "longitude": -8.607540131,
-    "speed": 0,
-    "stationarySince": 1759789554.876332,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3291": {
-    "firstSeenAt": 1759781654.304555,
-    "lastSeenAt": 1759793034.101898,
-    "latitude": 41.180877686,
-    "longitude": -8.66400528,
-    "speed": 29,
-    "stationarySince": 1759793034.101898,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3463": {
-    "firstSeenAt": 1759784998.692989,
-    "lastSeenAt": 1759794005.332536,
-    "latitude": 41.18012619,
-    "longitude": -8.689947128,
-    "speed": 0,
-    "stationarySince": 1759794005.332536,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3528": {
-    "firstSeenAt": 1759789554.876304,
-    "lastSeenAt": 1759794005.332531,
-    "latitude": 41.203578949,
-    "longitude": -8.664989471,
-    "speed": 40,
-    "stationarySince": 1759794005.332531,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3527": {
-    "firstSeenAt": 1759791497.962382,
-    "lastSeenAt": 1759791497.962382,
-    "latitude": 41.163330078,
-    "longitude": -8.537690163,
-    "speed": 50,
-    "stationarySince": 1759791497.962382,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3325": {
-    "firstSeenAt": 1759793034.101914,
-    "lastSeenAt": 1759794005.332578,
-    "latitude": 41.128673553,
-    "longitude": -8.608119011,
-    "speed": 32,
-    "stationarySince": 1759794005.332578,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3551": {
-    "firstSeenAt": 1759794005.33253,
-    "lastSeenAt": 1759794005.33253,
-    "latitude": 41.189502716,
-    "longitude": -8.524392128,
-    "speed": 0,
-    "stationarySince": 1759794005.33253,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3556": {
-    "firstSeenAt": 1759794005.33254,
-    "lastSeenAt": 1759794005.33254,
-    "latitude": 41.163196564,
-    "longitude": -8.627516747,
-    "speed": 22,
-    "stationarySince": 1759794005.33254,
-    "isGhost": false
-  },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3552": {
     "firstSeenAt": 1759794005.332541,
-    "lastSeenAt": 1759794005.332541,
-    "latitude": 41.19329071,
-    "longitude": -8.611406326,
+    "lastSeenAt": 1759802135.840456,
+    "latitude": 41.14868927,
+    "longitude": -8.611251831,
     "speed": 0,
-    "stationarySince": 1759794005.332541,
+    "stationarySince": 1759802135.840456,
     "isGhost": false
   },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3546": {
     "firstSeenAt": 1759794005.332542,
-    "lastSeenAt": 1759794005.332542,
-    "latitude": 41.168979645,
-    "longitude": -8.548647881,
-    "speed": 55,
-    "stationarySince": 1759794005.332542,
+    "lastSeenAt": 1759802135.840441,
+    "latitude": 41.148353577,
+    "longitude": -8.610725403,
+    "speed": 0,
+    "stationarySince": 1759802135.840441,
     "isGhost": false
   },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3459": {
     "firstSeenAt": 1759794005.332552,
-    "lastSeenAt": 1759794005.332552,
-    "latitude": 41.174598694,
-    "longitude": -8.586556435,
-    "speed": 50,
-    "stationarySince": 1759794005.332552,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3557": {
-    "firstSeenAt": 1759794005.332553,
-    "lastSeenAt": 1759794005.332553,
-    "latitude": 41.17937088,
-    "longitude": -8.652249336,
+    "lastSeenAt": 1759802135.840431,
+    "latitude": 41.148342133,
+    "longitude": -8.611270905,
     "speed": 0,
-    "stationarySince": 1759794005.332553,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3544": {
-    "firstSeenAt": 1759794005.332556,
-    "lastSeenAt": 1759794005.332556,
-    "latitude": 41.168785095,
-    "longitude": -8.552178383,
-    "speed": 30,
-    "stationarySince": 1759794005.332556,
+    "stationarySince": 1759802135.840431,
     "isGhost": false
   },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3531": {
     "firstSeenAt": 1759794005.332559,
-    "lastSeenAt": 1759794005.332559,
-    "latitude": 41.176017761,
-    "longitude": -8.66146183,
-    "speed": 49,
-    "stationarySince": 1759794005.332559,
+    "lastSeenAt": 1759802135.840449,
+    "latitude": 41.1512146,
+    "longitude": -8.610747337,
+    "speed": 0,
+    "stationarySince": 1759802135.840449,
     "isGhost": false
   },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3562": {
     "firstSeenAt": 1759794005.33256,
-    "lastSeenAt": 1759794005.33256,
-    "latitude": 41.205120087,
-    "longitude": -8.63331604,
-    "speed": 72,
-    "stationarySince": 1759794005.33256,
-    "isGhost": false
-  },
-  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3532": {
-    "firstSeenAt": 1759794005.332568,
-    "lastSeenAt": 1759794005.332568,
-    "latitude": 41.154342651,
-    "longitude": -8.673914909,
-    "speed": 23,
-    "stationarySince": 1759794005.332568,
+    "lastSeenAt": 1759802135.840451,
+    "latitude": 41.14691925,
+    "longitude": -8.611509323,
+    "speed": 4,
+    "stationarySince": 1759802135.840451,
     "isGhost": false
   },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3542": {
     "firstSeenAt": 1759794005.332575,
-    "lastSeenAt": 1759794005.332575,
-    "latitude": 41.127281189,
-    "longitude": -8.625165939,
-    "speed": 18,
-    "stationarySince": 1759794005.332575,
+    "lastSeenAt": 1759802135.840459,
+    "latitude": 41.148967743,
+    "longitude": -8.610512733,
+    "speed": 0,
+    "stationarySince": 1759802135.840459,
     "isGhost": false
   },
   "urn:ngsi-ld:Vehicle:porto:stcp:bus:3526": {
     "firstSeenAt": 1759794826.952276,
-    "lastSeenAt": 1759794826.952276,
-    "latitude": 41.158481598,
-    "longitude": -8.610017776,
-    "speed": 49,
-    "stationarySince": 1759794826.952276,
+    "lastSeenAt": 1759802135.840445,
+    "latitude": 41.147888184,
+    "longitude": -8.611305237,
+    "speed": 17,
+    "stationarySince": 1759802135.840445,
+    "isGhost": false
+  },
+  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3520": {
+    "firstSeenAt": 1759802135.840443,
+    "lastSeenAt": 1759802135.840443,
+    "latitude": 41.147670746,
+    "longitude": -8.609975815,
+    "speed": 0,
+    "stationarySince": 1759802135.840443,
+    "isGhost": false
+  },
+  "urn:ngsi-ld:Vehicle:porto:stcp:bus:3503": {
+    "firstSeenAt": 1759802135.840447,
+    "lastSeenAt": 1759802135.840447,
+    "latitude": 41.147632599,
+    "longitude": -8.609665871,
+    "speed": 0,
+    "stationarySince": 1759802135.840447,
     "isGhost": false
   }
 }
