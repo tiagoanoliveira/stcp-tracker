@@ -1,26 +1,23 @@
-// dataService.js - Responsável pela leitura e extração de dados dos autocarros
+// dataService.js - Versão corrigida e simplificada
 class DataService {
   constructor() {
-    this.trips = {};
+    this.trips = [];
     this.calendar = {};
     this.apiUrl = 'https://broker.fiware.urbanplatform.portodigital.pt/v2/entities?q=vehicleType==bus&limit=1000';
   }
 
-  // Carregar trips do ficheiro JSON
+  // Carregar trips do JSON (array simples)
   async carregarTrips() {
     try {
       const response = await fetch('./javascript/trips.json');
-      const tripsArray = await response.json();
-      this.trips = {};
-      for (const trip of tripsArray) {
-        this.trips[trip.trip_id] = trip;
-      }
+      this.trips = await response.json();
     } catch (error) {
       console.error('Erro ao carregar trips:', error);
+      this.trips = [];
     }
   }
 
-  // Carregar calendário do ficheiro JSON
+  // Carregar calendar do JSON (objeto mapeado por service_id)
   async carregarCalendar() {
     try {
       const response = await fetch('./javascript/calendar.json');
@@ -31,44 +28,35 @@ class DataService {
       }
     } catch (error) {
       console.error('Erro ao carregar calendar:', error);
+      this.calendar = {};
     }
   }
 
-  // Converter service_id do calendar.json para abreviação usada no trips.json
-  serviceIdToTripAbbr(serviceId) {
-    const map = {
-      UTEIS: "U",
-      SAB: "S",
-      DOM: "D",
-      UTEISFE: "U",
-      SABFE: "S",
-      DOMFE: "D",
-      ELECUTEIS: "U",
-      ELECSAB: "S",
-      ELECDOM: "D"
-    };
-    return map[serviceId] || serviceId;
-  }
-
-  // Obter o service_id atual com base na data e dia da semana
+  // Obter service_id atual simplificado: UTEIS, SAB, DOM
   obterServiceIdAtual() {
     const dateNow = new Date();
     const yyyyMMdd = dateNow.toISOString().slice(0, 10).replace(/-/g, '');
-    const weekday = dateNow.getDay();
-    const weekdayMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const weekday = dateNow.getDay(); // 0=domingo, 6=sábado
 
-    for (const serviceId in this.calendar) {
-      const service = this.calendar[serviceId];
-      if (service.start_date <= yyyyMMdd && service.end_date >= yyyyMMdd) {
-        if (service[weekdayMap[weekday]] === "1") {
-          return serviceId;
-        }
-      }
+    const dayMap = {
+      0: 'DOM',
+      6: 'SAB',
+      1: 'UTEIS',
+      2: 'UTEIS',
+      3: 'UTEIS',
+      4: 'UTEIS',
+      5: 'UTEIS'
+    };
+
+    const currentServiceId = dayMap[weekday];
+    const service = this.calendar[currentServiceId];
+    if (service && service.start_date <= yyyyMMdd && service.end_date >= yyyyMMdd) {
+      return currentServiceId;
     }
     return null;
   }
 
-  // Extrair número da linha do autocarro
+  // Extrair número da linha (route)
   extractLineNumber(bus) {
     if (!bus.annotations || !bus.annotations.value) return null;
     for (const annotation of bus.annotations.value) {
@@ -80,7 +68,7 @@ class DataService {
     return null;
   }
 
-  // Extrair direção raw do autocarro (sentido)
+  // Extrair sentido (direction) como string
   extractDirectionRaw(bus) {
     if (!bus.annotations || !bus.annotations.value) return null;
     for (const annotation of bus.annotations.value) {
@@ -92,44 +80,29 @@ class DataService {
     return null;
   }
 
-  // Extrair número da viagem do autocarro
-  extractNrViagem(bus) {
-    if (!bus.annotations || !bus.annotations.value) return null;
-    for (const annotation of bus.annotations.value) {
-      const decoded = decodeURIComponent(annotation);
-      if (decoded.startsWith("stcp:nr_viagem:")) {
-        return decoded.slice("stcp:nr_viagem:".length);
-      }
-    }
-    return null;
-  }
-
-  // Construir trip_id para procurar no trips.json
-  construirTripId(line, sentido, serviceId, nrViagem) {
-    if (!line || sentido == null || !serviceId || !nrViagem) return null;
-    const direction = sentido.toString();
-    return `${line}_${direction}_${serviceId}_${nrViagem}`;
-  }
-
-  // Obter destino baseado no trips.json, recebendo parâmetros necessários
-  obterDestino(line, sentido, nrViagem) {
+  // Obter destino baseado no trips.json (busca por route_id, direction_id e service_id)
+  obterDestino(line, sentido) {
     const serviceId = this.obterServiceIdAtual();
     if (!serviceId) {
       console.warn('Não foi possível determinar serviceId atual.');
       return 'Destino Desconhecido';
     }
-    const abbrServiceId = this.serviceIdToTripAbbr(serviceId);
-    const tripId = this.construirTripId(line, sentido, abbrServiceId, nrViagem);
-    if (!tripId) return 'Destino Desconhecido';
-
-    const trip = this.trips[tripId];
-    if (trip && trip.trip_headsign) {
-      return trip.trip_headsign;
+    if (!line || sentido == null) {
+      return 'Destino Desconhecido';
     }
-    return 'Destino Desconhecido';
+
+    const direction = sentido.toString();
+
+    const trip = this.trips.find(t =>
+      t.route_id === line &&
+      t.direction_id === direction &&
+      t.service_id === serviceId
+    );
+
+    return trip?.trip_headsign || 'Destino Desconhecido';
   }
 
-  // Buscar dados dos autocarros da API
+  // Buscar dados dos autocarros da API com fallback para evitar falha total
   async fetchBusData(filterValue = '') {
     try {
       const response = await fetch(this.apiUrl);
@@ -151,8 +124,7 @@ class DataService {
   processBusData(bus) {
     const line = this.extractLineNumber(bus);
     const sentidoRaw = this.extractDirectionRaw(bus);
-    const nrViagem = this.extractNrViagem(bus);
-    const destino = this.obterDestino(line, sentidoRaw, nrViagem);
+    const destino = this.obterDestino(line, sentidoRaw);
     const lat = bus.location?.value?.coordinates?.[1];
     const lon = bus.location?.value?.coordinates?.[0];
     if (lat === undefined || lon === undefined) return null;
@@ -170,7 +142,7 @@ class DataService {
     };
   }
 
-  // Verificar se o autocarro deve ser incluído baseado no filtro - geofencing removido aqui
+  // Filtro simples por linha
   shouldIncludeBus(bus, filterValue) {
     return filterValue === '' || (bus.line && bus.line.startsWith(filterValue));
   }
