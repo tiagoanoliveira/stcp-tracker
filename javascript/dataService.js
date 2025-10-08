@@ -1,12 +1,12 @@
-// dataService.js - Versão corrigida e simplificada
 class DataService {
   constructor() {
     this.trips = [];
     this.calendar = {};
     this.apiUrl = 'https://broker.fiware.urbanplatform.portodigital.pt/v2/entities?q=vehicleType==bus&limit=1000';
+    this.cachedServiceId = null;
+    this.cachedServiceDate = null;
   }
 
-  // Carregar trips do JSON (array simples)
   async carregarTrips() {
     try {
       const response = await fetch('./javascript/trips.json');
@@ -17,7 +17,6 @@ class DataService {
     }
   }
 
-  // Carregar calendar do JSON (objeto mapeado por service_id)
   async carregarCalendar() {
     try {
       const response = await fetch('./javascript/calendar.json');
@@ -32,12 +31,16 @@ class DataService {
     }
   }
 
-  // Obter service_id atual simplificado: UTEIS, SAB, DOM
+  // Cacheia o service_id atual por dia para evitar cálculos repetidos
   obterServiceIdAtual() {
     const dateNow = new Date();
     const yyyyMMdd = dateNow.toISOString().slice(0, 10).replace(/-/g, '');
-    const weekday = dateNow.getDay(); // 0=domingo, 6=sábado
 
+    if (this.cachedServiceDate === yyyyMMdd && this.cachedServiceId) {
+      return this.cachedServiceId;
+    }
+
+    const weekday = dateNow.getDay();
     const dayMap = {
       0: 'DOM',
       6: 'SAB',
@@ -51,36 +54,38 @@ class DataService {
     const currentServiceId = dayMap[weekday];
     const service = this.calendar[currentServiceId];
     if (service && service.start_date <= yyyyMMdd && service.end_date >= yyyyMMdd) {
+      this.cachedServiceDate = yyyyMMdd;
+      this.cachedServiceId = currentServiceId;
       return currentServiceId;
     }
+    this.cachedServiceId = null;
     return null;
   }
 
-  // Extrair número da linha (route)
+  // Auxiliar geral para extrair annotations por prefixo
+  extractAnnotation(bus, prefix) {
+    if (!bus.annotations || !bus.annotations.value) return null;
+    for (const annotation of bus.annotations.value) {
+      const decoded = decodeURIComponent(annotation);
+      if (decoded.startsWith(prefix)) {
+        return decoded.slice(prefix.length);
+      }
+    }
+    return null;
+  }
+
   extractLineNumber(bus) {
-    if (!bus.annotations || !bus.annotations.value) return null;
-    for (const annotation of bus.annotations.value) {
-      const decoded = decodeURIComponent(annotation);
-      if (decoded.startsWith("stcp:route:")) {
-        return decoded.slice("stcp:route:".length);
-      }
-    }
-    return null;
+    const line = this.extractAnnotation(bus, "stcp:route:");
+    if (!line) console.warn(`Linha não encontrada para autocarro ${bus.id}`);
+    return line;
   }
 
-  // Extrair sentido (direction) como string
   extractDirectionRaw(bus) {
-    if (!bus.annotations || !bus.annotations.value) return null;
-    for (const annotation of bus.annotations.value) {
-      const decoded = decodeURIComponent(annotation);
-      if (decoded.startsWith("stcp:sentido:")) {
-        return decoded.slice("stcp:sentido:".length);
-      }
-    }
-    return null;
+    const direction = this.extractAnnotation(bus, "stcp:sentido:");
+    if (direction === null) console.warn(`Sentido não encontrado para autocarro ${bus.id}`);
+    return direction;
   }
 
-  // Obter destino baseado no trips.json (busca por route_id, direction_id e service_id)
   obterDestino(line, sentido) {
     const serviceId = this.obterServiceIdAtual();
     if (!serviceId) {
@@ -102,11 +107,23 @@ class DataService {
     return trip?.trip_headsign || 'Destino Desconhecido';
   }
 
-  // Buscar dados dos autocarros da API com fallback para evitar falha total
+  // Exemplo simples de retry no fetch (3 tentativas)
+  async fetchWithRetry(url, options = {}, retries = 3, delayMs = 500) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await fetch(url, options);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return await response.json();
+      } catch (error) {
+        if (i === retries -1) throw error;
+        await new Promise(res => setTimeout(res, delayMs));
+      }
+    }
+  }
+
   async fetchBusData(filterValue = '') {
     try {
-      const response = await fetch(this.apiUrl);
-      const data = await response.json();
+      const data = await this.fetchWithRetry(this.apiUrl);
       if (!Array.isArray(data)) {
         console.error('Dados inválidos:', data);
         return [];
@@ -120,33 +137,33 @@ class DataService {
     }
   }
 
-  // Processar dados de um autocarro individual
   processBusData(bus) {
     const line = this.extractLineNumber(bus);
     const sentidoRaw = this.extractDirectionRaw(bus);
     const destino = this.obterDestino(line, sentidoRaw);
     const lat = bus.location?.value?.coordinates?.[1];
     const lon = bus.location?.value?.coordinates?.[0];
-    if (lat === undefined || lon === undefined) return null;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      console.warn(`Coordenadas inválidas para autocarro ${bus.id}`);
+      return null;
+    }
     const speed = bus.speed ? bus.speed.value : 'N/A';
     const busNumber = bus.fleetVehicleId ? bus.fleetVehicleId.value : 'N/A';
     return {
       id: bus.id,
-      line: line,
+      line,
       latitude: lat,
       longitude: lon,
-      speed: speed,
-      busNumber: busNumber,
-      destino: destino,
-      sentidoRaw: sentidoRaw
+      speed,
+      busNumber,
+      destino,
+      sentidoRaw
     };
   }
 
-  // Filtro simples por linha
   shouldIncludeBus(bus, filterValue) {
     return filterValue === '' || (bus.line && bus.line.startsWith(filterValue));
   }
 }
 
-// Exportar instância singleton
 export const dataService = new DataService();
