@@ -4,51 +4,48 @@ import { mapService } from './mapService.js';
 class BusTrackingApp {
   constructor() {
     this.refreshTimeout = null;
-    this.refreshDelay = 5000; // intervalo de atualização em ms
-    this.isRefreshing = false; // flag para evitar chamadas simultâneas
+    this.refreshDelay = 5000;
+    this.isRefreshing = false;
   }
 
   async initialize() {
     try {
-      // Inicializar mapa
+      console.log('Inicializando aplicação...');
+      
       mapService.initializeMap();
-      
-      // Aguardar o mapa estar completamente pronto
       await this.waitForMapReady();
-      
-      // Carregar dados necessários
+      console.log('Mapa pronto');
       await Promise.all([
         dataService.carregarTrips(),
         dataService.carregarCalendar(),
       ]);
-      
+      console.log('Dados carregados');
       this.setupGeolocation();
       this.setupEventListeners();
-
-      // Primeira atualização e início do ciclo automático
-      await this.forceRefresh();
       this.startAutoRefresh();
-      
       console.log('Aplicação inicializada com sucesso');
     } catch (error) {
       console.error('Erro na inicialização:', error);
     }
   }
 
-  // Aguarda o mapa estar pronto para receber marcadores
-  waitForMapReady() {
-    return new Promise(resolve => {
+  async waitForMapReady() {
+    return new Promise((resolve) => {
       if (mapService.map && mapService.map._loaded) {
         resolve();
-      } else {
-        // Aguarda evento 'load' do mapa
-        const checkMap = setInterval(() => {
-          if (mapService.map && mapService.map._loaded) {
-            clearInterval(checkMap);
-            resolve();
-          }
-        }, 50);
+        return;
       }
+      const checkInterval = setInterval(() => {
+        if (mapService.map && mapService.map._loaded) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 50);
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        console.warn('Timeout ao aguardar mapa estar pronto, prosseguindo...');
+        resolve();
+      }, 3000);
     });
   }
 
@@ -73,9 +70,7 @@ class BusTrackingApp {
     const refreshNowBtn = document.getElementById('refresh-now');
 
     if (applyFilterBtn) {
-      applyFilterBtn.addEventListener('click', this.forceRefresh.bind(this));
-    } else {
-      console.warn('Botão aplicar filtro não encontrado');
+      applyFilterBtn.addEventListener('click', () => this.forceRefresh());
     }
 
     if (centerUserBtn) {
@@ -83,54 +78,46 @@ class BusTrackingApp {
         if (mapService.userPosition) {
           mapService.centerMapOnUser();
         } else {
-          alert('Localização do utilizador não disponível para centrar o mapa.');
+          alert('Localização do utilizador não disponível.');
         }
       });
-    } else {
-      console.warn('Botão centrar mapa não encontrado');
     }
 
     if (refreshNowBtn) {
-      refreshNowBtn.addEventListener('click', this.forceRefresh.bind(this));
-    } else {
-      console.warn('Botão atualizar autocarros não encontrado');
+      refreshNowBtn.addEventListener('click', () => this.forceRefresh());
     }
   }
 
   startAutoRefresh() {
-    // Limpa timeout anterior se existir
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
     }
-
-    // Função recursiva com setTimeout para evitar overlapping
     const scheduleNext = async () => {
+      const startTime = Date.now();
       try {
         await this.fetchAndUpdateBuses();
-        console.log('Atualização automática feita');
+        const duration = Date.now() - startTime;
+        console.log(`Atualização automática concluída em ${duration}ms`);
       } catch (error) {
         console.error('Erro na atualização automática:', error);
       } finally {
-        // Agenda próxima atualização após a atual terminar
         this.refreshTimeout = setTimeout(scheduleNext, this.refreshDelay);
       }
     };
-
-    // Inicia o ciclo
-    this.refreshTimeout = setTimeout(scheduleNext, this.refreshDelay);
+    scheduleNext();
   }
 
   async forceRefresh() {
-    // Evita múltiplas chamadas simultâneas
     if (this.isRefreshing) {
       console.log('Atualização já em progresso, aguardando...');
       return;
     }
-
+    const startTime = Date.now();
     try {
       this.isRefreshing = true;
       await this.fetchAndUpdateBuses();
-      console.log('Atualização manual feita');
+      const duration = Date.now() - startTime;
+      console.log(`Atualização manual concluída em ${duration}ms`);
     } catch (error) {
       console.error('Erro na atualização forçada:', error);
     } finally {
@@ -140,26 +127,31 @@ class BusTrackingApp {
 
   async fetchAndUpdateBuses() {
     try {
-      const filterValue = document.getElementById('line-filter').value.trim().toLowerCase();
-      const busData = await dataService.fetchBusData(filterValue);
-      
-      if (!busData || busData.length === 0) {
-        console.warn('Nenhum autocarro encontrado');
+      const filterElement = document.getElementById('line-filter');
+      if (!filterElement) {
+        console.error('Elemento de filtro não encontrado');
         return;
       }
-      
+      const filterValue = filterElement.value.trim().toLowerCase();
+      console.log(`Buscando dados com filtro: "${filterValue}"`);
+      const busData = await dataService.fetchBusData(filterValue);
+      if (!busData || busData.length === 0) {
+        console.warn('Nenhum autocarro encontrado para os critérios atuais');
+        mapService.updateBusMarkers([]);
+        return;
+      }
+      console.log(`${busData.length} autocarros recebidos, atualizando mapa...`);
       mapService.updateBusMarkers(busData);
-      console.log(`${busData.length} autocarros atualizados no mapa`);
+      console.log('Marcadores atualizados no mapa');
     } catch (error) {
       console.error('Erro ao obter ou atualizar dados dos autocarros:', error);
-      throw error; // re-lança o erro para ser tratado pelo caller
+      throw error;
     }
   }
 }
 
 const app = new BusTrackingApp();
 
-// Garante que a aplicação só inicia após o DOM estar completamente carregado
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => app.initialize());
 } else {
