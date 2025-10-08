@@ -148,6 +148,11 @@ h1 {
   background-color: var(--color-map-bg);
 }
 
+footer {
+  margin-top: 1rem;
+  text-align: center;
+}
+
 /* Responsividade */
 @media (max-width: 720px) {
   #controls {

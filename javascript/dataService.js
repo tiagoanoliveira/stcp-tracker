@@ -107,15 +107,18 @@ class DataService {
     return trip?.trip_headsign || 'Destino Desconhecido';
   }
 
-  // Exemplo simples de retry no fetch (3 tentativas)
-  async fetchWithRetry(url, options = {}, retries = 3, delayMs = 500) {
+  async fetchWithRetry(url, options = {}, retries = 3, delayMs = 500, timeoutMs = 1000) {
     for (let i = 0; i < retries; i++) {
       try {
-        const response = await fetch(url, options);
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeoutMs);
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(id);
+        
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return await response.json();
       } catch (error) {
-        if (i === retries -1) throw error;
+        if (i === retries - 1) throw error;
         await new Promise(res => setTimeout(res, delayMs));
       }
     }
