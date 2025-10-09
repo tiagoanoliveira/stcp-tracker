@@ -75,9 +75,9 @@ h1 {
 
 #controls {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  gap: 24px;
+  gap:30px;
   background-color: var(--color-controls-bg);
   padding: 16px 24px;
   border-radius: 12px;
@@ -93,9 +93,9 @@ h1 {
   gap: 12px;
 }
 
-#line-filter {
-  width: 137px;
-  min-width: 60px;
+#stop-search {
+  width: 180px;
+  min-width: 150px;
   max-width: 250px;
   padding: 10px 14px;
   border-radius: 8px;
@@ -107,7 +107,7 @@ h1 {
 }
 
 
-#line-filter:focus {
+#stop-search:focus {
   border-color: var(--color-border-focus);
   outline: none;
   box-shadow: 0 0 8px var(--color-input-focus-shadow);
@@ -153,22 +153,129 @@ footer {
   text-align: center;
 }
 
+.stop-info {
+  margin-bottom: 20px;
+}
+
+.info-card {
+  background-color: var(--color-controls-bg);
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 6px 15px var(--color-box-shadow);
+  margin-bottom: 20px;
+}
+
+.info-card h2 {
+  color: var(--color-primary);
+  margin-bottom: 15px;
+  font-size: 1.5rem;
+  text-align: left;
+}
+
+.arrivals-container {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.arrival-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  margin-bottom: 10px;
+  background-color: white;
+  border-radius: 8px;
+  border-left: 4px solid var(--color-primary);
+  box-shadow: 0 2px 5px var(--color-box-shadow);
+  transition: transform 0.2s ease;
+}
+
+.arrival-item:hover {
+  transform: translateX(5px);
+}
+
+.arrival-line {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: white;
+  background-color: var(--color-primary);
+  padding: 5px 15px;
+  border-radius: 8px;
+  min-width: 60px;
+  text-align: center;
+}
+
+.arrival-info {
+  flex: 1;
+  margin-left: 15px;
+}
+
+.arrival-destination {
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 5px;
+}
+
+.arrival-status {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.arrival-time {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: var(--color-primary);
+  min-width: 80px;
+  text-align: right;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-left: 10px;
+}
+
+.status-ontime {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-delayed {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.loading-text {
+  text-align: center;
+  color: var(--color-text);
+  font-style: italic;
+  padding: 20px;
+}
+
+.no-arrivals {
+  text-align: center;
+  color: #999;
+  padding: 30px;
+  font-size: 1.1rem;
+}
+.info-card #map {
+  height: 45vh;
+}
+/* Estilos para ícones de paragem no mapa */
+.stop-marker-icon {
+  background-color: var(--color-secondary);
+  border: 3px solid white;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
 /* Responsividade */
 @media (max-width: 720px) {
-  #controls {
-    flex-direction: column;
-    gap: 10px;
-    align-items: stretch;
-  }
-  .controls-left,
-  .controls-right {
-    width: 100%;
-    justify-content: center;
-  }
-  .controls-right {
-    margin-top: 8px;
-  }
-  #line-filter {
+  #stop-search {
     width: 100%;
     max-width: 190px;
   }
@@ -179,6 +286,9 @@ footer {
   }
   #map {
     height: 65vh; /* ligeiramente menor para tablets e telas médias */
+  }
+  .info-card #map {
+    height: 35vh;
   }
   .advice p {
     font-size: 0.9rem;
@@ -191,6 +301,66 @@ footer {
   }
   .advice p {
     font-size: 0.8rem;
+  }
+  .info-card {
+    padding: 12px;
+  }
+  .info-card h2 {
+    font-size: 1.1rem;
+  }
+  .arrival-item {
+    flex-direction: row;  /* Mantém em linha */
+    flex-wrap: nowrap;     /* Não quebra linha */
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .arrival-line {
+    font-size: 1rem;
+    padding: 4px 10px;
+    min-width: 45px;
+    flex-shrink: 0;
+  }
+
+  .arrival-info {
+    flex: 1;
+    min-width: 0;  
+    margin-left: 10px;
+  }
+
+  .arrival-destination {
+    font-size: 0.85rem;
+    white-space: nowrap;      
+    overflow: hidden;         
+    text-overflow: ellipsis;
+  }
+
+  .arrival-status {
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+
+  .arrival-time {
+    font-size: 1.2rem;
+    text-align: right;
+    min-width: 60px;
+    flex-shrink: 0;
+  }
+
+  .status-badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+  }
+
+  .no-arrivals {
+    font-size: 0.9rem;
+    padding: 20px;
+  }
+
+  .loading-text {
+    font-size: 0.9rem;
+    padding: 15px;
   }
 }
 

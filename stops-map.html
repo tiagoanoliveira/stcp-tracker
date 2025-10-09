@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Paragens STCP - Mapa</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYVRR1K1R2"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-BYVRR1K1R2');
+  </script>
+</head>
+
+<body>
+
+  <header role="banner">
+    <h1>Paragens STCP - Localização</h1>
+  </header>
+
+  <main role="main" class="container">
+    <section aria-label="Controles de navegação">
+      <form id="controls">
+        <div class="controls-left">
+          <input type="text" id="stop-search" name="stop-search" placeholder="Pesquisar paragem..."
+            aria-label="Pesquisar paragem" />
+          <button type="button" id="search-stop">Pesquisar</button>
+        </div>
+        <div class="controls-right">
+          <button type="button" id="view-buses" onclick="window.location.href='index.html'">Ver Autocarros</button>
+          <button type="button" id="center-user-stops">Centrar mapa</button>
+        </div>
+      </form>
+    </section>
+    
+    <div class="advice">
+      <p style="text-align: center;">Clique numa paragem para ver os próximos autocarros em tempo real.</p>
+    </div>
+    
+    <section aria-label="Mapa das paragens" aria-live="polite">
+      <div id="map" tabindex="0" role="region"></div>
+    </section>
+  </main>
+
+  <footer role="contentinfo" class="footer">
+    <p>&copy; 2025 STCP Live Map • Website feito com 🤍 por <a href="https://www.linkedin.com/in/tiagoalexoliveira/">Tiago Oliveira</a>. Todos os direitos reservados.</p>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script type="module" src="javascript/stopsData.js"></script>
+  <script type="module" src="javascript/stopsMapApp.js"></script>
+</body>
+
+</html>
