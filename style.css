@@ -296,6 +296,9 @@ footer {
 }
 
 @media (max-width: 500px) {
+  #controls {
+    gap:10px;
+  }
   #map {
     height: 55vh; /* menor para dispositivos móveis */
   }
