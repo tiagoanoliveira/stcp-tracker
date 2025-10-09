@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Paragem STCP - Tempo Real</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYVRR1K1R2"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-BYVRR1K1R2');
+  </script>
+</head>
+
+<body>
+
+  <header role="banner">
+    <h1 id="stop-title">Paragem STCP</h1>
+  </header>
+
+  <main role="main" class="container">
+    <section aria-label="Controles">
+      <div id="controls" style="justify-content: flex-end;">
+        <button type="button" onclick="window.location.href='stops-map.html'">Voltar ao Mapa</button>
+        <button type="button" onclick="window.location.href='index.html'">Ver Autocarros</button>
+      </div>
+    </section>
+
+    <section class="stop-info" aria-label="Informação da paragem">
+      <div class="info-card">
+        <h2>Próximas Chegadas</h2>
+        <div id="arrivals-list" class="arrivals-container">
+          <p class="loading-text">A carregar informações...</p>
+        </div>
+      </div>
+    </section>
+
+    <section aria-label="Mapa com localização dos autocarros" aria-live="polite">
+      <div class="info-card">
+        <h2>Localização dos Autocarros</h2>
+        <div id="map" tabindex="0" role="region"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer role="contentinfo" class="footer">
+    <p>&copy; 2025 STCP Live Map • Website feito com 🤍 por <a href="https://www.linkedin.com/in/tiagoalexoliveira/">Tiago Oliveira</a>. Todos os direitos reservados.</p>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script type="module" src="javascript/stopService.js"></script>
+  <script type="module" src="javascript/stopView.js"></script>
+</body>
+
+</html>

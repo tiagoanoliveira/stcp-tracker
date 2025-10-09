@@ -13,7 +13,6 @@
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-
     gtag('config', 'G-BYVRR1K1R2');
   </script>
 </head>
@@ -28,13 +27,11 @@
     <section aria-label="Controles de filtro e navegação no mapa">
       <form id="controls">
         <div class="controls-left">
-          <input type="text" id="line-filter" name="line-filter" placeholder="Filtrar por linha"
-            aria-label="Filtrar linha" />
-          <button type="button" id="apply-filter">Aplicar filtro</button>
+          <button type="button" id="view-stops" onclick="window.location.href='stops-map.html'">Ver Paragens</button>
         </div>
         <div class="controls-right">
           <button type="button" id="center-user">Centrar mapa</button>
-          <button type="button" id="refresh-now" onclick="window.location.reload()">Atualizar autocarros</button>
+          <button type="button" id="refresh-now" onclick="window.location.reload()">Atualizar</button>
         </div>
       </form>
 

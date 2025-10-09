@@ -65,13 +65,8 @@ class BusTrackingApp {
   }
 
   setupEventListeners() {
-    const applyFilterBtn = document.getElementById('apply-filter');
     const centerUserBtn = document.getElementById('center-user');
     const refreshNowBtn = document.getElementById('refresh-now');
-
-    if (applyFilterBtn) {
-      applyFilterBtn.addEventListener('click', () => this.forceRefresh());
-    }
 
     if (centerUserBtn) {
       centerUserBtn.addEventListener('click', () => {
