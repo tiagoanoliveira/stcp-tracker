@@ -164,7 +164,6 @@ footer {
   padding: 20px;
   border-radius: 12px;
   box-shadow: 0 6px 15px var(--color-box-shadow);
-  margin-bottom: 20px;
 }
 
 .info-card h2 {
@@ -175,7 +174,7 @@ footer {
 }
 
 .arrivals-container {
-  max-height: 400px;
+  max-height: 300px;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -247,8 +246,8 @@ footer {
 }
 
 .status-delayed {
-  background-color: #fff3cd;
-  color: #856404;
+  background-color: #ffd392;
+  color: #000000;
 }
 
 .loading-text {
@@ -351,7 +350,9 @@ footer {
     gap: 8px;
     padding: 10px;
   }
-
+  .arrivals-container {
+    max-height: 200px;
+  }
   .arrival-line {
     font-size: 1rem;
     padding: 4px 10px;
