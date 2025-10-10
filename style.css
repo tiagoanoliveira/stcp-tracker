@@ -2,12 +2,12 @@
 :root {
   /* Cores principais */
   --color-primary: #0072C6;
-  --color-primary-dark: #004A82;
+  --color-primary-dark: #002542;
   /* tom mais escuro do primary para hover */
   --color-secondary: #5EDDC1;
 
   /* Cores de texto */
-  --color-text: #333;
+  --color-text: #000;
   --color-text-light: #fff;
 
   /* Cores de fundo */
@@ -41,22 +41,20 @@
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Red Hat Display', Roboto, sans-serif;
   background: linear-gradient(135deg, var(--color-background-gradient-start), var(--color-background-gradient-end));
-  color: var(--color-text);
+  color: var(--color-primary-dark);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px;
+  padding: 15px 10px 10px;
 }
 
 h1 {
   font-size: clamp(1rem, 2vw + 1rem, 3rem);
   color: var(--color-text-light);
   margin-top: clamp(5px, 1vw, 30px);
-  margin-bottom: clamp(10px, 3vw, 50px);
-  font-weight: 500;
   text-shadow: 1px 1px 3px var(--color-text-shadow);
   letter-spacing: 1px;
   text-align: center;
@@ -64,10 +62,12 @@ h1 {
   width: 100%;
 }
 
-
+button{
+  font-family: 'Red Hat Display';
+}
 .container {
   width: 100%;
-  max-width: 1400px;
+  max-width: 1200px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -78,11 +78,8 @@ h1 {
   justify-content: center;
   align-items: center;
   gap:15px;
-  background-color: var(--color-controls-bg);
-  padding: 15px 15px;
+  padding: 20px 5px 10px;
   border-radius: 12px;
-  box-shadow: 0 6px 15px var(--color-box-shadow);
-  margin-bottom: 20px;
   flex-wrap: wrap;
 }
 
@@ -90,16 +87,22 @@ h1 {
 .controls-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+}
+.controls-left {
+  gap: 5px;
+}
+.controls-right {
+  gap: 15px;
 }
 
 #stop-search {
+  font-family: 'Red Hat Display';
   width: 185px;
   min-width: 100px;
   max-width: 250px;
   padding: 10px 14px;
   border-radius: 8px;
-  border: 2px solid var(--color-border-primary);
+  border: 1.5px solid var(--color-border-primary);
   font-size: 1rem;
   transition: border-color 0.3s ease;
   max-height: 40px;
@@ -114,13 +117,11 @@ h1 {
 }
 
 #controls button {
-  background-color: var(--color-primary);
-  color: var(--color-text-light);
+  background-color: #fff;
   padding: 10px 15px;
-  border: none;
+  border: 1.5px solid var(--color-border-primary);
   border-radius: 10px;
   cursor: pointer;
-  font-weight: 700;
   font-size: 1rem;
   transition: background-color 0.3s ease, transform 0.2s ease;
   box-shadow: 0 3px 8px var(--color-button-shadow);
@@ -129,9 +130,10 @@ h1 {
 }
 
 #controls button:hover {
-  background-color: var(--color-primary-dark);
+  background-color: var(--color-primary);
   transform: translateY(-2px);
   box-shadow: 0 6px 14px var(--color-button-hover-shadow);
+  color: #fff;
 }
 
 #controls button:active {
@@ -146,13 +148,18 @@ h1 {
   width: 100%;
   border-radius: 16px;
   box-shadow: 0 8px 24px var(--color-map-shadow);
-  border: 3px solid var(--color-border-primary);
+  border: 1.5px solid var(--color-border-primary);
   background-color: var(--color-map-bg);
 }
 
 footer {
   margin-top: 1rem;
   text-align: center;
+  color: var(--color-primary-dark)
+}
+
+footer a{
+  color:#5EDDC1
 }
 
 .stop-info {
@@ -329,7 +336,10 @@ footer {
 
 @media (max-width: 500px) {
   #controls {
-    gap:10px;
+    gap:5px;
+  }
+  .controls-right{
+    gap: 5px;
   }
   #map {
     height: 50vh; /* menor para dispositivos móveis */
@@ -399,14 +409,21 @@ footer {
     font-size: 0.9rem;
     padding: 15px;
   }
+  #stop-search {
+    width: 100%;
+    max-width: 150px;
+  }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 430px) {
   #map {
     height: 40vh; /* mais pequeno para telemóveis muito pequenos */
   }
   .advice p {
     font-size: 0.8rem;
+  }
+  footer {
+    font-size: 0.9rem;
   }
 }
 
