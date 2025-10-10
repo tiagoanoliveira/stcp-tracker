@@ -1,4 +1,4 @@
-  class StopService {
+class StopService {
   constructor() {
     this.proxyUrl = 'https://stcp.up202007448.workers.dev';
     

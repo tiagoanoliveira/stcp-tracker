@@ -2,6 +2,7 @@ import { stopService } from './stopService.js';
 import { createBusIcon } from '../resources/busDesign/busIcon.js';
 import { BUS_COLORS, CUSTOM_LINE_TEXTS } from '../resources/busDesign/busColors.js';
 import { initializeMapWithControls, createCenterControl } from '../realtime_bus_map/mapUtils.js';
+import { eventBus } from './eventBus.js';
 
 class StopView {
   constructor() {
@@ -12,6 +13,7 @@ class StopView {
     this.refreshTimeout = null;
     this.iconCache = {};
     this.lastBusPositions = [];
+    this.vehicleIdToArrival = new Map();
   }
 
   getLineColors(line) {
@@ -51,6 +53,8 @@ class StopView {
       });
       centerControl.addTo(this.map);
       
+      eventBus.on('arrivalClicked', (data) => this.handleArrivalClick(data));
+      
       await this.loadStopData();
       this.startAutoRefresh();
       
@@ -80,10 +84,9 @@ class StopView {
         titleElement.textContent = `Paragem: ${stopData.stop_name}`;
       }
 
-      this.displayArrivals(stopData.arrivals || []);
-
       const vehicles = await stopService.fetchVehicleData();
       this.updateBusMap(stopData.arrivals || [], vehicles);
+      this.displayArrivals(stopData.arrivals || [], vehicles);
 
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -91,7 +94,7 @@ class StopView {
     }
   }
 
-  displayArrivals(arrivals) {
+  displayArrivals(arrivals, vehicles) {
     const container = document.getElementById('arrivals-list');
     
     if (!container) return;
@@ -101,31 +104,67 @@ class StopView {
       return;
     }
 
-    container.innerHTML = arrivals.map(arrival => {
-      const statusClass = arrival.status === 'ON_TIME' ? 'status-ontime' : 'status-delayed';
-      
-      const lineColors = this.getLineColors(arrival.route_short_name);
-      const lineColor = lineColors.busColor;
-      const textColor = lineColors.textColor;
-      
-      return `
-        <div class="arrival-item">
-          <div class="arrival-line" style="background-color: ${lineColor}; color: ${textColor};">
-            ${arrival.route_short_name}
-          </div>
-          <div class="arrival-info">
-            <div class="arrival-destination">${arrival.trip_headsign}</div>
-            <div class="arrival-status">
-              ${stopService.getStatusText(arrival.status)}
-              ${arrival.delay_minutes > 1 ? `<span class="status-badge ${statusClass}">+${Math.round(arrival.delay_minutes)} min</span>` : ''}
-            </div>
-          </div>
-          <div class="arrival-time">
-            ${stopService.formatArrivalTime(arrival.arrival_minutes)}
-          </div>
+    container.innerHTML = '';
+    
+    arrivals.forEach(arrival => {
+      const vehicle = stopService.matchVehicleToTrip(vehicles, arrival.trip_id);
+      const arrivalElement = this.createArrivalElement(arrival, vehicle);
+      container.appendChild(arrivalElement);
+    });
+  }
+
+  createArrivalElement(arrival, vehicle) {
+    const statusClass = arrival.status === 'ON_TIME' ? 'status-ontime' : 'status-delayed';
+    const lineColors = this.getLineColors(arrival.route_short_name);
+    
+    const div = document.createElement('div');
+    div.className = 'arrival-item';
+    
+    if (vehicle) {
+      const location = stopService.extractVehicleLocation(vehicle);
+      if (location) {
+        div.style.cursor = 'pointer';
+        div.setAttribute('data-vehicle-id', vehicle.id);
+        div.addEventListener('click', () => {
+          eventBus.emit('arrivalClicked', {
+            vehicleId: vehicle.id,
+            location: location,
+            arrival: arrival
+          });
+        });
+      }
+    }
+    
+    div.innerHTML = `
+      <div class="arrival-line" style="background-color: ${lineColors.busColor}; color: ${lineColors.textColor};">
+        ${arrival.route_short_name}
+      </div>
+      <div class="arrival-info">
+        <div class="arrival-destination">${arrival.trip_headsign}</div>
+        <div class="arrival-status">
+          ${stopService.getStatusText(arrival.status)}
+          ${arrival.delay_minutes > 1 ? `<span class="status-badge ${statusClass}">+${Math.round(arrival.delay_minutes)} min</span>` : ''}
         </div>
-      `;
-    }).join('');
+      </div>
+      <div class="arrival-time">
+        ${stopService.formatArrivalTime(arrival.arrival_minutes)}
+      </div>
+    `;
+    
+    return div;
+  }
+
+  handleArrivalClick(data) {
+    const { vehicleId, location } = data;
+    
+    if (!location || !this.map) return;
+    
+    const coords = [location.latitude, location.longitude];
+    this.map.setView(coords, 17, { animate: true, duration: 0.5 });
+    
+    if (this.busMarkers[vehicleId]) {
+      this.busMarkers[vehicleId].openPopup();
+    }
   }
 
   updateBusMap(arrivals, vehicles) {
