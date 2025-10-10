@@ -273,6 +273,22 @@ footer {
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
+/* Estilo para botão de centrar mapa */
+.leaflet-control-center {
+  font-size: 18px;
+  line-height: 26px;
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+}
+
+.leaflet-control-center:hover {
+  background-color: #f4f4f4;
+}
+
 /* Responsividade */
 @media (max-width: 720px) {
   #stop-search {

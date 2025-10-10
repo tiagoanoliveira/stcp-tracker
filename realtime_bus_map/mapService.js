@@ -1,6 +1,7 @@
 // mapService.js - Responsável pela visualização e elementos do mapa
-import { createBusIcon } from '../busDesign/busIcon.js';
-import { BUS_COLORS, CUSTOM_LINE_TEXTS } from '../busDesign/busColors.js';
+import { createBusIcon } from '../resources/busDesign/busIcon.js';
+import { BUS_COLORS, CUSTOM_LINE_TEXTS } from '../resources/busDesign/busColors.js';
+import { initializeMapWithControls, createUserMarker } from './mapUtils.js';
 
 class MapService {
   constructor() {
@@ -11,15 +12,18 @@ class MapService {
     this.userPosition = null;
   }
 
-  // Inicializar o mapa
+  // Inicializar o mapa com botão de centrar
   initializeMap() {
-    this.map = L.map('map').setView([41.1579, -8.6291], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap'
-    }).addTo(this.map);
+    const { map } = initializeMapWithControls(
+      'map',
+      [41.1579, -8.6291],
+      13,
+      () => this.userPosition
+    );
+    this.map = map;
   }
 
-  // Configuração de cores das linhas (agora importada)
+  // Configuração de cores das linhas
   getLineColors() {
     return BUS_COLORS;
   }
@@ -29,16 +33,6 @@ class MapService {
     if (this.iconCache[line]) return this.iconCache[line];
     this.iconCache[line] = createBusIcon(line, this.getLineColors(), CUSTOM_LINE_TEXTS);
     return this.iconCache[line];
-  }
-
-  // Ícone padrão para localização do utilizador
-  defaultIcon() {
-    return L.icon({
-      iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34]
-    });
   }
 
   // Atualizar marcadores dos autocarros no mapa
@@ -51,12 +45,10 @@ class MapService {
       const popupContent = `Linha: ${bus.line}<br>Velocidade: ${bus.speed} km/h<br>Destino: ${bus.destino}<br>Veículo nº ${bus.busNumber}`;
 
       if (this.busMarkers[bus.id]) {
-        // Atualizar marcador existente
         this.busMarkers[bus.id].setLatLng([bus.latitude, bus.longitude]);
         this.busMarkers[bus.id].setIcon(this.getBusIcon(bus.line));
         this.busMarkers[bus.id].bindPopup(popupContent);
       } else {
-        // Criar novo marcador
         const marker = L.marker([bus.latitude, bus.longitude], {
           icon: this.getBusIcon(bus.line)
         }).addTo(this.map);
@@ -65,7 +57,6 @@ class MapService {
       }
     });
 
-    // Remover marcadores que já não existem
     Object.keys(this.busMarkers).forEach(id => {
       if (!validIDs.has(id)) {
         this.map.removeLayer(this.busMarkers[id]);
@@ -79,10 +70,7 @@ class MapService {
     if (this.userPosition) {
       this.map.setView(this.userPosition, 16);
       if (!this.userMarker) {
-        this.userMarker = L.marker(this.userPosition, {
-          title: "Você está aqui",
-          icon: this.defaultIcon()
-        }).addTo(this.map).bindPopup("Localização Atual");
+        this.userMarker = createUserMarker(this.map, this.userPosition);
       } else {
         this.userMarker.setLatLng(this.userPosition);
       }
@@ -97,5 +85,4 @@ class MapService {
   }
 }
 
-// Exportar instância singleton
 export const mapService = new MapService();

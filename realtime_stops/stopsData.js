@@ -5,7 +5,7 @@ let STOPS_DATA = [];
 // Carregar dados do ficheiro stops.json
 export async function loadStopsData() {
   try {
-    const response = await fetch('./javascript/stops.json');
+    const response = await fetch('./resources/stops.json');
     const data = await response.json();
     
     // Mapear os dados para o formato esperado

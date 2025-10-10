@@ -1,7 +1,7 @@
-// stopView.js - Controlador para a página de visualização de paragem individual
 import { stopService } from './stopService.js';
-import { createBusIcon } from '../../busDesign/busIcon.js';
-import { BUS_COLORS, CUSTOM_LINE_TEXTS } from '../../busDesign/busColors.js';
+import { createBusIcon } from '../resources/busDesign/busIcon.js';
+import { BUS_COLORS, CUSTOM_LINE_TEXTS } from '../resources/busDesign/busColors.js';
+import { initializeMapWithControls } from '../realtime_bus_map/mapUtils.js';
 
 class StopView {
   constructor() {
@@ -11,6 +11,7 @@ class StopView {
     this.stopMarker = null;
     this.refreshTimeout = null;
     this.iconCache = {};
+    this.lastBusPositions = [];
   }
 
   async initialize() {
@@ -24,7 +25,9 @@ class StopView {
 
       console.log(`Inicializando vista para paragem: ${this.stopId}`);
       
-      this.initializeMap();
+      const { map } = initializeMapWithControls('map', [41.1579, -8.6291], 15);
+      this.map = map;
+      
       await this.loadStopData();
       this.startAutoRefresh();
       
@@ -40,13 +43,6 @@ class StopView {
     return params.get('id');
   }
 
-  initializeMap() {
-    this.map = L.map('map').setView([41.1579, -8.6291], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap'
-    }).addTo(this.map);
-  }
-
   async loadStopData() {
     try {
       const stopData = await stopService.fetchStopRealtime(this.stopId);
@@ -56,16 +52,13 @@ class StopView {
         return;
       }
 
-      // Atualizar título da página
       const titleElement = document.getElementById('stop-title');
       if (titleElement && stopData.stop_name) {
         titleElement.textContent = `Paragem: ${stopData.stop_name}`;
       }
 
-      // Exibir próximas chegadas
       this.displayArrivals(stopData.arrivals || []);
 
-      // Obter dados dos veículos e atualizar mapa
       const vehicles = await stopService.fetchVehicleData();
       this.updateBusMap(stopData.arrivals || [], vehicles);
 
