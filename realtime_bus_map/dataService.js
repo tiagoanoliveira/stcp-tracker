@@ -9,7 +9,7 @@ class DataService {
 
   async carregarTrips() {
     try {
-      const response = await fetch('./javascript/trips.json');
+      const response = await fetch('./resources/trips.json');
       this.trips = await response.json();
     } catch (error) {
       console.error('Erro ao carregar trips:', error);
@@ -19,7 +19,7 @@ class DataService {
 
   async carregarCalendar() {
     try {
-      const response = await fetch('./javascript/calendar.json');
+      const response = await fetch('./resources/calendar.json');
       const calendarArray = await response.json();
       this.calendar = {};
       for (const service of calendarArray) {

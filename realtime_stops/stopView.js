@@ -1,7 +1,7 @@
-// stopView.js - Controlador para a página de visualização de paragem individual
 import { stopService } from './stopService.js';
-import { createBusIcon } from '../../busDesign/busIcon.js';
-import { BUS_COLORS, CUSTOM_LINE_TEXTS } from '../../busDesign/busColors.js';
+import { createBusIcon } from '../resources/busDesign/busIcon.js';
+import { BUS_COLORS, CUSTOM_LINE_TEXTS } from '../resources/busDesign/busColors.js';
+import { initializeMapWithControls, createCenterControl } from '../realtime_bus_map/mapUtils.js';
 
 class StopView {
   constructor() {
@@ -11,6 +11,21 @@ class StopView {
     this.stopMarker = null;
     this.refreshTimeout = null;
     this.iconCache = {};
+    this.lastBusPositions = [];
+  }
+
+  getLineColors(line) {
+    if (!line) return { busColor: '#0072C6', textColor: '#fff' };
+    if (BUS_COLORS[line]) {
+      return BUS_COLORS[line];
+    }
+    
+    const prefix = line[0];
+    if (BUS_COLORS[prefix]) {
+      return BUS_COLORS[prefix];
+    }
+  
+    return { busColor: '#0072C6', textColor: '#fff' };
   }
 
   async initialize() {
@@ -24,7 +39,18 @@ class StopView {
 
       console.log(`Inicializando vista para paragem: ${this.stopId}`);
       
-      this.initializeMap();
+      const { map } = initializeMapWithControls('map', [41.1579, -8.6291], 15);
+      this.map = map;
+      
+      const centerControl = createCenterControl(this.map, () => {
+        if (this.lastBusPositions.length > 0) {
+          const bounds = L.latLngBounds(this.lastBusPositions);
+          return bounds.getCenter();
+        }
+        return null;
+      });
+      centerControl.addTo(this.map);
+      
       await this.loadStopData();
       this.startAutoRefresh();
       
@@ -40,13 +66,6 @@ class StopView {
     return params.get('id');
   }
 
-  initializeMap() {
-    this.map = L.map('map').setView([41.1579, -8.6291], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap'
-    }).addTo(this.map);
-  }
-
   async loadStopData() {
     try {
       const stopData = await stopService.fetchStopRealtime(this.stopId);
@@ -56,16 +75,13 @@ class StopView {
         return;
       }
 
-      // Atualizar título da página
       const titleElement = document.getElementById('stop-title');
       if (titleElement && stopData.stop_name) {
         titleElement.textContent = `Paragem: ${stopData.stop_name}`;
       }
 
-      // Exibir próximas chegadas
       this.displayArrivals(stopData.arrivals || []);
 
-      // Obter dados dos veículos e atualizar mapa
       const vehicles = await stopService.fetchVehicleData();
       this.updateBusMap(stopData.arrivals || [], vehicles);
 
@@ -87,11 +103,14 @@ class StopView {
 
     container.innerHTML = arrivals.map(arrival => {
       const statusClass = arrival.status === 'ON_TIME' ? 'status-ontime' : 'status-delayed';
-      const lineColor = BUS_COLORS[arrival.route_short_name]?.busColor || '#0072C6';
+      
+      const lineColors = this.getLineColors(arrival.route_short_name);
+      const lineColor = lineColors.busColor;
+      const textColor = lineColors.textColor;
       
       return `
         <div class="arrival-item">
-          <div class="arrival-line" style="background-color: ${lineColor};">
+          <div class="arrival-line" style="background-color: ${lineColor}; color: ${textColor};">
             ${arrival.route_short_name}
           </div>
           <div class="arrival-info">
@@ -112,6 +131,7 @@ class StopView {
   updateBusMap(arrivals, vehicles) {
     if (!arrivals || arrivals.length === 0) {
       this.clearBusMarkers();
+      this.lastBusPositions = [];
       return;
     }
 
@@ -151,7 +171,8 @@ class StopView {
       }
     });
 
-    // Remover marcadores antigos
+    this.lastBusPositions = busPositions;
+
     Object.keys(this.busMarkers).forEach(id => {
       if (!validIDs.has(id)) {
         this.map.removeLayer(this.busMarkers[id]);
@@ -159,7 +180,6 @@ class StopView {
       }
     });
 
-    // Ajustar vista do mapa se houver autocarros
     if (busPositions.length > 0) {
       const bounds = L.latLngBounds(busPositions);
       this.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
