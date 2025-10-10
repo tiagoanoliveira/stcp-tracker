@@ -275,6 +275,22 @@ footer {
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
+.arrival-item[data-vehicle-id] {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.arrival-item[data-vehicle-id]:hover {
+  transform: translateX(8px);
+  box-shadow: 0 4px 12px rgba(0, 114, 198, 0.2);
+  background-color: #f8f9fa;
+}
+
+.arrival-item[data-vehicle-id]:active {
+  transform: translateX(5px);
+  box-shadow: 0 2px 8px rgba(0, 114, 198, 0.15);
+}
+
 /* Estilo para botão de centrar mapa */
 .leaflet-control-center {
   font-size: 18px;

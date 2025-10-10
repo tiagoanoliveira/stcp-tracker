@@ -23,10 +23,13 @@
   </header>
 
   <main role="main" class="container">
-    <section aria-label="Controles">
-      <div id="controls" style="justify-content: flex-end;">
-        <button type="button" onclick="window.location.href='index.html'">Voltar ao Mapa</button>
+    <section id="controls" aria-label="Controles">
+      <div class="controls-left">
+        <button type="button" onclick="window.location.href='index.html'">← Voltar ao Mapa</button>
+      </div>
+      <div class="controls-right">
         <button type="button" onclick="window.location.href='busmap.html'">Ver Autocarros</button>
+        <button type="button" id="refresh-now" onclick="window.location.reload()">↺ Atualizar</button>      
       </div>
     </section>
 
@@ -52,6 +55,7 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script type="module" src="realtime_stops/eventBus.js"></script>
   <script type="module" src="realtime_stops/stopService.js"></script>
   <script type="module" src="realtime_stops/stopView.js"></script>
 </body>
