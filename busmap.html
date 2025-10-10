@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live location STCP</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYVRR1K1R2"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-BYVRR1K1R2');
+  </script>
+</head>
+
+<body>
+
+  <header role="banner">
+    <h1>Localização em Tempo Real dos Autocarros STCP</h1>
+  </header>
+
+  <main role="main" class="container">
+    <section aria-label="Controles de filtro e navegação no mapa">
+      <form id="controls">
+        <div class="controls-left">
+          <button type="button" id="view-stops" onclick="window.location.href='index.html'">Ver paragens</button>
+        </div>
+        <div class="controls-right">
+          <button type="button" id="refresh-now" onclick="window.location.reload()">Atualizar</button>
+        </div>
+      </form>
+    </section>
+    <div class="advice">
+      <p style="text-align: center;">Para ver os próximos autocarros numa dada paragem, selecione "Ver paragens".</p>
+    </div>
+    <section aria-label="Mapa dos autocarros em tempo real" aria-live="polite">
+      <div id="map" tabindex="0" role="region"></div>
+    </section>
+  </main>
+
+  <footer role="contentinfo" class="footer">
+    <p>&copy; 2025 STCP Live Map • Website feito com 🤍 por <a href="https://www.linkedin.com/in/tiagoalexoliveira/">Tiago Oliveira</a>. Todos os direitos reservados. Desenvolvido com tecnologia Leaflet</p>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <script type="module" src="realtime_bus_map/dataService.js"></script>
+  <script type="module" src="realtime_bus_map/mapService.js"></script>
+  <script type="module" src="realtime_bus_map/app.js"></script>
+</body>
+
+</html>

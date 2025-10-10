@@ -4,10 +4,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Live location STCP</title>
+  <title>Horários em tempo real</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYVRR1K1R2"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -20,38 +19,37 @@
 <body>
 
   <header role="banner">
-    <h1>Localização em Tempo Real dos Autocarros STCP</h1>
+    <h1>Próximas chegadas em tempo real</h1>
   </header>
 
   <main role="main" class="container">
-    <section aria-label="Controles de filtro e navegação no mapa">
+    <section aria-label="Controles de navegação">
       <form id="controls">
         <div class="controls-left">
-          <button type="button" id="view-stops" onclick="window.location.href='stops-map.html'">Ver Paragens</button>
+          <input type="text" id="stop-search" name="stop-search" placeholder="Pesquisar paragem..."
+            aria-label="Pesquisar paragem" />
+          <button type="button" id="search-stop">Pesquisar</button>
         </div>
         <div class="controls-right">
-          <button type="button" id="refresh-now" onclick="window.location.reload()">Atualizar</button>
+          <button type="button" id="view-buses" onclick="window.location.href='busmap.html'">Ver todos os autocarros</button>
         </div>
       </form>
-
     </section>
     <div class="advice">
-      <p style="text-align: center;"> As localizações dos veículos e respetivos destinos estão dependentes da informação fornecida pela STCP, pelo que é frequente a atualização não ser regular.</p>
+      <p style="text-align: center;">Clique numa paragem para ver os próximos autocarros em tempo real.</p>
     </div>
-    <section aria-label="Mapa dos autocarros em tempo real" aria-live="polite">
+    <section aria-label="Mapa das paragens" aria-live="polite">
       <div id="map" tabindex="0" role="region"></div>
     </section>
   </main>
 
   <footer role="contentinfo" class="footer">
-    <p>&copy; 2025 STCP Live Map • Website feito com 🤍 por <a href="https://www.linkedin.com/in/tiagoalexoliveira/">Tiago Oliveira</a>. Todos os direitos reservados. Desenvolvido com tecnologia Leaflet</p>
+    <p>&copy; 2025 STCP Live Map • Website feito com 🤍 por <a href="https://www.linkedin.com/in/tiagoalexoliveira/">Tiago Oliveira</a>. Todos os direitos reservados.</p>
   </footer>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-  <script type="module" src="realtime_bus_map/dataService.js"></script>
-  <script type="module" src="realtime_bus_map/mapService.js"></script>
-  <script type="module" src="realtime_bus_map/app.js"></script>
+  <script type="module" src="realtime_stops/stopsData.js"></script>
+  <script type="module" src="realtime_stops/stopsMapApp.js"></script>
 </body>
 
 </html>
