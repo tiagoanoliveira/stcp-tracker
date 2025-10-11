@@ -11,8 +11,8 @@
   --color-text-light: #fff;
 
   /* Cores de fundo */
-  --color-background-gradient-start: var(--color-secondary);
-  --color-background-gradient-end: var(--color-primary);
+  --color-background-main: white;
+  --color-background-header: var(--color-primary);
   --color-controls-bg: rgba(255, 255, 255, 0.9);
   --color-map-bg: white;
 
@@ -39,27 +39,30 @@
   margin: 0;
   padding: 0;
 }
-
+header {
+  background: var(--color-background-header);
+  position: fixed;
+  width: 100%;
+  top: 0;
+  padding: 15px;
+}
 body {
   font-family: 'Red Hat Display', Roboto, sans-serif;
-  background: linear-gradient(135deg, var(--color-background-gradient-start), var(--color-background-gradient-end));
+  background: var(--color-background-main);
   color: var(--color-primary-dark);
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 15px 10px 10px;
+  margin-top: 5px;
 }
 
 h1 {
-  font-size: clamp(1rem, 2vw + 1rem, 3rem);
+  font-size: 2rem;
   color: var(--color-text-light);
-  margin-top: clamp(5px, 1vw, 30px);
   text-shadow: 1px 1px 3px var(--color-text-shadow);
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
   text-align: center;
-  max-width: 1400px;
-  width: 100%;
 }
 
 button{
@@ -78,7 +81,7 @@ button{
   justify-content: center;
   align-items: center;
   gap:15px;
-  padding: 20px 5px 10px;
+  padding: 20px 0px 10px;
   border-radius: 12px;
   flex-wrap: wrap;
 }
@@ -116,9 +119,8 @@ button{
   box-shadow: 0 0 8px var(--color-input-focus-shadow);
 }
 
-#controls button {
+.btn-common {
   background-color: #fff;
-  padding: 10px 15px;
   border: 1.5px solid var(--color-border-primary);
   border-radius: 10px;
   cursor: pointer;
@@ -129,17 +131,24 @@ button{
   white-space: nowrap;
 }
 
-#controls button:hover {
+#controls button {
+  padding: 10px 15px;
+}
+
+#controls button:hover,
+.button-refresh:hover {
   background-color: var(--color-primary);
   transform: translateY(-2px);
   box-shadow: 0 6px 14px var(--color-button-hover-shadow);
   color: #fff;
 }
 
-#controls button:active {
+#controls button:active,
+.button-refresh:active {
   transform: translateY(0);
   box-shadow: 0 2px 5px var(--color-button-active-shadow);
 }
+
 .advice p {
   margin-bottom: 0.5rem;
 }
@@ -173,9 +182,19 @@ footer a{
   box-shadow: 0 6px 15px var(--color-box-shadow);
 }
 
+.header-arrivals {
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center; /* Centraliza verticalmente */
+}
+.button-refresh {
+  padding: 5px 10px;
+  box-shadow: 0px 0px;
+}
+
 .info-card h2 {
   color: var(--color-primary);
-  margin-bottom: 15px;
   font-size: 1.5rem;
   text-align: left;
 }
@@ -409,9 +428,13 @@ footer a{
     font-size: 0.9rem;
     padding: 15px;
   }
-  #stop-search {
-    width: 100%;
-    max-width: 150px;
+
+  header {
+    padding: 15px;
+  }
+  h1 {
+    font-size: 1.5rem;
+    letter-spacing: 0.8px;
   }
 }
 
@@ -424,6 +447,15 @@ footer a{
   }
   footer {
     font-size: 0.9rem;
+  }
+  #stop-search {
+    max-width: 150px;
+  }
+}
+
+@media (max-width: 380px){
+  #stop-search {
+    max-width: 120px;
   }
 }
 

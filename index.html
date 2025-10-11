@@ -22,22 +22,19 @@
 </head>
 
 <body>
-
-  <header role="banner">
+  <header id="header" role="banner">
     <h1>Próximas chegadas em tempo real</h1>
   </header>
-
   <main role="main" class="container">
     <section aria-label="Controles de navegação">
       <form id="controls">
         <div class="controls-left">
           <input type="text" id="stop-search" name="stop-search" placeholder="Pesquisar paragem..."
             aria-label="Pesquisar paragem" />
-          <button type="button" id="search-stop">🔎</button>
+          <button class="btn-common" type="button" id="search-stop">🔎</button>
         </div>
         <div class="controls-right">
-          <button type="button" id="view-buses" onclick="window.location.href='busmap.html'">Ver autocarros</button>
-          <button type="button" id="refresh-now" onclick="window.location.reload()">↺</button>
+          <button class="btn-common" type="button" id="view-buses" onclick="window.location.href='busmap.html'">Ver autocarros</button>
         </div>
       </form>
     </section>
@@ -56,6 +53,7 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script type="module" src="realtime_stops/stopsData.js"></script>
   <script type="module" src="realtime_stops/stopsMapApp.js"></script>
+  <script src="./resources/header.js"></script>
 </body>
 
 </html>

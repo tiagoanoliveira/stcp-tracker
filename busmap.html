@@ -21,20 +21,13 @@
 </head>
 
 <body>
-
-  <header role="banner">
+  <header id="header" role="banner">
     <h1>Localização em Tempo Real dos Autocarros STCP</h1>
   </header>
-
   <main role="main" class="container">
     <section aria-label="Controles de filtro e navegação no mapa">
       <form id="controls">
-        <div class="controls-left">
-          <button type="button" id="view-stops" onclick="window.location.href='index.html'">← Ver paragens</button>
-        </div>
-        <div class="controls-right">
-          <button type="button" id="refresh-now" onclick="window.location.reload()">↺ Atualizar</button>
-        </div>
+          <button class="btn-common" type="button" id="view-stops" onclick="window.location.href='index.html'">← Ver paragens</button>
       </form>
     </section>
     <div class="advice">
@@ -54,6 +47,7 @@
   <script type="module" src="realtime_bus_map/dataService.js"></script>
   <script type="module" src="realtime_bus_map/mapService.js"></script>
   <script type="module" src="realtime_bus_map/app.js"></script>
+  <script src="./resources/header.js"></script>
 </body>
 
 </html>

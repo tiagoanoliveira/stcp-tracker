@@ -22,25 +22,25 @@
 </head>
 
 <body>
-
-  <header role="banner">
+  <header id="header" role="banner">
     <h1 id="stop-title">Paragem STCP</h1>
   </header>
-
   <main role="main" class="container">
     <section id="controls" aria-label="Controles">
       <div class="controls-left">
-        <button type="button" onclick="window.location.href='index.html'">← Voltar ao Mapa</button>
+        <button type="button" class="btn-common" onclick="window.location.href='index.html'">← Voltar ao Mapa</button>
       </div>
       <div class="controls-right">
-        <button type="button" onclick="window.location.href='busmap.html'">Ver Autocarros</button>
-        <button type="button" id="refresh-now" onclick="window.location.reload()">↺ Atualizar</button>      
+        <button type="button" class="btn-common" onclick="window.location.href='busmap.html'">Ver Autocarros</button>
       </div>
     </section>
 
     <section class="stop-info" aria-label="Informação da paragem">
       <div class="info-card">
-        <h2>Próximas Chegadas</h2>
+        <div class="header-arrivals">
+          <h2>Próximas Chegadas</h2>
+          <button id="refresh-now" type="button" class="btn-common button-refresh" onclick="window.location.reload()">↺</button>
+        </div>
         <div id="arrivals-list" class="arrivals-container">
           <p class="loading-text">A carregar informações...</p>
         </div>
@@ -63,6 +63,7 @@
   <script type="module" src="realtime_stops/eventBus.js"></script>
   <script type="module" src="realtime_stops/stopService.js"></script>
   <script type="module" src="realtime_stops/stopView.js"></script>
+  <script src="./resources/header.js"></script>
 </body>
 
 </html>

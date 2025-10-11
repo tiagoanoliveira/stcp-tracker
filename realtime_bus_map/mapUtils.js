@@ -36,20 +36,54 @@ export function createCenterControl(map, getUserPosition) {
   return new CenterControl();
 }
 
+export function createReloadControl(map) {
+  const ReloadControl = L.Control.extend({
+    options: {
+      position: 'topright'
+    },
+    onAdd: function() {
+      const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      const button = L.DomUtil.create('a', 'leaflet-control-reload', container);
+
+      button.innerHTML = '⟲'; // Ícone de reload
+      button.href = '#';
+      button.title = 'Recarregar página';
+      button.setAttribute('role', 'button');
+      button.setAttribute('aria-label', 'Recarregar página');
+
+      L.DomEvent.disableClickPropagation(button);
+      L.DomEvent.on(button, 'click', function(e) {
+        L.DomEvent.preventDefault(e);
+        L.DomEvent.stopPropagation(e);
+        window.location.reload();  // Recarregar a página inteira
+      });
+
+      return container;
+    }
+  });
+
+  return new ReloadControl();
+}
+
 export function initializeMapWithControls(elementId, center = [41.1579, -8.6291], zoom = 13, getUserPosition = null) {
   const map = L.map(elementId).setView(center, zoom);
-  
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
   }).addTo(map);
-  
-  let centerControl = null;
+
   if (getUserPosition) {
-    centerControl = createCenterControl(map, getUserPosition);
+    const centerControl = createCenterControl(map, getUserPosition);
     centerControl.addTo(map);
   }
-  
-  return { map, centerControl };
+
+  const currentPage = window.location.pathname.split('/').pop(); // pega 'index.html', 'busmap.html' ou 'stop.html'
+  if (currentPage === 'index.html' || currentPage === 'busmap.html') {
+    const reloadControl = createReloadControl(map);
+    reloadControl.addTo(map);
+  }
+
+  return { map };
 }
 
 export function createUserMarker(map, position) {
