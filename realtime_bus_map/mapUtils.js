@@ -36,36 +36,30 @@ export function createCenterControl(map, getUserPosition) {
   return new CenterControl();
 }
 
-export function createReloadControl(map) {
+export function createReloadControl() {
   const ReloadControl = L.Control.extend({
-    options: {
-      position: 'topright'
-    },
+    options: { position: 'topright' },
     onAdd: function() {
       const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-      const button = L.DomUtil.create('a', 'leaflet-control-reload', container);
-
-      button.innerHTML = '⟲'; // Ícone de reload
-      button.href = '#';
-      button.title = 'Recarregar página';
-      button.setAttribute('role', 'button');
-      button.setAttribute('aria-label', 'Recarregar página');
-
-      L.DomEvent.disableClickPropagation(button);
-      L.DomEvent.on(button, 'click', function(e) {
+      const a = L.DomUtil.create('a', '', container);
+      a.href = '#';
+      a.title = 'Recarregar página';
+      a.setAttribute('role', 'button');
+      a.setAttribute('aria-label', 'Recarregar página');
+      a.innerHTML = '⟲';
+      L.DomEvent.disableClickPropagation(a);
+      L.DomEvent.on(a, 'click', (e) => {
         L.DomEvent.preventDefault(e);
         L.DomEvent.stopPropagation(e);
-        window.location.reload();  // Recarregar a página inteira
+        window.location.reload();
       });
-
       return container;
     }
   });
-
   return new ReloadControl();
 }
 
-export function initializeMapWithControls(elementId, center = [41.1579, -8.6291], zoom = 13, getUserPosition = null) {
+export function initializeMapWithControls(elementId, center=[41.1579,-8.6291], zoom=13, getUserPosition=null) {
   const map = L.map(elementId).setView(center, zoom);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -73,14 +67,14 @@ export function initializeMapWithControls(elementId, center = [41.1579, -8.6291]
   }).addTo(map);
 
   if (getUserPosition) {
-    const centerControl = createCenterControl(map, getUserPosition);
-    centerControl.addTo(map);
+    const centerCtrl = createCenterControl(map, getUserPosition);
+    centerCtrl.addTo(map);
   }
 
-  const currentPage = window.location.pathname.split('/').pop(); // pega 'index.html', 'busmap.html' ou 'stop.html'
-  if (currentPage === 'index.html' || currentPage === 'busmap.html') {
-    const reloadControl = createReloadControl(map);
-    reloadControl.addTo(map);
+  const page = (window.location.pathname.split('/').pop() || '').toLowerCase();
+  if (page === 'index.html' || page === 'busmap.html' || page === '') {
+    const reloadCtrl = createReloadControl();
+    reloadCtrl.addTo(map);
   }
 
   return { map };
