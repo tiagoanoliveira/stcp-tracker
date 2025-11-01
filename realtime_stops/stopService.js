@@ -1,9 +1,9 @@
 class StopService {
   constructor() {
     this.proxyUrl = 'https://stcp.up202007448.workers.dev';
-    
+
     this.vehicleApiUrl = 'https://broker.fiware.urbanplatform.portodigital.pt/v2/entities?q=vehicleType==bus&limit=1000';
-    this.refreshInterval = 5000; // 5 segundos
+    this.refreshInterval = 3000; // 5 segundos
   }
 
   async fetchStopRealtime(stopId) {
@@ -29,16 +29,28 @@ class StopService {
 
   async fetchVehicleData() {
     try {
-      const response = await fetch(this.vehicleApiUrl);
-      
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
+      const fetchPromise = fetch(this.vehicleApiUrl).then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      });
+
+      const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout: dados dos veículos demoraram muito')), 3000)
+      );
+
+      const data = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (!Array.isArray(data)) {
+        throw new Error('Dados inválidos recebidos');
       }
 
-      const data = await response.json();
+      console.log(`✓ ${data.length} veículos carregados com sucesso`);
       return data;
+
     } catch (error) {
-      console.error('Erro ao obter dados dos veículos:', error);
+      console.error('❌ Erro ao obter dados dos veículos:', error.message);
       return [];
     }
   }
@@ -80,6 +92,7 @@ class StopService {
 
   getStatusText(status) {
     const statusMap = {
+      'ARRIVING': 'A chegar',
       'ON_TIME': 'No horário',
       'DELAYED': 'Atrasado',
       'EARLY': 'Adiantado'

@@ -123,22 +123,27 @@ class BusTrackingApp {
   async fetchAndUpdateBuses() {
     try {
       const filterValue = '';
-      
-      console.log('Buscando dados de todos os autocarros...');
+
+      console.log('⏳ Buscando dados de autocarros...');
       const busData = await dataService.fetchBusData(filterValue);
-      
-      if (!busData || busData.length === 0) {
-        console.warn('Nenhum autocarro encontrado');
+
+      if (!Array.isArray(busData)) {
+        console.error('❌ Dados inválidos recebidos:', typeof busData);
+        return;
+      }
+
+      if (busData.length === 0) {
+        console.warn('⚠ Nenhum autocarro encontrado');
         mapService.updateBusMarkers([]);
         return;
       }
-      
-      console.log(`${busData.length} autocarros recebidos, atualizando mapa...`);
+
+      console.log(`✓ ${busData.length} autocarros recebidos`);
       mapService.updateBusMarkers(busData);
-      console.log('Marcadores atualizados no mapa');
+      console.log('✓ Mapa atualizado com sucesso');
+
     } catch (error) {
-      console.error('Erro ao obter ou atualizar dados dos autocarros:', error);
-      throw error;
+      console.error('❌ Erro crítico:', error);
     }
   }
 }

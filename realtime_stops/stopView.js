@@ -72,8 +72,16 @@ class StopView {
 
   async loadStopData() {
     try {
+      console.log('🔄 Iniciando carregamento de dados para paragem:', this.stopId);
+
       const stopData = await stopService.fetchStopRealtime(this.stopId);
-      
+
+      console.log('📍 Dados da paragem recebidos:', {
+        stop_name: stopData?.stop_name,
+        arrivals_count: stopData?.arrivals?.length || 0,
+        has_data: !!stopData
+      });
+
       if (!stopData) {
         this.showError('Não foi possível carregar dados da paragem.');
         return;
@@ -84,20 +92,58 @@ class StopView {
         titleElement.textContent = `Paragem: ${stopData.stop_name}`;
       }
 
+      if (!stopData.arrivals || stopData.arrivals.length === 0) {
+        console.log('⚠ Nenhuma chegada prevista nesta paragem');
+        this.displayArrivals([], []);
+        this.clearBusMarkers();
+        return;
+      }
+
+      console.log('🚌 A carregar dados de veículos em tempo real...');
+
       const vehicles = await stopService.fetchVehicleData();
-      this.updateBusMap(stopData.arrivals || [], vehicles);
-      this.displayArrivals(stopData.arrivals || [], vehicles);
+
+      console.log('🔍 Verificação de dados:', {
+        stopDataReceived: !!stopData,
+        arrivalsCount: stopData?.arrivals?.length || 0,
+        vehiclesCount: vehicles?.length || 0,
+        hasMap: !!this.map,
+        mapReady: this.map?._loaded || false
+      });
+
+      console.log('🎨 A atualizar interface...');
+
+      this.updateBusMap(stopData.arrivals, vehicles);
+      this.displayArrivals(stopData.arrivals, vehicles);
+
+      console.log('✅ Dados carregados com sucesso:', {
+        arrivals: stopData.arrivals.length,
+        vehicles: vehicles.length,
+        markers: Object.keys(this.busMarkers).length
+      });
 
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      console.error('❌ Erro crítico ao carregar dados:', {
+        error: error.message,
+        stack: error.stack,
+        stopId: this.stopId
+      });
       this.showError('Erro ao atualizar informações.');
     }
   }
 
   displayArrivals(arrivals, vehicles) {
     const container = document.getElementById('arrivals-list');
-    
-    if (!container) return;
+
+    if (!container) {
+      console.error('❌ Container arrivals-list não encontrado no DOM');
+      return;
+    }
+
+    console.log('📋 A mostrar chegadas:', {
+      arrivals: arrivals?.length || 0,
+      vehicles: vehicles?.length || 0
+    });
 
     if (!arrivals || arrivals.length === 0) {
       container.innerHTML = '<p class="no-arrivals">Não há autocarros previstos de momento.</p>';
@@ -105,13 +151,15 @@ class StopView {
     }
 
     container.innerHTML = '';
-    
+
     arrivals.forEach(arrival => {
       const vehicle = stopService.matchVehicleToTrip(vehicles, arrival.trip_id);
       const arrivalElement = this.createArrivalElement(arrival, vehicle);
       container.appendChild(arrivalElement);
     });
+    console.log(`✓ ${arrivals.length} chegadas mostradas na interface`);
   }
+
 
   createArrivalElement(arrival, vehicle) {
     const statusClass = arrival.status === 'ON_TIME' ? 'status-ontime' : 'status-delayed';
@@ -168,7 +216,14 @@ class StopView {
   }
 
   updateBusMap(arrivals, vehicles) {
+    console.log('🗺️ A atualizar mapa:', {
+      arrivals: arrivals?.length || 0,
+      vehicles: vehicles?.length || 0,
+      currentMarkers: Object.keys(this.busMarkers).length
+    });
+
     if (!arrivals || arrivals.length === 0) {
+      console.log('⚠ Sem chegadas, a limpar marcadores');
       this.clearBusMarkers();
       this.lastBusPositions = [];
       return;
@@ -179,10 +234,10 @@ class StopView {
 
     arrivals.forEach(arrival => {
       const vehicle = stopService.matchVehicleToTrip(vehicles, arrival.trip_id);
-      
+
       if (vehicle) {
         const location = stopService.extractVehicleLocation(vehicle);
-        
+
         if (location) {
           const busId = vehicle.id;
           validIDs.add(busId);
@@ -206,7 +261,11 @@ class StopView {
             marker.bindPopup(popupContent);
             this.busMarkers[busId] = marker;
           }
+        } else {
+          console.warn(`⚠ Localização não encontrada para veículo ${vehicle.id}`);
         }
+      } else {
+        console.warn(`⚠ Veículo não encontrado para trip_id: ${arrival.trip_id}`);
       }
     });
 
