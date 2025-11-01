@@ -14,6 +14,7 @@ class StopView {
     this.iconCache = {};
     this.lastBusPositions = [];
     this.vehicleIdToArrival = new Map();
+    this.lastUpdateTime = null;
   }
 
   getLineColors(line) {
@@ -96,6 +97,7 @@ class StopView {
         console.log('⚠ Nenhuma chegada prevista nesta paragem');
         this.displayArrivals([], []);
         this.clearBusMarkers();
+        this.updateLastUpdateTime();
         return;
       }
 
@@ -115,6 +117,7 @@ class StopView {
 
       this.updateBusMap(stopData.arrivals, vehicles);
       this.displayArrivals(stopData.arrivals, vehicles);
+      this.updateLastUpdateTime();
 
       console.log('✅ Dados carregados com sucesso:', {
         arrivals: stopData.arrivals.length,
@@ -318,6 +321,22 @@ class StopView {
     if (container) {
       container.innerHTML = `<p class="no-arrivals">${message}</p>`;
     }
+  }
+  updateLastUpdateTime() {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+    const timeString = `${hours}:${minutes}:${seconds}`;
+
+    this.lastUpdateTime = timeString;
+
+    const updateElement = document.getElementById('last-update-time');
+    if (updateElement) {
+      updateElement.innerHTML = `Última atualização: <strong>${timeString}</strong>`;
+    }
+
+    console.log(`⏰ Atualização registada às ${timeString}`);
   }
 }
 

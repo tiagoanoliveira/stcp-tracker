@@ -275,7 +275,6 @@ footer a{
   background-color: #ffd392;
   color: #000000;
 }
-
 .loading-text {
   text-align: center;
   color: var(--color-text);
@@ -289,6 +288,24 @@ footer a{
   padding: 30px;
   font-size: 1.1rem;
 }
+
+.last-update-container {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.last-update-text {
+  font-size: 0.9rem;
+  color: #666;
+  font-style: italic;
+  margin: 0;
+}
+
+.last-update-text strong {
+  color: #0072C6;
+  font-weight: 600;
+}
+
 .info-card #map {
   height: 45vh;
 }
