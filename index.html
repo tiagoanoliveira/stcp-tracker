@@ -56,6 +56,13 @@
   <script type="module" src="realtime_stops/stopsData.js"></script>
   <script type="module" src="realtime_stops/stopsMapApp.js"></script>
   <script src="./resources/header.js"></script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js', {scope: '/'})
+      .then(reg => console.log('Service Worker registado', reg))
+      .catch(err => console.log('Erro no Service Worker', err));
+  }
+      </script>
 </body>
 
 </html>
