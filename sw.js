@@ -1,10 +1,10 @@
 const CACHE_NAME = 'stcp-live-v2';
 const urlsToCache = [
   '/',
-  '/index.html',
-  '/busmap.html',
-  '/stop.html',
-  '/style.css',
+  'index.html',
+  'busmap.html',
+  'stop.html',
+  'style.css',
   './resources/favicon.svg',
   './resources/header.js',
   './realtime_stops/stopsData.js',
