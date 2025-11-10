@@ -8,7 +8,11 @@ const urlsToCache = [
   './resources/favicon.svg',
   './resources/header.js',
   './realtime_stops/stopsData.js',
-  './realtime_stops/stopsMapApp.js'
+  './realtime_stops/stopsMapApp.js',
+    './realtime_bus_map/app.js',
+    './realtime_bus_map/dataService.js',
+    './realtime_stops/stopView.js',
+    './realtime_stops/stopsService.js'
 ];
 
 // Instalação - cachear recursos
