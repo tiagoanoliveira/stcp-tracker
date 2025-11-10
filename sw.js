@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stcp-live-v3';
+const CACHE_NAME = 'stcp-live-v4';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -12,31 +12,33 @@ const urlsToCache = [
   '/realtime_bus_map/app.js',
   '/realtime_bus_map/dataService.js',
   '/realtime_stops/stopView.js',
-  '/realtime_stops/stopsService.js'
+  '/realtime_stops/stopService.js'
 ];
 
-// Instalação com tratamento de erros
+// Instalação
 self.addEventListener('install', event => {
+  console.log('Service Worker: Instalando...');
   event.waitUntil(
       caches.open(CACHE_NAME)
           .then(cache => {
+            console.log('Cache aberto');
             return cache.addAll(urlsToCache);
           })
           .then(() => self.skipWaiting())
-          .catch(err => {
-            console.error('Falha ao cachear recursos:', err);
-          })
+          .catch(err => console.error('Erro ao cachear:', err))
   );
 });
 
 // Ativação
 self.addEventListener('activate', event => {
+  console.log('Service Worker: Ativando...');
   event.waitUntil(
       caches.keys()
           .then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cacheName => {
                   if (cacheName !== CACHE_NAME) {
+                    console.log('Deletando cache antiga:', cacheName);
                     return caches.delete(cacheName);
                   }
                 })
@@ -46,35 +48,42 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch melhorado
+// Fetch - NÃO interceptar navegações para evitar conflito com redirects do Cloudflare
 self.addEventListener('fetch', event => {
-  // Ignorar pedidos não-GET ou externos
-  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
+  const { request } = event;
+
+  // IMPORTANTE: Ignorar navegações completamente
+  if (request.mode === 'navigate') {
+    return; // Deixar o browser/Cloudflare lidar com navegações
+  }
+
+  // Só cachear recursos (JS, CSS, imagens, etc)
+  if (request.method !== 'GET') {
     return;
   }
 
   event.respondWith(
-      caches.match(event.request)
-          .then(response => {
-            if (response) {
-              return response;
+      caches.match(request)
+          .then(cachedResponse => {
+            if (cachedResponse) {
+              return cachedResponse;
             }
-            return fetch(event.request)
-                .then(fetchResponse => {
-                  // Cachear respostas válidas dinamicamente
-                  if (fetchResponse && fetchResponse.status === 200) {
-                    const responseToCache = fetchResponse.clone();
+
+            return fetch(request)
+                .then(response => {
+                  // Cachear apenas respostas válidas
+                  if (response && response.status === 200 && response.type === 'basic') {
+                    const responseToCache = response.clone();
                     caches.open(CACHE_NAME)
-                        .then(cache => cache.put(event.request, responseToCache));
+                        .then(cache => cache.put(request, responseToCache))
+                        .catch(err => console.error('Erro ao cachear resposta:', err));
                   }
-                  return fetchResponse;
+                  return response;
+                })
+                .catch(err => {
+                  console.error('Fetch falhou:', err);
+                  return caches.match(request);
                 });
-          })
-          .catch(() => {
-            // Retornar página offline se for navegação
-            if (event.request.mode === 'navigate') {
-              return caches.match('/index.html');
-            }
           })
   );
 });
