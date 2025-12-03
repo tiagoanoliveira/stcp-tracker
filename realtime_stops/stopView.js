@@ -149,7 +149,7 @@ class StopView {
     });
 
     if (!arrivals || arrivals.length === 0) {
-      container.innerHTML = '<p class="no-arrivals">Não há chegadas previstas de momento. Consulte</p><a href="busmap.html"> aqui a localização em tempo real dos autocarros</a> ou verifique o horário planeado na paragem.</p>';
+      container.innerHTML = '<p class="no-arrivals">Não há chegadas previstas de momento. Consulte <a href="busmap.html"> aqui a localização em tempo real dos autocarros</a> ou verifique o horário planeado na paragem.</p>';
       return;
     }
 
