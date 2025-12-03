@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stcp-live-v2.02';
+const CACHE_NAME = 'stcp-live-v2.3';
 const urlsToCache = [
   '/',
   '/index.html',
