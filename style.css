@@ -309,6 +309,10 @@ footer a{
 .info-card #map {
   height: 45vh;
 }
+
+.busmap {
+  margin-top: 5px;
+}
 /* Estilos para ícones de paragem no mapa */
 .stop-marker-icon {
   background-color: var(--color-secondary);

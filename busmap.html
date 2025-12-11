@@ -34,8 +34,13 @@
       <p style="text-align: center;">🕘 Para ver os próximos autocarros numa dada paragem, selecione "Ver paragens".</p>
       <p style="text-align: center;">💡 Ao pressionar sobre um autocarro, é possível ver o seu destino, velocidade, entre outros. Experimente!</p>
     </div>
+    <div class="last-update-container">
+      <p id="last-update-time" class="last-update-text">
+        Última atualização: --:--:--
+      </p>
+    </div>
     <section aria-label="Mapa dos autocarros em tempo real" aria-live="polite">
-      <div id="map" tabindex="0" role="region"></div>
+      <div id="map" class="busmap" tabindex="0" role="region"></div>
     </section>
   </main>
 

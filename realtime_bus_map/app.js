@@ -6,6 +6,7 @@ class BusTrackingApp {
     this.refreshTimeout = null;
     this.refreshDelay = 5000;
     this.isRefreshing = false;
+    this.lastUpdateTime = null;
   }
 
   async initialize() {
@@ -120,6 +121,21 @@ class BusTrackingApp {
     }
   }
 
+  updateLastUpdateTime() {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+    const timeString = `${hours}:${minutes}:${seconds}`;
+
+    this.lastUpdateTime = timeString;
+
+    const updateElement = document.getElementById('last-update-time');
+    if (updateElement) {
+      updateElement.innerHTML = `Última atualização: <strong>${timeString}</strong>`;
+    }
+  }
+  
   async fetchAndUpdateBuses() {
     try {
       const filterValue = '';
@@ -135,11 +151,13 @@ class BusTrackingApp {
       if (busData.length === 0) {
         console.warn('⚠ Nenhum autocarro encontrado');
         mapService.updateBusMarkers([]);
+        this.updateLastUpdateTime();
         return;
       }
 
       console.log(`✓ ${busData.length} autocarros recebidos`);
       mapService.updateBusMarkers(busData);
+      this.updateLastUpdateTime();
       console.log('✓ Mapa atualizado com sucesso');
 
     } catch (error) {
