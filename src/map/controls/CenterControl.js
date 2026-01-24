@@ -1,6 +1,6 @@
 /**
  * CenterControl - Controlo customizado para centrar o mapa no utilizador
- * Usa o ícone GPS e posiciona-se no canto inferior direito
+ * Posiciona-se no canto inferior direito, acima dos controlos de zoom
  */
 
 export function createCenterControl(map, getUserPosition) {
@@ -10,7 +10,7 @@ export function createCenterControl(map, getUserPosition) {
     },
 
     onAdd: function(map) {
-      const container = L.DomUtil.create('div', 'leaflet-control-center leaflet-bar');
+      const container = L.DomUtil.create('div', 'leaflet-control-center');
       
       const button = L.DomUtil.create('button', '', container);
       button.type = 'button';
