@@ -90,10 +90,10 @@ class DataService {
     const serviceId = this.obterServiceIdAtual();
     if (!serviceId) {
       console.warn('Não foi possível determinar serviceId atual.');
-      return 'Destino Desconhecido';
+      return 'Destino Desconhecido 1';
     }
     if (!line || sentido == null) {
-      return 'Destino Desconhecido';
+      return 'Destino Desconhecido 2';
     }
 
     const direction = sentido.toString();
@@ -104,7 +104,7 @@ class DataService {
       t.service_id === serviceId
     );
 
-    return trip?.trip_headsign || 'Destino Desconhecido';
+    return trip?.trip_headsign || 'Destino Desconhecido 3';
   }
 
   async fetchWithRetry(url, options = {}, retries = 3, delayMs = 500, timeoutMs = 1000) {
