@@ -11,7 +11,17 @@ export class MapInitializer {
   }
 
   initialize(getUserPosition = null) {
-    const map = L.map(this.elementId).setView(this.center, this.zoom);
+    // Criar mapa com zoomControl desativado para reposicionar
+    const map = L.map(this.elementId, {
+      center: this.center,
+      zoom: this.zoom,
+      zoomControl: false // Desativar controlo padrão
+    });
+
+    // Adicionar controlo de zoom no canto inferior direito
+    L.control.zoom({
+      position: 'bottomright'
+    }).addTo(map);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
