@@ -104,18 +104,45 @@ class DataService {
   obterDestino(line, sentido) {
     const serviceId = this.obterServiceIdAtual();
 
+    console.log('  - Linha (route_id):', line);
+    console.log('  - Sentido (direction_id):', sentido);
+    console.log('  - Service ID:', serviceId);
+
     if (!line || sentido == null) {
       return 'Destino Desconhecido';
     }
 
     const direction = sentido.toString();
+    //DEBUG START
+    const tripsForLine = this.trips.filter(t => t.route_id === line);
+    console.log(`Trips disponíveis para linha ${line}:`, tripsForLine.length);
 
+
+    if (tripsForLine.length > 0) {
+      console.log('Exemplo de trip desta linha:', tripsForLine[0]);
+      console.log('Service IDs disponíveis para esta linha:',
+          [...new Set(tripsForLine.map(t => t.service_id))]);
+    }
+    //DEBUG END
     const trip = this.trips.find(t =>
         t.route_id === line &&
         t.direction_id === direction &&
         t.service_id === serviceId
     );
-
+    //DEBUG START
+    if (trip) {
+      console.log('✅ Trip encontrado:', trip.trip_headsign);
+    } else {
+      console.log('❌ Nenhum trip encontrado com estes critérios');
+      // Mostra trips similares para debug
+      const similarTrips = this.trips.filter(t =>
+          t.route_id === line && t.direction_id === direction
+      );
+      console.log('Trips com mesma linha e sentido (service_id diferente):',
+          similarTrips.map(t => ({ service_id: t.service_id, headsign: t.trip_headsign })));
+    }
+    console.log('========================\n');
+    // DEBUG END
     return trip?.trip_headsign || `Destino Desconhecido (${serviceId})`;
   }
 
