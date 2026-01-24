@@ -3,23 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Mapa de paragens STCP no Porto">
+  <meta name="theme-color" content="#0072c6">
   <title>STCP Tracker - Mapa de Paragens</title>
-  <link rel="shortcut icon" href="./resources/favicon.svg">
   
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
-  <!-- StopsMap CSS (mesmo estilo do BusMap) -->
-  <link rel="stylesheet" href="./src/ui/styles/stopsmap.css" />
+  <!-- CSS da aplicação (busmap.css como base) -->
+  <link rel="stylesheet" href="./src/ui/styles/busmap.css">
+  <link rel="stylesheet" href="./src/ui/styles/stopsmap.css">
+  
+  <!-- Favicon -->
+  <link rel="shortcut icon" href="./resources/favicon.svg">
 </head>
 <body>
+  <!-- Mapa full-screen -->
+  <div id="map"></div>
+
   <!-- Logo no canto superior esquerdo -->
   <div class="logo-overlay">
-    <img src="./resources/logo_stcp.svg" alt="STCP Logo" />
-    <span class="logo-text">Mapa de Paragens</span>
+    <img src="./resources/favicon.svg" alt="STCP Live Map Logo">
+    <span class="logo-text">Paragens STCP</span>
   </div>
 
-  <!-- Barra de pesquisa centrada -->
+  <!-- Barra de pesquisa - abaixo do logo, centrada -->
   <div class="search-overlay">
     <div class="search-input-wrapper">
       <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -34,41 +42,15 @@
         autocomplete="off"
       />
     </div>
-    <button id="search-stop" class="search-btn" title="Pesquisar">
-      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"/>
-        <path d="m21 21-4.35-4.35"/>
-      </svg>
-    </button>
-    <button id="center-user-stops" class="center-btn" title="Centrar na minha localização">
-      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <circle cx="12" cy="12" r="3"/>
-      </svg>
-    </button>
   </div>
 
-  <!-- Menu de navegação -->
-  <div class="nav-overlay">
-    <a href="busmap_refactored.html" class="nav-btn">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="6" width="18" height="12" rx="2"/>
-        <path d="M7 10h.01M12 10h.01M17 10h.01"/>
-      </svg>
-      Ver Autocarros
-    </a>
-  </div>
-
-  <!-- Mensagem de erro (escondida por padrão) -->
-  <div id="error-message" class="error-overlay"></div>
-
-  <!-- Mapa full-screen -->
-  <div id="map"></div>
-
-  <!-- Rodapé -->
+  <!-- Rodapé no fundo centro -->
   <div class="footer-overlay">
-    &copy; 2025 STCP Tracker • Website feito com 🤍 por <a href="https://www.linkedin.com/in/tiagoalexoliveira/" target="_blank">Tiago Oliveira</a>. Todos os direitos reservados.
+    &copy; 2026 STCP Live Map • Website feito com 🤍 por <a href="https://www.linkedin.com/in/tiagoalexoliveira/" target="_blank">Tiago Oliveira</a>. Todos os direitos reservados.
   </div>
+
+  <!-- Mensagem de erro -->
+  <div id="error-message" class="error-overlay"></div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
