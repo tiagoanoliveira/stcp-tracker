@@ -50,11 +50,11 @@ class ScheduleService {
     let serviceId;
     
     if (weekday === 0) {
-      serviceId = 'D'; // Domingo
+      serviceId = 'DOM'; // Domingo
     } else if (weekday === 6) {
-      serviceId = 'S'; // Sábado
+      serviceId = 'SAB'; // Sábado
     } else {
-      serviceId = 'U'; // Útil (segunda a sexta)
+      serviceId = 'UTEIS'; // Útil (segunda a sexta)
     }
 
     // Verificar se está num período especial
@@ -65,7 +65,7 @@ class ScheduleService {
     if (specialPeriod) {
       if (specialPeriod.description === 'FERIADO') {
         // Feriados usam horário de domingo
-        serviceId = 'D';
+        serviceId = 'DOM';
         console.log(`🌟 FERIADO detectado - usando horário D (domingo)`);
       } else if (specialPeriod.description === 'FERIAS') {
         // Férias escolares: F (útil), G (sábado), H (domingo)
