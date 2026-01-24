@@ -113,17 +113,7 @@ class DataService {
     }
 
     const direction = sentido.toString();
-    //DEBUG START
-    const tripsForLine = this.trips.filter(t => t.route_id === line);
-    console.log(`Trips disponíveis para linha ${line}:`, tripsForLine.length);
 
-
-    if (tripsForLine.length > 0) {
-      console.log('Exemplo de trip desta linha:', tripsForLine[0]);
-      console.log('Service IDs disponíveis para esta linha:',
-          [...new Set(tripsForLine.map(t => t.service_id))]);
-    }
-    //DEBUG END
     const trip = this.trips.find(t =>
         t.route_id === line &&
         t.direction_id === direction &&
