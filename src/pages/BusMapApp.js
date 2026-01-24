@@ -11,7 +11,7 @@ import { scheduleService } from '../services/scheduleService.js';
 import { MapManager } from '../map/MapManager.js';
 import { BusMarkerManager } from '../map/markers/BusMarkerManager.js';
 import { LastUpdateDisplay } from '../ui/components/LastUpdateDisplay.js';
-import { CenterControl } from '../map/controls/CenterControl.js';
+import { createCenterControl } from '../map/controls/CenterControl.js';
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -34,11 +34,11 @@ export class BusMapApp {
       console.log('✓ Mapa inicializado');
 
       // 2. Adicionar controlo customizado de centrar
-      this.centerControl = new CenterControl(
+      this.centerControl = createCenterControl(
         this.mapManager.map,
         () => this.mapManager.getUserPosition()
       );
-      this.mapManager.map.addControl(this.centerControl);
+      this.centerControl.addTo(this.mapManager.map);
       console.log('✓ Controlo de centrar adicionado');
 
       // 3. Inicializar bus marker manager
