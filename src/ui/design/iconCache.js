@@ -1,7 +1,7 @@
 // iconCache.js - cache centralizado de ícones de autocarros, paragens e utilizador
 
-import { createBusIcon } from '../../resources/busDesign/busIcon.js';
-import { BUS_COLORS, CUSTOM_LINE_TEXTS } from '../../resources/busDesign/busColors.js';
+import { createBusIcon } from '../../../resources/busDesign/busIcon.js';
+import { BUS_COLORS, CUSTOM_LINE_TEXTS } from '../../../resources/busDesign/busColors.js';
 
 class IconCache {
   constructor() {
