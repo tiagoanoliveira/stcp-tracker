@@ -42,11 +42,11 @@ class DataService {
     let serviceId;
 
     if (weekday === 0) {
-      serviceId = 'D'; // Domingo
+      serviceId = 'DOM'; // Domingo
     } else if (weekday === 6) {
-      serviceId = 'S'; // Sábado
+      serviceId = 'SAB'; // Sábado
     } else {
-      serviceId = 'U'; // Útil (segunda a sexta)
+      serviceId = 'UTEIS'; // Útil (segunda a sexta)
     }
 
     // Verifica se está num período especial
