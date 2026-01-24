@@ -1,7 +1,7 @@
 class DataService {
   constructor() {
     this.trips = [];
-    this.calendar = {};
+    this.specialPeriods = []; // Substitui o calendar
     this.apiUrl = 'https://broker.fiware.urbanplatform.portodigital.pt/v2/entities?q=vehicleType==bus&limit=1000';
     this.cachedServiceId = null;
     this.cachedServiceDate = null;
@@ -20,46 +20,61 @@ class DataService {
   async carregarCalendar() {
     try {
       const response = await fetch('./resources/calendar.json');
-      const calendarArray = await response.json();
-      this.calendar = {};
-      for (const service of calendarArray) {
-        this.calendar[service.service_id] = service;
-      }
+      this.specialPeriods = await response.json();
     } catch (error) {
       console.error('Erro ao carregar calendar:', error);
-      this.calendar = {};
+      this.specialPeriods = [];
     }
   }
 
-  // Cacheia o service_id atual por dia para evitar cálculos repetidos
+  // Determina o service_id baseado no dia atual e períodos especiais
   obterServiceIdAtual() {
     const dateNow = new Date();
     const yyyyMMdd = dateNow.toISOString().slice(0, 10).replace(/-/g, '');
 
+    // Verifica cache
     if (this.cachedServiceDate === yyyyMMdd && this.cachedServiceId) {
       return this.cachedServiceId;
     }
 
+    // Determina o tipo de dia base (U, S, D)
     const weekday = dateNow.getDay();
-    const dayMap = {
-      0: 'DOM',
-      6: 'SAB',
-      1: 'UTEIS',
-      2: 'UTEIS',
-      3: 'UTEIS',
-      4: 'UTEIS',
-      5: 'UTEIS'
-    };
+    let serviceId;
 
-    const currentServiceId = dayMap[weekday];
-    const service = this.calendar[currentServiceId];
-    if (service && service.start_date <= yyyyMMdd && service.end_date >= yyyyMMdd) {
-      this.cachedServiceDate = yyyyMMdd;
-      this.cachedServiceId = currentServiceId;
-      return currentServiceId;
+    if (weekday === 0) {
+      serviceId = 'D'; // Domingo
+    } else if (weekday === 6) {
+      serviceId = 'S'; // Sábado
+    } else {
+      serviceId = 'U'; // Útil (segunda a sexta)
     }
-    this.cachedServiceId = null;
-    return null;
+
+    // Verifica se está num período especial
+    const specialPeriod = this.specialPeriods.find(period =>
+        period.start_date <= yyyyMMdd && period.end_date >= yyyyMMdd
+    );
+
+    if (specialPeriod) {
+      if (specialPeriod.description === 'FERIADO') {
+        // Feriados usam horário de domingo
+        serviceId = 'D';
+      } else if (specialPeriod.description === 'FERIAS') {
+        // Férias escolares: F (útil), G (sábado), H (domingo)
+        if (weekday === 0) {
+          serviceId = 'H';
+        } else if (weekday === 6) {
+          serviceId = 'G';
+        } else {
+          serviceId = 'F';
+        }
+      }
+    }
+
+    // Cacheia o resultado
+    this.cachedServiceDate = yyyyMMdd;
+    this.cachedServiceId = serviceId;
+
+    return serviceId;
   }
 
   // Auxiliar geral para extrair annotations por prefixo
@@ -88,23 +103,20 @@ class DataService {
 
   obterDestino(line, sentido) {
     const serviceId = this.obterServiceIdAtual();
-    if (!serviceId) {
-      console.warn('Não foi possível determinar serviceId atual.');
-      return 'Destino Desconhecido 1';
-    }
+
     if (!line || sentido == null) {
-      return 'Destino Desconhecido 2';
+      return 'Destino Desconhecido';
     }
 
     const direction = sentido.toString();
 
     const trip = this.trips.find(t =>
-      t.route_id === line &&
-      t.direction_id === direction &&
-      t.service_id === serviceId
+        t.route_id === line &&
+        t.direction_id === direction &&
+        t.service_id === serviceId
     );
 
-    return trip?.trip_headsign || 'Destino Desconhecido 3';
+    return trip?.trip_headsign || `Destino Desconhecido (${serviceId})`;
   }
 
   async fetchWithRetry(url, options = {}, retries = 3, delayMs = 500, timeoutMs = 1000) {
@@ -114,7 +126,7 @@ class DataService {
         const id = setTimeout(() => controller.abort(), timeoutMs);
         const response = await fetch(url, { ...options, signal: controller.signal });
         clearTimeout(id);
-        
+
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return await response.json();
       } catch (error) {
@@ -132,8 +144,8 @@ class DataService {
         return [];
       }
       return data
-        .map(bus => this.processBusData(bus))
-        .filter(bus => bus && this.shouldIncludeBus(bus, filterValue));
+          .map(bus => this.processBusData(bus))
+          .filter(bus => bus && this.shouldIncludeBus(bus, filterValue));
     } catch (error) {
       console.error('Erro ao obter dados dos autocarros:', error);
       return [];
