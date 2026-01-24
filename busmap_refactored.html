@@ -3,109 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>STCP Tracker - Mapa de Autocarros (Refatorizado)</title>
+  <meta name="description" content="Mapa em tempo real dos autocarros STCP no Porto">
+  <title>STCP Tracker - Mapa de Autocarros</title>
   
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .header {
-      background-color: #0072c6;
-      color: white;
-      padding: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .header h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 1rem;
-      align-items: center;
-    }
-
-    .btn {
-      background-color: rgba(255,255,255,0.2);
-      border: 1px solid rgba(255,255,255,0.3);
-      color: white;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.875rem;
-      transition: background-color 0.2s;
-    }
-
-    .btn:hover {
-      background-color: rgba(255,255,255,0.3);
-    }
-
-    #last-update-time {
-      font-size: 0.875rem;
-      opacity: 0.9;
-    }
-
-    #map {
-      flex: 1;
-      width: 100%;
-    }
-
-    #error-message {
-      display: none;
-      position: fixed;
-      top: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      background-color: #ff6b6b;
-      color: white;
-      padding: 1rem 2rem;
-      border-radius: 4px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      z-index: 10000;
-    }
-
-    .refactored-badge {
-      background-color: #28a745;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: bold;
-    }
-  </style>
+  <!-- CSS da aplicação -->
+  <link rel="stylesheet" href="./src/ui/styles/busmap.css">
 </head>
 <body>
-  <div class="header">
-    <div>
-      <h1>🚍 STCP Tracker <span class="refactored-badge">REFACTORED</span></h1>
+  <!-- Mapa full-screen -->
+  <div id="map"></div>
+
+  <!-- Header overlay transparente com botões opacos -->
+  <div class="header-overlay">
+    <div id="last-update-time" class="header-timestamp">
+      Última atualização: <strong>--:--:--</strong>
     </div>
-    <div class="header-actions">
-      <div id="last-update-time">Última atualização: --:--:--</div>
-      <button id="center-user" class="btn">📍 Centrar</button>
-      <button id="refresh-now" class="btn">🔄 Atualizar</button>
-    </div>
+    <button id="center-user" class="header-btn" title="Centrar no utilizador">
+      <span class="header-btn-icon">📍</span>
+      Centrar
+    </button>
+    <button id="refresh-now" class="header-btn header-btn-primary" title="Forçar atualização">
+      <span class="header-btn-icon">🔄</span>
+      Atualizar
+    </button>
   </div>
 
-  <div id="error-message"></div>
-  <div id="map"></div>
+  <!-- Mensagem de erro -->
+  <div id="error-message" class="error-overlay"></div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
