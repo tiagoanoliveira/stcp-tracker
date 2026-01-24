@@ -1,6 +1,6 @@
 // mapInitializer.js - Wrapper em torno do Leaflet para inicializar mapas com controlos padrão
 
-import { createCenterControl, createReloadControl, createUserMarker } from '../../realtime_bus_map/mapUtils.js';
+import { createCenterControl, createReloadControl, createUserMarker } from '../../../realtime_bus_map/mapUtils.js';
 
 export class MapInitializer {
   constructor(elementId, center=[41.1579,-8.6291], zoom=13) {
@@ -23,7 +23,7 @@ export class MapInitializer {
     }
 
     const page = (window.location.pathname.split('/').pop() || '').toLowerCase();
-    if (page === 'index.html' || page === 'busmap.html' || page === '') {
+    if (page === 'index.html' || page === 'busmap.html' || page === 'busmap_refactored.html' || page === '') {
       const reloadCtrl = createReloadControl();
       reloadCtrl.addTo(map);
     }
