@@ -199,7 +199,8 @@ html, body {
 
 /* Controlo de centrar - mesmo estilo */
 .leaflet-control-center {
-  margin-bottom: 8px;
+  margin-bottom: 8px; !important;
+  margin-right: 0; !important;
 }
 
 .leaflet-control-center button {
@@ -225,6 +226,10 @@ html, body {
 .leaflet-control-center button img {
   width: 24px;
   height: 24px;
+}
+
+.leaflet-container .leaflet-control-attribution {
+  display: none !important;
 }
 
 /* Mensagem de erro */
@@ -407,6 +412,6 @@ html, body {
   }
 
   .leaflet-control-center {
-    margin-bottom: 6px;
+    margin-bottom: 6px; !important;
   }
 }
