@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Mapa em tempo real dos autocarros STCP no Porto">
+  <meta name="theme-color" content="#0072c6">
   <title>STCP Tracker - Mapa de Autocarros</title>
   
   <!-- Leaflet CSS -->
@@ -11,24 +12,33 @@
   
   <!-- CSS da aplicação -->
   <link rel="stylesheet" href="./src/ui/styles/busmap.css">
+  
+  <!-- Favicon -->
+  <link rel="shortcut icon" href="./resources/favicon.svg">
 </head>
 <body>
   <!-- Mapa full-screen -->
   <div id="map"></div>
 
-  <!-- Header overlay transparente com botões opacos -->
+  <!-- Logo no canto superior esquerdo -->
+  <div class="logo-overlay">
+    <img src="./resources/favicon.svg" alt="STCP Live Map Logo">
+    <span class="logo-text">STCP Live</span>
+  </div>
+
+  <!-- Header menu no topo centro -->
   <div class="header-overlay">
     <div id="last-update-time" class="header-timestamp">
       Última atualização: <strong>--:--:--</strong>
     </div>
-    <button id="center-user" class="header-btn" title="Centrar no utilizador">
-      <span class="header-btn-icon">📍</span>
-      Centrar
+    <button id="refresh-now" class="header-btn" title="Atualizar dados">
+      <img src="./resources/atualizar.png" alt="Atualizar">
     </button>
-    <button id="refresh-now" class="header-btn header-btn-primary" title="Forçar atualização">
-      <span class="header-btn-icon">🔄</span>
-      Atualizar
-    </button>
+  </div>
+
+  <!-- Rodapé no fundo centro -->
+  <div class="footer-overlay">
+    &copy; 2026 STCP Live Map • Website feito com 🤍 por <a href="https://www.linkedin.com/in/tiagoalexoliveira/" target="_blank">Tiago Oliveira</a>. Todos os direitos reservados.
   </div>
 
   <!-- Mensagem de erro -->
