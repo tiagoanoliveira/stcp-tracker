@@ -1,5 +1,5 @@
 /**
- * BusMap Styles - Mapa full-screen com header overlay transparente
+ * BusMap Styles - Mapa full-screen com overlays
  */
 
 * {
@@ -25,7 +25,67 @@ html, body {
   z-index: 1;
 }
 
-/* Header transparente por cima do mapa */
+/* Controlos do Leaflet (zoom) no canto inferior direito */
+.leaflet-top.leaflet-left {
+  top: auto;
+  left: auto;
+  bottom: 20px;
+  right: 20px;
+}
+
+.leaflet-control-zoom {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.leaflet-control-zoom a {
+  background-color: rgba(255, 255, 255, 0.95);
+  color: #333;
+  width: 36px;
+  height: 36px;
+  line-height: 36px;
+  font-size: 18px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #fff;
+}
+
+.leaflet-control-zoom a:last-child {
+  border-bottom: none;
+}
+
+/* Logo no canto superior esquerdo */
+.logo-overlay {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+  background-color: rgba(255, 255, 255, 0.95);
+  padding: 12px 16px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-overlay img {
+  height: 32px;
+  width: auto;
+}
+
+.logo-overlay .logo-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0072c6;
+}
+
+/* Header menu no topo centro */
 .header-overlay {
   position: absolute;
   top: 20px;
@@ -44,47 +104,37 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Botões opacos */
+/* Botões do menu */
 .header-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 10px 18px;
+  padding: 10px;
   background-color: rgba(255, 255, 255, 0.95);
   color: #333;
   border: none;
-  border-radius: 24px;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  white-space: nowrap;
 }
 
 .header-btn:hover {
   background-color: #fff;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .header-btn:active {
   transform: translateY(0);
 }
 
-.header-btn-icon {
-  font-size: 16px;
-}
-
-/* Botão primário (destaque) */
-.header-btn-primary {
-  background-color: #0072c6;
-  color: white;
-}
-
-.header-btn-primary:hover {
-  background-color: #005fa3;
+.header-btn img {
+  width: 24px;
+  height: 24px;
+  display: block;
 }
 
 /* Timestamp */
@@ -101,6 +151,36 @@ html, body {
 .header-timestamp strong {
   color: #333;
   font-weight: 600;
+}
+
+/* Rodapé no fundo centro */
+.footer-overlay {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 12px 24px;
+  background-color: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+  max-width: 90%;
+}
+
+.footer-overlay a {
+  color: rgba(255, 255, 255, 0.95);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.footer-overlay a:hover {
+  text-decoration: underline;
 }
 
 /* Mensagem de erro */
@@ -154,6 +234,39 @@ html, body {
   font-size: 15px;
 }
 
+/* Custom control de centrar */
+.leaflet-control-center {
+  position: absolute;
+  bottom: 90px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.leaflet-control-center button {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.leaflet-control-center button:hover {
+  background-color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.leaflet-control-center button img {
+  width: 24px;
+  height: 24px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .header-overlay {
@@ -163,30 +276,66 @@ html, body {
     gap: 8px;
   }
 
-  .header-btn,
-  .header-timestamp {
-    padding: 8px 14px;
-    font-size: 13px;
+  .header-btn {
+    width: 40px;
+    height: 40px;
   }
 
-  .header-btn-icon {
+  .header-btn img {
+    width: 20px;
+    height: 20px;
+  }
+
+  .header-timestamp {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .logo-overlay {
+    top: 12px;
+    left: 12px;
+    padding: 8px 12px;
+  }
+
+  .logo-overlay img {
+    height: 24px;
+  }
+
+  .logo-overlay .logo-text {
     font-size: 14px;
+  }
+
+  .footer-overlay {
+    bottom: 12px;
+    padding: 10px 16px;
+    font-size: 11px;
+  }
+
+  .leaflet-control-center {
+    bottom: 80px;
+    right: 12px;
+  }
+
+  .leaflet-top.leaflet-left {
+    bottom: 12px;
+    right: 12px;
   }
 }
 
 @media (max-width: 480px) {
   .header-overlay {
-    top: 12px;
-    left: 12px;
-    right: 12px;
-    transform: none;
-    flex-direction: column;
-    border-radius: 16px;
+    top: 70px;
+    flex-direction: row;
+    border-radius: 24px;
+    gap: 6px;
   }
 
-  .header-btn,
-  .header-timestamp {
-    width: 100%;
-    justify-content: center;
+  .logo-overlay .logo-text {
+    display: none;
+  }
+
+  .footer-overlay {
+    font-size: 10px;
+    padding: 8px 12px;
   }
 }
