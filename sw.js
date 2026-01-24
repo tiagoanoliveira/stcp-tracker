@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stcp-live-v4';
+const CACHE_NAME = 'stcp-live-v5';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -6,13 +6,7 @@ const urlsToCache = [
   '/stop.html',
   '/style.css',
   '/resources/favicon.svg',
-  '/resources/header.js',
-  '/realtime_stops/stopsData.js',
-  '/realtime_stops/stopsMapApp.js',
-  '/realtime_bus_map/app.js',
-  '/realtime_bus_map/dataService.js',
-  '/realtime_stops/stopView.js',
-  '/realtime_stops/stopService.js'
+  '/resources/header.js'
 ];
 
 // Instalação
@@ -48,16 +42,22 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch - NÃO interceptar navegações para evitar conflito com redirects do Cloudflare
+// Fetch
 self.addEventListener('fetch', event => {
   const { request } = event;
+  const url = new URL(request.url);
 
-  // IMPORTANTE: Ignorar navegações completamente
-  if (request.mode === 'navigate') {
-    return; // Deixar o browser/Cloudflare lidar com navegações
+  // Ignorar schemes não suportados
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    return; // Ignorar chrome-extension:, blob:, data:, etc
   }
 
-  // Só cachear recursos (JS, CSS, imagens, etc)
+  // Ignorar navegações
+  if (request.mode === 'navigate') {
+    return;
+  }
+
+  // Só cachear GET requests
   if (request.method !== 'GET') {
     return;
   }
