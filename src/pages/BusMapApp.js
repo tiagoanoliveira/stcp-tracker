@@ -11,6 +11,7 @@ import { scheduleService } from '../services/scheduleService.js';
 import { MapManager } from '../map/MapManager.js';
 import { BusMarkerManager } from '../map/markers/BusMarkerManager.js';
 import { LastUpdateDisplay } from '../ui/components/LastUpdateDisplay.js';
+import { CenterControl } from '../map/controls/CenterControl.js';
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -19,6 +20,7 @@ export class BusMapApp {
     this.mapManager = null;
     this.busMarkerManager = null;
     this.lastUpdateDisplay = new LastUpdateDisplay();
+    this.centerControl = null;
   }
 
   async initialize() {
@@ -31,26 +33,34 @@ export class BusMapApp {
       await this.mapManager.waitForReady();
       console.log('✓ Mapa inicializado');
 
-      // 2. Inicializar bus marker manager
+      // 2. Adicionar controlo customizado de centrar
+      this.centerControl = new CenterControl(
+        this.mapManager.map,
+        () => this.mapManager.getUserPosition()
+      );
+      this.mapManager.map.addControl(this.centerControl);
+      console.log('✓ Controlo de centrar adicionado');
+
+      // 3. Inicializar bus marker manager
       this.busMarkerManager = new BusMarkerManager(this.mapManager.map);
 
-      // 3. Carregar dados de schedule (trips + calendar)
+      // 4. Carregar dados de schedule (trips + calendar)
       await scheduleService.loadScheduleData();
       console.log('✓ Dados de horários carregados');
 
-      // 4. Configurar geolocalização
+      // 5. Configurar geolocalização
       this.setupGeolocation();
 
-      // 5. Configurar event listeners
+      // 6. Configurar event listeners
       this.setupEventListeners();
 
-      // 6. Inicializar display de última atualização
+      // 7. Inicializar display de última atualização
       this.lastUpdateDisplay.initialize();
 
-      // 7. Primeira busca de dados
+      // 8. Primeira busca de dados
       await this.fetchAndUpdateBuses();
 
-      // 8. Iniciar auto-refresh
+      // 9. Iniciar auto-refresh
       this.startAutoRefresh();
 
       console.log('✅ BusMapApp inicializado com sucesso');
@@ -72,18 +82,6 @@ export class BusMapApp {
   }
 
   setupEventListeners() {
-    // Botão centrar no utilizador
-    const centerUserBtn = document.getElementById('center-user');
-    if (centerUserBtn) {
-      centerUserBtn.addEventListener('click', () => {
-        if (geolocationService.isAvailable()) {
-          this.mapManager.centerOnUser();
-        } else {
-          alert('Localização do utilizador não disponível.');
-        }
-      });
-    }
-
     // Botão refresh manual
     const refreshNowBtn = document.getElementById('refresh-now');
     if (refreshNowBtn) {
