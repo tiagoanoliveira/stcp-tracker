@@ -57,6 +57,7 @@ html, body {
   position: absolute;
   top: 20px;
   left: 50%;
+  margin-left: 20px;
   transform: translateX(-50%);
   z-index: 1000;
   display: flex;
@@ -360,7 +361,6 @@ html, body {
 
   .header-overlay {
     height: 44px;
-    top: 70px; /* Abaixo do logo */
     font-size: 12px;
   }
 
