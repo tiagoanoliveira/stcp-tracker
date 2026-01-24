@@ -12,6 +12,7 @@ import { MapManager } from '../map/MapManager.js';
 import { BusMarkerManager } from '../map/markers/BusMarkerManager.js';
 import { LastUpdateDisplay } from '../ui/components/LastUpdateDisplay.js';
 import { createCenterControl } from '../map/controls/CenterControl.js';
+import { createStopsControl } from '../map/controls/StopsControl.js';
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -21,6 +22,7 @@ export class BusMapApp {
     this.busMarkerManager = null;
     this.lastUpdateDisplay = new LastUpdateDisplay();
     this.centerControl = null;
+    this.stopsControl = null;
   }
 
   async initialize() {
@@ -41,26 +43,31 @@ export class BusMapApp {
       this.centerControl.addTo(this.mapManager.map);
       console.log('✓ Controlo de centrar adicionado');
 
-      // 3. Inicializar bus marker manager
+      // 3. Adicionar controlo de ver paragens
+      this.stopsControl = createStopsControl(this.mapManager.map);
+      this.stopsControl.addTo(this.mapManager.map);
+      console.log('✓ Controlo de paragens adicionado');
+
+      // 4. Inicializar bus marker manager
       this.busMarkerManager = new BusMarkerManager(this.mapManager.map);
 
-      // 4. Carregar dados de schedule (trips + calendar)
+      // 5. Carregar dados de schedule (trips + calendar)
       await scheduleService.loadScheduleData();
       console.log('✓ Dados de horários carregados');
 
-      // 5. Configurar geolocalização
+      // 6. Configurar geolocalização
       this.setupGeolocation();
 
-      // 6. Configurar event listeners
+      // 7. Configurar event listeners
       this.setupEventListeners();
 
-      // 7. Inicializar display de última atualização
+      // 8. Inicializar display de última atualização
       this.lastUpdateDisplay.initialize();
 
-      // 8. Primeira busca de dados
+      // 9. Primeira busca de dados
       await this.fetchAndUpdateBuses();
 
-      // 9. Iniciar auto-refresh
+      // 10. Iniciar auto-refresh
       this.startAutoRefresh();
 
       console.log('✅ BusMapApp inicializado com sucesso');
