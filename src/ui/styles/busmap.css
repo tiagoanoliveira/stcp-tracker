@@ -200,8 +200,8 @@ html, body {
 
 /* Controlo de centrar - mesmo estilo */
 .leaflet-control-center.leaflet-control {
-  margin-bottom: 8px; !important;
-  margin-right: 0; !important;
+  margin-bottom: 8px !important;
+  margin-right: 0 !important;
 }
 
 .leaflet-control-center button {
@@ -225,6 +225,44 @@ html, body {
 }
 
 .leaflet-control-center button img {
+  width: 24px;
+  height: 24px;
+}
+
+/* Controlos no canto inferior ESQUERDO */
+.leaflet-bottom.leaflet-left {
+  bottom: 80px; /* Espaço para o footer */
+  left: 20px;
+}
+
+/* Controlo de ver paragens - mesmo estilo dos outros controlos */
+.leaflet-control-stops.leaflet-control {
+  margin-bottom: 0 !important;
+  margin-left: 0 !important;
+}
+
+.leaflet-control-stops button {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.leaflet-control-stops button:hover {
+  background-color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.leaflet-control-stops button img {
   width: 24px;
   height: 24px;
 }
@@ -333,12 +371,22 @@ html, body {
     font-size: 12px;
   }
 
+  .leaflet-bottom.leaflet-right,
+  .leaflet-bottom.leaflet-left {
+    bottom: 60px;
+  }
+
   .leaflet-bottom.leaflet-right {
     right: 12px;
   }
 
+  .leaflet-bottom.leaflet-left {
+    left: 12px;
+  }
+
   .leaflet-control-zoom a,
-  .leaflet-control-center button {
+  .leaflet-control-center button,
+  .leaflet-control-stops button {
     width: 40px !important;
     height: 40px !important;
   }
@@ -386,12 +434,22 @@ html, body {
     padding: 6px 12px;
   }
 
+  .leaflet-bottom.leaflet-right,
+  .leaflet-bottom.leaflet-left {
+    bottom: 60px;
+  }
+
   .leaflet-bottom.leaflet-right {
     right: 10px;
   }
 
+  .leaflet-bottom.leaflet-left {
+    left: 10px;
+  }
+
   .leaflet-control-zoom a,
-  .leaflet-control-center button {
+  .leaflet-control-center button,
+  .leaflet-control-stops button {
     width: 40px !important;
     height: 40px !important;
   }
@@ -403,6 +461,6 @@ html, body {
   }
 
   .leaflet-control-center {
-    margin-bottom: 6px; !important;
+    margin-bottom: 6px !important;
   }
 }
