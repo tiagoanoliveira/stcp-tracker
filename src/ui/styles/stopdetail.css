@@ -1,0 +1,459 @@
+/**
+ * StopDetail Styles - Layout card-based com mapa
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: #f5f7fa;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header-overlay {
+  background: linear-gradient(135deg, #0072c6 0%, #005a9e 100%);
+  color: white;
+  padding: 16px 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-title svg {
+  flex-shrink: 0;
+}
+
+.header-title h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.header-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.header-btn:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.header-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Container principal */
+.container {
+  flex: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* Cards */
+.card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e8ecf0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.refresh-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background-color: #f5f7fa;
+  color: #0072c6;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  font-size: 20px;
+}
+
+.refresh-btn:hover {
+  background-color: #e8ecf0;
+  transform: rotate(90deg);
+}
+
+.refresh-btn:active {
+  transform: rotate(90deg) scale(0.95);
+}
+
+/* Lista de chegadas */
+.arrivals-container {
+  padding: 12px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.arrival-item {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: #f5f7fa;
+}
+
+.arrival-item:hover {
+  background-color: #e8ecf0;
+  transform: translateX(4px);
+}
+
+.arrival-item:last-child {
+  margin-bottom: 0;
+}
+
+.arrival-line {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  min-width: 56px;
+  text-align: center;
+  margin-right: 16px;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.arrival-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.arrival-destination {
+  font-weight: 600;
+  font-size: 15px;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrival-status {
+  font-size: 13px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-badge {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-ontime {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-delayed {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.arrival-time {
+  font-weight: 700;
+  font-size: 18px;
+  color: #0072c6;
+  min-width: 80px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.no-arrivals {
+  text-align: center;
+  padding: 48px 24px;
+  color: #666;
+  line-height: 1.6;
+}
+
+.no-arrivals a {
+  color: #0072c6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.no-arrivals a:hover {
+  text-decoration: underline;
+}
+
+/* Rodapé do card */
+.card-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e8ecf0;
+  background-color: #f5f7fa;
+  text-align: center;
+  font-size: 13px;
+  color: #666;
+}
+
+.card-footer strong {
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+/* Card do mapa */
+.map-card {
+  height: 100%;
+  min-height: 500px;
+}
+
+.map-card .card-header {
+  padding: 16px 20px;
+}
+
+.map-card .card-header h2 {
+  font-size: 16px;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  min-height: 450px;
+  flex: 1;
+}
+
+/* Popup dos autocarros */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.bus-popup {
+  font-family: inherit;
+  padding: 4px 0;
+}
+
+.bus-popup strong {
+  color: #0072c6;
+  font-size: 15px;
+}
+
+/* Remover atribuição do Leaflet */
+.leaflet-container .leaflet-control-attribution {
+  display: none !important;
+}
+
+/* Controlos do mapa */
+.leaflet-control-zoom a {
+  background-color: white !important;
+  color: #333 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Mensagem de erro */
+.error-overlay {
+  position: fixed;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(255, 59, 48, 0.95);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 10000;
+  display: none;
+  font-size: 14px;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.error-overlay.show {
+  display: block;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Scrollbar personalizada */
+.arrivals-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.arrivals-container::-webkit-scrollbar-track {
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.arrivals-container::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 4px;
+}
+
+.arrivals-container::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
+
+/* Responsive - Tablet */
+@media (max-width: 1024px) {
+  .container {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .map-card {
+    min-height: 400px;
+  }
+
+  #map {
+    min-height: 350px;
+  }
+}
+
+/* Responsive - Mobile */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-title h1 {
+    font-size: 18px;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+  }
+
+  .header-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .container {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .card-header {
+    padding: 16px;
+  }
+
+  .card-header h2 {
+    font-size: 16px;
+  }
+
+  .arrivals-container {
+    max-height: 400px;
+  }
+
+  .arrival-item {
+    padding: 12px;
+  }
+
+  .arrival-line {
+    min-width: 48px;
+    padding: 6px 10px;
+    font-size: 14px;
+    margin-right: 12px;
+  }
+
+  .arrival-destination {
+    font-size: 14px;
+  }
+
+  .arrival-time {
+    font-size: 16px;
+    min-width: 70px;
+  }
+
+  .map-card {
+    min-height: 350px;
+  }
+
+  #map {
+    min-height: 300px;
+  }
+}
