@@ -155,13 +155,12 @@ export class BusMapApp {
 
   showError(message) {
     console.error('❌', message);
-    // TODO: Implementar UI de erro mais robusta
     const errorElement = document.getElementById('error-message');
     if (errorElement) {
       errorElement.textContent = message;
-      errorElement.style.display = 'block';
+      errorElement.classList.add('show');
       setTimeout(() => {
-        errorElement.style.display = 'none';
+        errorElement.classList.remove('show');
       }, 5000);
     }
   }
