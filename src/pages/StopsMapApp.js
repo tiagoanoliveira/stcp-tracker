@@ -7,12 +7,16 @@ import { geolocationService } from '../core/geolocationService.js';
 import { stopService } from '../services/stopService.js';
 import { MapManager } from '../map/MapManager.js';
 import { StopMarkerManager } from '../map/markers/StopMarkerManager.js';
+import { createCenterControl } from '../map/controls/CenterControl.js';
+import { createBusMapControl } from '../map/controls/BusMapControl.js';
 
 export class StopsMapApp {
   constructor(options = {}) {
     this.mapElementId = options.mapElementId || 'map';
     this.mapManager = null;
     this.stopMarkerManager = null;
+    this.centerControl = null;
+    this.busMapControl = null;
   }
 
   async initialize() {
@@ -29,16 +33,29 @@ export class StopsMapApp {
       await this.mapManager.waitForReady();
       console.log('✓ Mapa inicializado');
 
-      // 3. Inicializar stop marker manager
+      // 3. Adicionar controlo de centrar
+      this.centerControl = createCenterControl(
+        this.mapManager.map,
+        () => this.mapManager.getUserPosition()
+      );
+      this.centerControl.addTo(this.mapManager.map);
+      console.log('✓ Controlo de centrar adicionado');
+
+      // 4. Adicionar controlo de voltar ao busmap
+      this.busMapControl = createBusMapControl(this.mapManager.map);
+      this.busMapControl.addTo(this.mapManager.map);
+      console.log('✓ Controlo de busmap adicionado');
+
+      // 5. Inicializar stop marker manager
       this.stopMarkerManager = new StopMarkerManager(this.mapManager.map);
 
-      // 4. Configurar geolocalização
+      // 6. Configurar geolocalização
       this.setupGeolocation();
 
-      // 5. Configurar event listeners
+      // 7. Configurar event listeners
       this.setupEventListeners();
 
-      // 6. Mostrar paragens
+      // 8. Mostrar paragens
       this.displayAllStops();
 
       console.log('✅ StopsMapApp inicializado com sucesso');
@@ -62,24 +79,24 @@ export class StopsMapApp {
   }
 
   setupEventListeners() {
-    // Botão de pesquisa
-    const searchBtn = document.getElementById('search-stop');
+    // Pesquisa ao escrever (debounced)
     const searchInput = document.getElementById('stop-search');
+    if (searchInput) {
+      let searchTimeout;
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          this.handleSearch();
+        }, 300);
+      });
 
-    if (searchBtn && searchInput) {
-      searchBtn.addEventListener('click', () => this.handleSearch());
       searchInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
+          clearTimeout(searchTimeout);
           this.handleSearch();
         }
       });
-    }
-
-    // Botão centrar no utilizador
-    const centerBtn = document.getElementById('center-user-stops');
-    if (centerBtn) {
-      centerBtn.addEventListener('click', () => this.centerOnUser());
     }
   }
 
@@ -119,7 +136,8 @@ export class StopsMapApp {
     const results = stopService.searchStops(query);
     
     if (results.length === 0) {
-      alert('Nenhuma paragem encontrada.');
+      this.stopMarkerManager.clearAllMarkers();
+      console.log('🔍 Nenhuma paragem encontrada');
       return;
     }
 
@@ -134,24 +152,14 @@ export class StopsMapApp {
     }
   }
 
-  centerOnUser() {
-    const userPos = this.mapManager.getUserPosition();
-    if (userPos) {
-      this.mapManager.centerOn(userPos, 16);
-      this.displayNearbyStops();
-    } else {
-      alert('Localização do utilizador não disponível.');
-    }
-  }
-
   showError(message) {
     console.error('❌', message);
     const errorElement = document.getElementById('error-message');
     if (errorElement) {
       errorElement.textContent = message;
-      errorElement.style.display = 'block';
+      errorElement.classList.add('show');
       setTimeout(() => {
-        errorElement.style.display = 'none';
+        errorElement.classList.remove('show');
       }, 5000);
     }
   }
