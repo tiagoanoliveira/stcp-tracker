@@ -149,25 +149,27 @@ export class NextArrivals {
     const busColor = arrival.route_color || '#0072C6';
     const textColor = arrival.route_text_color || '#FFFFFF';
     
+    // Verificar se há localização do autocarro
+    const hasLocation = vehicle && vehicleService.extractVehicleLocation(vehicle) !== null;
+    const locationIcon = hasLocation ? this.getActiveLocationIcon() : this.getInactiveLocationIcon();
+    
     const div = document.createElement('div');
     div.className = 'arrival-item';
     
-    // Se há veículo, adicionar click handler
-    if (vehicle) {
+    // Se há veículo com localização, adicionar click handler
+    if (hasLocation) {
       const location = vehicleService.extractVehicleLocation(vehicle);
-      if (location) {
-        div.style.cursor = 'pointer';
-        div.setAttribute('data-vehicle-id', vehicle.id);
-        div.addEventListener('click', () => {
-          if (this.onArrivalClickCallback) {
-            this.onArrivalClickCallback({
-              vehicleId: vehicle.id,
-              location: location,
-              arrival: arrival
-            });
-          }
-        });
-      }
+      div.style.cursor = 'pointer';
+      div.setAttribute('data-vehicle-id', vehicle.id);
+      div.addEventListener('click', () => {
+        if (this.onArrivalClickCallback) {
+          this.onArrivalClickCallback({
+            vehicleId: vehicle.id,
+            location: location,
+            arrival: arrival
+          });
+        }
+      });
     }
     
     div.innerHTML = `
@@ -181,12 +183,112 @@ export class NextArrivals {
           ${arrival.delay_minutes > 1 ? `<span class="status-badge ${statusClass}">+${Math.round(arrival.delay_minutes)} min</span>` : ''}
         </div>
       </div>
-      <div class="arrival-time">
-        ${this.formatArrivalTime(arrival.arrival_minutes)}
+      <div class="arrival-time-container">
+        <div class="arrival-location-icon">
+          ${locationIcon}
+        </div>
+        <div class="arrival-time">
+          ${this.formatArrivalTime(arrival.arrival_minutes)}
+        </div>
       </div>
     `;
     
     return div;
+  }
+
+  getActiveLocationIcon() {
+    return `
+      <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+        <!-- Pin de localização -->
+        <path d="M10 2 C7.5 2, 5.5 4, 5.5 6.5 C5.5 8, 6.5 9.5, 10 13 C13.5 9.5, 14.5 8, 14.5 6.5 C14.5 4, 12.5 2, 10 2 Z" 
+              fill="#2C2C2C"/>
+        
+        <!-- Círculo branco interior -->
+        <circle cx="10" cy="6.5" r="2" fill="#FFFFFF"/>
+        
+        <!-- Checkmark -->
+        <path d="M9 6.5 L9.6 7.2 L11.2 5.5" 
+              stroke="#22C55E" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        
+        <!-- Círculo central -->
+        <circle cx="10" cy="16" r="1.2" fill="#22C55E">
+          <animate attributeName="opacity" values="1;0.5;1" dur="1.5s" repeatCount="indefinite"/>
+        </circle>
+        
+        <!-- Ondas de sinal (arcos laterais) -->
+        <!-- Onda 1 esquerda (interior) -->
+        <path d="M 8.2 14.5 A 2.5 2.5 0 0 0 8.2 17.5" 
+              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+          <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
+        </path>
+        
+        <!-- Onda 1 direita (interior) -->
+        <path d="M 11.8 14.5 A 2.5 2.5 0 0 1 11.8 17.5" 
+              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+          <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
+        </path>
+        
+        <!-- Onda 2 esquerda (meio) -->
+        <path d="M 6.8 14 A 4 4 0 0 0 6.8 18" 
+              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+          <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" begin="0.2s" repeatCount="indefinite"/>
+        </path>
+        
+        <!-- Onda 2 direita (meio) -->
+        <path d="M 13.2 14 A 4 4 0 0 1 13.2 18" 
+              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+          <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" begin="0.2s" repeatCount="indefinite"/>
+        </path>
+        
+        <!-- Onda 3 esquerda (exterior) -->
+        <path d="M 5.4 13.5 A 5.5 5.5 0 0 0 5.4 18.5" 
+              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+          <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" begin="0.4s" repeatCount="indefinite"/>
+        </path>
+        
+        <!-- Onda 3 direita (exterior) -->
+        <path d="M 14.6 13.5 A 5.5 5.5 0 0 1 14.6 18.5" 
+              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+          <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" begin="0.4s" repeatCount="indefinite"/>
+        </path>
+      </svg>
+    `;
+  }
+
+  getInactiveLocationIcon() {
+    return `
+      <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+        <!-- 1. Pin de Localização -->
+        <path d="M10 1.5 C7.5 1.5, 5.5 3.5, 5.5 6 C5.5 7.5, 6.5 9, 10 12.5 C13.5 9, 14.5 7.5, 14.5 6 C14.5 3.5, 12.5 1.5, 10 1.5 Z" 
+              fill="#2C2C2C"/>
+        
+        <!-- Círculo branco interior -->
+        <circle cx="10" cy="6" r="2.2" fill="#FFFFFF"/>
+        
+        <!-- X (Vermelho) -->
+        <path d="M8.5 4.5 L11.5 7.5 M11.5 4.5 L8.5 7.5" 
+              stroke="#EF4444" stroke-width="0.9" stroke-linecap="round"/>
+        
+        <!-- 2. Mapa em Perspetiva (Trapézio) -->
+        <g transform="translate(0, 1)"> <!-- Ajuste fino de posição vertical -->
+          <!-- Contorno do Mapa -->
+          <!-- A forma é um trapézio: mais estreito em cima, mais largo em baixo -->
+          <path d="M5 13.5 L15 13.5 L17 18 L3 18 Z" 
+                fill="#EF4444" fill-opacity="0.15" stroke="#EF4444" stroke-width="0.8" stroke-linejoin="round"/>
+          
+          <!-- Linhas de dobra (dividem o mapa em 3 secções) -->
+          <!-- Linha esquerda -->
+          <line x1="8.3" y1="13.5" x2="7.6" y2="18" stroke="#EF4444" stroke-width="0.6"/>
+          
+          <!-- Linha direita -->
+          <line x1="11.7" y1="13.5" x2="12.4" y2="18" stroke="#EF4444" stroke-width="0.6"/>
+          
+          <!-- Pequenos detalhes de rua (opcional, para reforçar a ideia) -->
+          <path d="M5 13.5 L10 18" stroke="#EF4444" stroke-width="0.5" stroke-linecap="round"/>
+          <path d="M8 16 L15.4 15" stroke="#EF4444" stroke-width="0.5" stroke-linecap="round"/>
+        </g>
+      </svg>
+    `;
   }
 
   getStatusText(status) {
