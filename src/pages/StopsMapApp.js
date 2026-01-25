@@ -27,6 +27,7 @@ export class StopsMapApp {
     
     // Estado
     this.currentStopId = null;
+    this.currentStopPosition = null;
     this.refreshInterval = null;
   }
 
@@ -70,6 +71,7 @@ export class StopsMapApp {
       // Callbacks
       this.nextArrivals.onArrivalClick((data) => this.handleArrivalClick(data));
       this.nextArrivals.onClose(() => this.handleCloseArrivals());
+      this.nextArrivals.onRefresh(() => this.handleRefreshArrivals());
 
       // 8. Configurar geolocalização
       this.setupGeolocation();
@@ -184,9 +186,10 @@ export class StopsMapApp {
     console.log('📍 Paragem clicada:', stop.stop_id, stop.stop_name);
     
     this.currentStopId = stop.stop_id;
+    this.currentStopPosition = [stop.latitude, stop.longitude];
     
-    // Abrir painel
-    this.nextArrivals.show(stop.stop_name);
+    // Abrir painel (passar stopId para mostrar código)
+    this.nextArrivals.show(stop.stop_name, stop.stop_id);
     
     // Esconder marcadores de paragens
     this.stopMarkerManager.hideAllMarkers();
@@ -262,15 +265,20 @@ export class StopsMapApp {
       this.busMarkerManager.updateBusMarkers(busesToShow);
 
       // Ajustar zoom do mapa para mostrar todos os autocarros
-      // Adicionar pequeno delay para garantir que os marcadores foram criados
+      // IMPORTANTE: Como o painel ocupa metade inferior (50vh),
+      // precisamos ajustar o padding para centrar na metade superior
       setTimeout(() => {
         if (busPositions.length === 1) {
           // Se for apenas 1 autocarro, centrar nele com zoom 16
           this.mapManager.centerOn(busPositions[0], 16);
         } else if (busPositions.length > 1) {
           // Se forem vários, ajustar bounds para ver todos
+          // Padding maior em baixo para compensar o painel (50vh = ~metade do ecrã)
+          const mapHeight = this.mapManager.map.getSize().y;
+          const panelHeight = mapHeight * 0.5; // 50% do ecrã
+          
           this.mapManager.fitBounds(busPositions, { 
-            padding: [80, 80],
+            padding: [60, 60, panelHeight + 60, 60], // top, right, bottom, left
             maxZoom: 15
           });
         }
@@ -289,7 +297,7 @@ export class StopsMapApp {
     
     if (!location || !this.mapManager) return;
     
-    // Fazer zoom no autocarro
+    // Fazer zoom no autocarro (na metade superior do ecrã)
     const coords = [location.latitude, location.longitude];
     this.mapManager.centerOn(coords, 17);
     
@@ -297,6 +305,13 @@ export class StopsMapApp {
     const marker = this.busMarkerManager.markers[vehicleId];
     if (marker) {
       marker.openPopup();
+    }
+  }
+
+  handleRefreshArrivals() {
+    if (this.currentStopId) {
+      console.log('🔄 Refresh manual...');
+      this.loadStopArrivals(this.currentStopId);
     }
   }
 
@@ -312,8 +327,16 @@ export class StopsMapApp {
     // Mostrar paragens novamente
     this.stopMarkerManager.showAllMarkers();
     
+    // Voltar à localização do utilizador (se existir)
+    const userPos = this.mapManager.getUserPosition();
+    if (userPos) {
+      this.mapManager.centerOn(userPos, 15);
+      console.log('✓ Mapa centrado na localização do utilizador');
+    }
+    
     // Limpar estado
     this.currentStopId = null;
+    this.currentStopPosition = null;
   }
 
   startAutoRefresh() {
