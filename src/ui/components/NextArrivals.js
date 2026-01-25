@@ -11,6 +11,8 @@ export class NextArrivals {
     this.isVisible = false;
     this.onArrivalClickCallback = null;
     this.onCloseCallback = null;
+    this.onRefreshCallback = null;
+    this.currentStopId = null;
   }
 
   create() {
@@ -22,11 +24,11 @@ export class NextArrivals {
     sheet.innerHTML = `
       <div class="next-arrivals-header">
         <div class="next-arrivals-title">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-          <h2 id="arrivals-stop-name">Paragem</h2>
+          <img src="./resources/paragem.png" alt="Paragem" class="next-arrivals-icon">
+          <div class="next-arrivals-title-text">
+            <h2 id="arrivals-stop-name">Paragem</h2>
+            <p id="arrivals-stop-code" class="arrivals-stop-code"></p>
+          </div>
         </div>
         <button class="next-arrivals-close" title="Fechar">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -42,6 +44,13 @@ export class NextArrivals {
       </div>
       <div class="next-arrivals-footer">
         <p id="arrivals-last-update">Última atualização: <strong>--:--:--</strong></p>
+        <button class="next-arrivals-refresh" id="arrivals-refresh-btn" title="Atualizar">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </button>
       </div>
     `;
 
@@ -51,6 +60,15 @@ export class NextArrivals {
     // Event listeners
     const closeBtn = sheet.querySelector('.next-arrivals-close');
     closeBtn.addEventListener('click', () => this.hide());
+
+    const refreshBtn = sheet.querySelector('#arrivals-refresh-btn');
+    refreshBtn.addEventListener('click', () => {
+      if (this.onRefreshCallback) {
+        refreshBtn.classList.add('refreshing');
+        this.onRefreshCallback();
+        setTimeout(() => refreshBtn.classList.remove('refreshing'), 1000);
+      }
+    });
 
     // Fechar ao clicar fora (opcional)
     sheet.addEventListener('click', (e) => {
@@ -62,14 +80,22 @@ export class NextArrivals {
     return sheet;
   }
 
-  show(stopName) {
+  show(stopName, stopId = null) {
     if (!this.element) {
       this.create();
     }
 
+    this.currentStopId = stopId;
+
     const titleElement = this.element.querySelector('#arrivals-stop-name');
+    const codeElement = this.element.querySelector('#arrivals-stop-code');
+    
     if (titleElement && stopName) {
       titleElement.textContent = stopName;
+    }
+    
+    if (codeElement && stopId) {
+      codeElement.textContent = `Código: ${stopId}`;
     }
 
     this.element.classList.add('visible');
@@ -81,6 +107,7 @@ export class NextArrivals {
     if (this.element) {
       this.element.classList.remove('visible');
       this.isVisible = false;
+      this.currentStopId = null;
       console.log('🚫 NextArrivals fechado');
       
       if (this.onCloseCallback) {
@@ -203,6 +230,10 @@ export class NextArrivals {
 
   onClose(callback) {
     this.onCloseCallback = callback;
+  }
+
+  onRefresh(callback) {
+    this.onRefreshCallback = callback;
   }
 
   destroy() {
