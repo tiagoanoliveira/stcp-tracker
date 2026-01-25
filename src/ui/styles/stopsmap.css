@@ -1,0 +1,129 @@
+/**
+ * StopsMap CSS - Apenas barra de pesquisa (o resto vem do busmap.css)
+ */
+
+/* Barra de pesquisa - abaixo do logo e menu, centrada */
+.search-overlay {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  margin-left: 20px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  background-color: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 28px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  min-width: 400px;
+  max-width: 600px;
+  height: 56px;
+}
+
+.search-input-wrapper {
+  flex: 1;
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 16px;
+  padding-left: 40px;
+  background-color: rgba(255, 255, 255, 0.95);
+  border: none;
+  border-radius: 22px;
+  font-size: 14px;
+  color: #333;
+  outline: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+  height: 44px;
+}
+
+.search-input:focus {
+  background-color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.search-input::placeholder {
+  color: #999;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Popup das paragens */
+.stop-popup {
+  font-family: inherit;
+  padding: 4px 0;
+}
+
+.stop-popup strong {
+  color: #0072c6;
+  font-size: 15px;
+}
+
+.stop-popup a {
+  color: #0072c6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.stop-popup a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive - Tablet */
+@media (max-width: 768px) {
+  .search-overlay {
+    top: 12px;
+    min-width: 300px;
+    max-width: 500px;
+    height: 48px;
+    padding: 4px 8px;
+  }
+
+  .search-input {
+    font-size: 13px;
+    padding: 8px 14px;
+    padding-left: 38px;
+    height: 40px;
+  }
+}
+
+/* Responsive - Mobile */
+@media (max-width: 480px) {
+  .search-overlay {
+    top: 12px;
+    min-width: calc(90% - 44px);
+    max-width: calc(90% - 44px);
+    height: 44px;
+    padding: 4px;
+    margin-left: 25px;
+  }
+
+  .search-input {
+    font-size: 12px;
+    padding: 8px 12px;
+    padding-left: 36px;
+    height: 36px;
+  }
+
+  .search-icon {
+    width: 16px;
+    height: 16px;
+    left: 12px;
+  }
+}

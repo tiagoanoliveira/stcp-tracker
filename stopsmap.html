@@ -3,15 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Mapa em tempo real dos autocarros STCP no Porto">
+  <meta name="description" content="Mapa de paragens STCP no Porto">
   <meta name="theme-color" content="#0072c6">
-  <title>STCP Tracker - Mapa de Autocarros</title>
+  <title>STCP Tracker - Mapa de Paragens</title>
   
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
-  <!-- CSS da aplicação -->
+  <!-- CSS da aplicação (busmap.css como base) -->
   <link rel="stylesheet" href="./src/ui/styles/busmap.css">
+  <link rel="stylesheet" href="./src/ui/styles/stopsmap.css">
+  <link rel="stylesheet" href="./src/ui/styles/stopDetail.css">
   
   <!-- Favicon -->
   <link rel="shortcut icon" href="./resources/favicon.svg">
@@ -23,17 +25,24 @@
   <!-- Logo no canto superior esquerdo -->
   <div class="logo-overlay">
     <img src="./resources/favicon.svg" alt="STCP Live Map Logo">
-    <span class="logo-text">STCP Live</span>
+    <span class="logo-text">Paragens STCP</span>
   </div>
 
-  <!-- Header menu no topo centro -->
-  <div class="header-overlay">
-    <div id="last-update-time" class="header-timestamp">
-      Última atualização: <strong>--:--:--</strong>
+  <!-- Barra de pesquisa -->
+  <div class="search-overlay">
+    <div class="search-input-wrapper">
+      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/>
+        <path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input 
+        type="text" 
+        id="stop-search" 
+        class="search-input" 
+        placeholder="Pesquisar paragem por nome ou código..."
+        autocomplete="off"
+      />
     </div>
-    <button id="refresh-now" class="header-btn" title="Atualizar dados">
-      <img src="./resources/atualizar.png" alt="Atualizar">
-    </button>
   </div>
 
   <!-- Rodapé no fundo centro -->
@@ -48,6 +57,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
   <!-- Nossa aplicação refatorizada -->
-  <script type="module" src="./src/pages/BusMapApp.js"></script>
+  <script type="module" src="./src/pages/StopsMapApp.js"></script>
 </body>
 </html>
