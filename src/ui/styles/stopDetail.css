@@ -12,7 +12,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 50vh;
+  max-height: 40vh;
   background-color: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -298,10 +298,6 @@
 
 /* Responsive - Tablet */
 @media (max-width: 768px) {
-  .next-arrivals {
-    height: 50vh;
-  }
-
   .next-arrivals-header {
     padding: 12px 16px;
   }
@@ -336,7 +332,7 @@
 
   .arrival-time {
     font-size: 16px;
-    min-width: 65px;
+    min-width: 60px;
   }
 
   .next-arrivals-footer {
@@ -357,7 +353,7 @@
 /* Responsive - Mobile */
 @media (max-width: 480px) {
   .next-arrivals {
-    height: 50vh;
+    max-height: 50vh;
   }
 
   .next-arrivals-header {
@@ -415,13 +411,13 @@
   }
 
   .arrival-location-icon {
-    width: 25px;
-    height: 25px;
+    width: 30px;
+    height: 30px;
   }
 
   .arrival-time {
     font-size: 15px;
-    min-width: 60px;
+    min-width: 55px;
   }
 
   .next-arrivals-footer {
