@@ -191,8 +191,8 @@ export class StopsMapApp {
     // Abrir painel (passar stopId para mostrar código)
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     
-    // Esconder marcadores de paragens
-    this.stopMarkerManager.hideAllMarkers();
+    // Mostrar apenas o marcador desta paragem (esconder os outros)
+    this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     
     // Carregar e mostrar chegadas
     await this.loadStopArrivals(stop.stop_id);
@@ -324,7 +324,7 @@ export class StopsMapApp {
     // Limpar autocarros do mapa
     this.busMarkerManager.clearAllMarkers();
     
-    // Mostrar paragens novamente
+    // Mostrar todas as paragens novamente
     this.stopMarkerManager.showAllMarkers();
     
     // Voltar à paragem que foi consultada
