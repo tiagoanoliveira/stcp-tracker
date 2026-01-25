@@ -109,9 +109,10 @@
 .loading-message,
 .no-arrivals {
   text-align: center;
-  padding: 48px 24px;
+  padding: 12px;
   color: #666;
-  line-height: 1.6;
+  line-height: 1.4;
+  font-size: 14px;
 }
 
 .no-arrivals a {

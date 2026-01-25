@@ -124,7 +124,7 @@ export class NextArrivals {
     if (!arrivals || arrivals.length === 0) {
       listContainer.innerHTML = `
         <p class="no-arrivals">
-          ⚠️ Não há, de momento, localizações dos autocarros previstos para esta paragem.<br><br>
+          ⚠️ Não há, de momento, localizações dos autocarros previstos para esta paragem - pode ter que aguardar que estes iniciem viagem.<br><br>
           Consulte <a href="index.html">aqui a localização em tempo real de todos os autocarros</a> ou verifique o horário planeado na paragem.
         </p>
       `;
