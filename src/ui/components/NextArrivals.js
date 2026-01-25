@@ -124,8 +124,8 @@ export class NextArrivals {
     if (!arrivals || arrivals.length === 0) {
       listContainer.innerHTML = `
         <p class="no-arrivals">
-          ⚠️ Foram registadas anomalias na informação prestada sobre as próximas chegadas em tempo real pela STCP.<br><br>
-          Consulte <a href="index.html">aqui a localização em tempo real dos autocarros</a> ou verifique o horário planeado na paragem.
+          ⚠️ Não há, de momento, localizações dos autocarros previstos para esta paragem.<br><br>
+          Consulte <a href="index.html">aqui a localização em tempo real de todos os autocarros</a> ou verifique o horário planeado na paragem.
         </p>
       `;
       return;
