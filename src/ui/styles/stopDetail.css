@@ -103,7 +103,7 @@
 .arrivals-list-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .loading-message,
@@ -197,7 +197,6 @@
 .arrival-time-container {
   display: flex;
   align-items: center;
-  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -205,8 +204,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
 }
 
@@ -335,11 +334,6 @@
     font-size: 14px;
   }
 
-  .arrival-location-icon {
-    width: 18px;
-    height: 18px;
-  }
-
   .arrival-time {
     font-size: 16px;
     min-width: 65px;
@@ -420,13 +414,9 @@
     font-size: 12px;
   }
 
-  .arrival-time-container {
-    gap: 6px;
-  }
-
   .arrival-location-icon {
-    width: 16px;
-    height: 16px;
+    width: 25px;
+    height: 25px;
   }
 
   .arrival-time {

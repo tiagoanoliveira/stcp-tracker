@@ -198,57 +198,57 @@ export class NextArrivals {
 
   getActiveLocationIcon() {
     return `
-      <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
         <!-- Pin de localização -->
-        <path d="M10 2 C7.5 2, 5.5 4, 5.5 6.5 C5.5 8, 6.5 9.5, 10 13 C13.5 9.5, 14.5 8, 14.5 6.5 C14.5 4, 12.5 2, 10 2 Z" 
+        <path d="M20 4 C15 4, 11 8, 11 13 C11 16, 13 19, 20 26 C27 19, 29 16, 29 13 C29 8, 25 4, 20 4 Z"
               fill="#2C2C2C"/>
         
         <!-- Círculo branco interior -->
-        <circle cx="10" cy="6.5" r="2" fill="#FFFFFF"/>
+        <circle cx="20" cy="13" r="4" fill="#FFFFFF"/>
         
         <!-- Checkmark -->
-        <path d="M9 6.5 L9.6 7.2 L11.2 5.5" 
-              stroke="#22C55E" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <path d="M18 13 L19.2 14.4 L22.4 11"
+              stroke="#22C55E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         
         <!-- Círculo central -->
-        <circle cx="10" cy="16" r="1.2" fill="#22C55E">
+        <circle cx="20" cy="32" r="2.4" fill="#22C55E">
           <animate attributeName="opacity" values="1;0.5;1" dur="1.5s" repeatCount="indefinite"/>
         </circle>
         
         <!-- Ondas de sinal (arcos laterais) -->
         <!-- Onda 1 esquerda (interior) -->
-        <path d="M 8.2 14.5 A 2.5 2.5 0 0 0 8.2 17.5" 
-              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+        <path d="M 16.4 29 A 5 5 0 0 0 16.4 35"
+              stroke="#22C55E" stroke-width="2" fill="none" stroke-linecap="round">
           <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
         </path>
         
         <!-- Onda 1 direita (interior) -->
-        <path d="M 11.8 14.5 A 2.5 2.5 0 0 1 11.8 17.5" 
-              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+        <path d="M 23.6 29 A 5 5 0 0 1 23.6 35"
+              stroke="#22C55E" stroke-width="2" fill="none" stroke-linecap="round">
           <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
         </path>
         
         <!-- Onda 2 esquerda (meio) -->
-        <path d="M 6.8 14 A 4 4 0 0 0 6.8 18" 
-              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+        <path d="M 13.6 28 A 8 8 0 0 0 13.6 36"
+              stroke="#22C55E" stroke-width="2" fill="none" stroke-linecap="round">
           <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" begin="0.2s" repeatCount="indefinite"/>
         </path>
         
         <!-- Onda 2 direita (meio) -->
-        <path d="M 13.2 14 A 4 4 0 0 1 13.2 18" 
-              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+        <path d="M 26.4 28 A 8 8 0 0 1 26.4 36"
+              stroke="#22C55E" stroke-width="2" fill="none" stroke-linecap="round">
           <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" begin="0.2s" repeatCount="indefinite"/>
         </path>
         
         <!-- Onda 3 esquerda (exterior) -->
-        <path d="M 5.4 13.5 A 5.5 5.5 0 0 0 5.4 18.5" 
-              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+        <path d="M 10.8 27 A 11 11 0 0 0 10.8 37"
+              stroke="#22C55E" stroke-width="2" fill="none" stroke-linecap="round">
           <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" begin="0.4s" repeatCount="indefinite"/>
         </path>
         
         <!-- Onda 3 direita (exterior) -->
-        <path d="M 14.6 13.5 A 5.5 5.5 0 0 1 14.6 18.5" 
-              stroke="#22C55E" stroke-width="1" fill="none" stroke-linecap="round">
+        <path d="M 29.2 27 A 11 11 0 0 1 29.2 37"
+              stroke="#22C55E" stroke-width="2" fill="none" stroke-linecap="round">
           <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" begin="0.4s" repeatCount="indefinite"/>
         </path>
       </svg>
@@ -257,35 +257,34 @@ export class NextArrivals {
 
   getInactiveLocationIcon() {
     return `
-      <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
         <!-- 1. Pin de Localização -->
-        <path d="M10 1.5 C7.5 1.5, 5.5 3.5, 5.5 6 C5.5 7.5, 6.5 9, 10 12.5 C13.5 9, 14.5 7.5, 14.5 6 C14.5 3.5, 12.5 1.5, 10 1.5 Z" 
+        <path d="M20 3 C15 3, 11 7, 11 12 C11 15, 13 18, 20 25 C27 18, 29 15, 29 12 C29 7, 25 3, 20 3 Z"
               fill="#2C2C2C"/>
         
         <!-- Círculo branco interior -->
-        <circle cx="10" cy="6" r="2.2" fill="#FFFFFF"/>
+        <circle cx="20" cy="12" r="4.4" fill="#FFFFFF"/>
         
         <!-- X (Vermelho) -->
-        <path d="M8.5 4.5 L11.5 7.5 M11.5 4.5 L8.5 7.5" 
-              stroke="#EF4444" stroke-width="0.9" stroke-linecap="round"/>
+        <path d="M17 9 L23 15 M23 9 L17 15"
+              stroke="#EF4444" stroke-width="1.8" stroke-linecap="round"/>
         
         <!-- 2. Mapa em Perspetiva (Trapézio) -->
-        <g transform="translate(0, 1)"> <!-- Ajuste fino de posição vertical -->
+        <g transform="translate(0, 2)">
           <!-- Contorno do Mapa -->
-          <!-- A forma é um trapézio: mais estreito em cima, mais largo em baixo -->
-          <path d="M5 13.5 L15 13.5 L17 18 L3 18 Z" 
-                fill="#EF4444" fill-opacity="0.15" stroke="#EF4444" stroke-width="0.8" stroke-linejoin="round"/>
+          <path d="M10 27 L30 27 L34 36 L6 36 Z"
+                fill="#EF4444" fill-opacity="0.15" stroke="#EF4444" stroke-width="1.6" stroke-linejoin="round"/>
           
           <!-- Linhas de dobra (dividem o mapa em 3 secções) -->
           <!-- Linha esquerda -->
-          <line x1="8.3" y1="13.5" x2="7.6" y2="18" stroke="#EF4444" stroke-width="0.6"/>
+          <line x1="16.6" y1="27" x2="15.2" y2="36" stroke="#EF4444" stroke-width="1.2"/>
           
           <!-- Linha direita -->
-          <line x1="11.7" y1="13.5" x2="12.4" y2="18" stroke="#EF4444" stroke-width="0.6"/>
+          <line x1="23.4" y1="27" x2="24.8" y2="36" stroke="#EF4444" stroke-width="1.2"/>
           
-          <!-- Pequenos detalhes de rua (opcional, para reforçar a ideia) -->
-          <path d="M5 13.5 L10 18" stroke="#EF4444" stroke-width="0.5" stroke-linecap="round"/>
-          <path d="M8 16 L15.4 15" stroke="#EF4444" stroke-width="0.5" stroke-linecap="round"/>
+          <!-- Pequenos detalhes de rua -->
+          <path d="M10 27 L20 36" stroke="#EF4444" stroke-width="1" stroke-linecap="round"/>
+          <path d="M16 32 L30.8 30" stroke="#EF4444" stroke-width="1" stroke-linecap="round"/>
         </g>
       </svg>
     `;
