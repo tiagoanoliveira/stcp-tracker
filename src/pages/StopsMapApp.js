@@ -194,6 +194,10 @@ export class StopsMapApp {
     // Mostrar apenas o marcador desta paragem (esconder os outros)
     this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     
+    // Fechar popup da paragem
+    this.mapManager.map.closePopup();
+    console.log('✓ Popup da paragem fechado');
+    
     // Carregar e mostrar chegadas
     await this.loadStopArrivals(stop.stop_id);
     
