@@ -193,11 +193,28 @@
   color: #721c24;
 }
 
+/* Container para ícone de localização + tempo */
+.arrival-time-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.arrival-location-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
 .arrival-time {
   font-weight: 700;
   font-size: 18px;
   color: #0072c6;
-  min-width: 80px;
+  min-width: 70px;
   text-align: right;
   flex-shrink: 0;
 }
@@ -318,9 +335,14 @@
     font-size: 14px;
   }
 
+  .arrival-location-icon {
+    width: 18px;
+    height: 18px;
+  }
+
   .arrival-time {
     font-size: 16px;
-    min-width: 70px;
+    min-width: 65px;
   }
 
   .next-arrivals-footer {
@@ -398,9 +420,18 @@
     font-size: 12px;
   }
 
+  .arrival-time-container {
+    gap: 6px;
+  }
+
+  .arrival-location-icon {
+    width: 16px;
+    height: 16px;
+  }
+
   .arrival-time {
     font-size: 15px;
-    min-width: 65px;
+    min-width: 60px;
   }
 
   .next-arrivals-footer {
