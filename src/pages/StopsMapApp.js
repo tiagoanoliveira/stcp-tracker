@@ -327,11 +327,10 @@ export class StopsMapApp {
     // Mostrar paragens novamente
     this.stopMarkerManager.showAllMarkers();
     
-    // Voltar à localização do utilizador (se existir)
-    const userPos = this.mapManager.getUserPosition();
-    if (userPos) {
-      this.mapManager.centerOn(userPos, 15);
-      console.log('✓ Mapa centrado na localização do utilizador');
+    // Voltar à paragem que foi consultada
+    if (this.currentStopPosition) {
+      this.mapManager.centerOn(this.currentStopPosition, 16);
+      console.log('✓ Mapa centrado na paragem consultada');
     }
     
     // Limpar estado
@@ -347,9 +346,9 @@ export class StopsMapApp {
         console.log('🔄 Auto-refresh...');
         this.loadStopArrivals(this.currentStopId);
       }
-    }, 30000); // 30 segundos
+    }, 5000); // 5 segundos
     
-    console.log('✓ Auto-refresh iniciado (30s)');
+    console.log('✓ Auto-refresh iniciado (5s)');
   }
 
   stopAutoRefresh() {
