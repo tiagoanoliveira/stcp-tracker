@@ -143,7 +143,7 @@ export class NextArrivals {
   }
 
   createArrivalElement(arrival, vehicle) {
-    const statusClass = arrival.status === 'ON_TIME' ? 'status-ontime' : 'status-delayed';
+    const statusClass = arrival.status === 'ON_TIME' ? 'status-ontime' : ('ARRIVING' ? 'status-ontime' :  'status-delayed');
     
     // Usar cores da API (route_color e route_text_color)
     const busColor = arrival.route_color || '#0072C6';
