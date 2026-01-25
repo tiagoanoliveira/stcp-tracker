@@ -1,59 +1,101 @@
-const CACHE_NAME = 'stcp-live-v3';
+/**
+ * Service Worker - STCP Live Tracker
+ * Cache estratégico para funcionamento offline
+ */
+
+const CACHE_NAME = 'stcp-live-v4';
+
+// Ficheiros essenciais para cachear
 const urlsToCache = [
+  // Páginas principais
   '/',
   '/index.html',
   '/stopsmap.html',
-  '/stop.html',
-  '/src/',
+  
+  // Recursos estáticos
   '/resources/favicon.svg',
-  '/resources/header.js'
+  '/resources/header.js',
+  '/manifest.json',
+  
+  // Core services
+  '/src/core/apiService.js',
+  '/src/core/geolocationService.js',
+  
+  // Services
+  '/src/services/stopService.js',
+  '/src/services/vehicleService.js',
+  
+  // Map modules
+  '/src/map/MapManager.js',
+  '/src/map/markers/BusMarkerManager.js',
+  '/src/map/markers/StopMarkerManager.js',
+  '/src/map/controls/CenterControl.js',
+  '/src/map/controls/BusMapControl.js',
+  
+  // UI components
+  '/src/ui/components/NextArrivals.js',
+  '/src/ui/design/iconCache.js',
+  
+  // Pages (aplicações principais)
+  '/src/pages/BusMapApp.js',
+  '/src/pages/StopsMapApp.js',
+  
+  // Styles
+  '/src/ui/styles/base.css',
+  '/src/ui/styles/busMap.css',
+  '/src/ui/styles/stopDetail.css'
 ];
 
-// Instalação
+// Instalação do Service Worker
 self.addEventListener('install', event => {
-  console.log('Service Worker: Instalando...');
+  console.log('🔧 Service Worker: Instalando v4...');
+  
   event.waitUntil(
-      caches.open(CACHE_NAME)
-          .then(cache => {
-            console.log('Cache aberto');
-            return cache.addAll(urlsToCache);
-          })
-          .then(() => self.skipWaiting())
-          .catch(err => console.error('Erro ao cachear:', err))
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('✓ Cache aberta:', CACHE_NAME);
+        return cache.addAll(urlsToCache);
+      })
+      .then(() => {
+        console.log('✓ Todos os ficheiros cacheados');
+        return self.skipWaiting();
+      })
+      .catch(err => {
+        console.error('❌ Erro ao cachear ficheiros:', err);
+      })
   );
 });
 
-// Ativação
+// Ativação - Limpar caches antigas
 self.addEventListener('activate', event => {
-  console.log('Service Worker: Ativando...');
+  console.log('✅ Service Worker: Ativando v4...');
+  
   event.waitUntil(
-      caches.keys()
-          .then(cacheNames => {
-            return Promise.all(
-                cacheNames.map(cacheName => {
-                  if (cacheName !== CACHE_NAME) {
-                    console.log('Deletando cache antiga:', cacheName);
-                    return caches.delete(cacheName);
-                  }
-                })
-            );
+    caches.keys()
+      .then(cacheNames => {
+        return Promise.all(
+          cacheNames.map(cacheName => {
+            if (cacheName !== CACHE_NAME) {
+              console.log('🗑 Deletando cache antiga:', cacheName);
+              return caches.delete(cacheName);
+            }
           })
-          .then(() => self.clients.claim())
+        );
+      })
+      .then(() => {
+        console.log('✓ Service Worker ativo e a controlar páginas');
+        return self.clients.claim();
+      })
   );
 });
 
-// Fetch
+// Fetch - Estratégia: Cache First, depois Network
 self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
 
   // Ignorar schemes não suportados
   if (!['http:', 'https:'].includes(url.protocol)) {
-    return; // Ignorar chrome-extension:, blob:, data:, etc
-  }
-
-  // Ignorar navegações
-  if (request.mode === 'navigate') {
     return;
   }
 
@@ -62,28 +104,69 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  event.respondWith(
-      caches.match(request)
-          .then(cachedResponse => {
-            if (cachedResponse) {
-              return cachedResponse;
+  // Não cachear chamadas à API (sempre buscar dados frescos)
+  if (url.hostname === 'broker.fiware.urbanplatform.portodigital.pt' || 
+      url.pathname.includes('/api/') ||
+      url.pathname.includes('gtfs.portodigital.pt')) {
+    event.respondWith(
+      fetch(request)
+        .catch(() => {
+          return new Response(
+            JSON.stringify({ error: 'Sem ligação à Internet' }),
+            { 
+              headers: { 'Content-Type': 'application/json' },
+              status: 503
             }
+          );
+        })
+    );
+    return;
+  }
 
-            return fetch(request)
-                .then(response => {
-                  // Cachear apenas respostas válidas
-                  if (response && response.status === 200 && response.type === 'basic') {
-                    const responseToCache = response.clone();
-                    caches.open(CACHE_NAME)
-                        .then(cache => cache.put(request, responseToCache))
-                        .catch(err => console.error('Erro ao cachear resposta:', err));
-                  }
-                  return response;
-                })
-                .catch(err => {
-                  console.error('Fetch falhou:', err);
-                  return caches.match(request);
-                });
+  // Estratégia Cache First para recursos estáticos
+  event.respondWith(
+    caches.match(request)
+      .then(cachedResponse => {
+        // Se existir em cache, retornar imediatamente
+        if (cachedResponse) {
+          // Atualizar cache em background (stale-while-revalidate)
+          fetch(request)
+            .then(response => {
+              if (response && response.status === 200) {
+                caches.open(CACHE_NAME)
+                  .then(cache => cache.put(request, response.clone()))
+                  .catch(err => console.warn('⚠ Erro ao atualizar cache:', err));
+              }
+            })
+            .catch(() => {});
+          
+          return cachedResponse;
+        }
+
+        // Se não existir em cache, buscar da rede
+        return fetch(request)
+          .then(response => {
+            // Cachear apenas respostas válidas
+            if (response && response.status === 200) {
+              const responseToCache = response.clone();
+              caches.open(CACHE_NAME)
+                .then(cache => cache.put(request, responseToCache))
+                .catch(err => console.warn('⚠ Erro ao cachear resposta:', err));
+            }
+            return response;
           })
+          .catch(err => {
+            console.error('❌ Fetch falhou:', err);
+            // Tentar retornar da cache como fallback
+            return caches.match(request);
+          });
+      })
   );
+});
+
+// Mensagens do cliente
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
