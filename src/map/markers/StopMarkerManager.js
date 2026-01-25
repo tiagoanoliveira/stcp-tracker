@@ -6,14 +6,20 @@ export class StopMarkerManager {
   constructor(map) {
     this.map = map;
     this.markers = {};
+    this.clickCallback = null;
   }
 
   /**
    * Atualizar todos os marcadores de paragens
    * @param {Array} stops - Array de paragens
    * @param {boolean} showDistance - Mostrar distância no popup
+   * @param {Function} onClickCallback - Callback ao clicar numa paragem
    */
-  updateStopMarkers(stops, showDistance = false) {
+  updateStopMarkers(stops, showDistance = false, onClickCallback = null) {
+    if (onClickCallback) {
+      this.clickCallback = onClickCallback;
+    }
+    
     this.clearAllMarkers();
     stops.forEach(stop => this.addStopMarker(stop, showDistance));
     console.log(`✓ ${stops.length} marcadores de paragens atualizados`);
@@ -33,8 +39,15 @@ export class StopMarkerManager {
 
     marker.bindPopup(popupContent);
     
+    // Click handler
     marker.on('click', () => {
-      this.map.setView([stop.latitude, stop.longitude], 16);
+      if (this.clickCallback) {
+        // Callback personalizado
+        this.clickCallback(stop);
+      } else {
+        // Comportamento padrão: centrar no mapa
+        this.map.setView([stop.latitude, stop.longitude], 16);
+      }
     });
 
     this.markers[stop.stop_id] = marker;
@@ -76,10 +89,34 @@ export class StopMarkerManager {
       content += `<br>Distância: ${Math.round(stop.distance)}m`;
     }
     
-    content += `<br><a href="stop.html?id=${stop.stop_id}" style="color: #0072C6; font-weight: bold;">Ver horários →</a>
-    </div>`;
+    // Remover link "Ver horários" se houver callback (significa que o clique é gerido pela app)
+    if (!this.clickCallback) {
+      content += `<br><a href="stop.html?id=${stop.stop_id}" style="color: #0072C6; font-weight: bold;">Ver horários →</a>`;
+    }
+    
+    content += `</div>`;
     
     return content;
+  }
+
+  /**
+   * Esconder todos os marcadores (sem remover)
+   */
+  hideAllMarkers() {
+    Object.values(this.markers).forEach(marker => {
+      marker.remove();
+    });
+    console.log('🚫 Marcadores de paragens escondidos');
+  }
+
+  /**
+   * Mostrar todos os marcadores (restaurar)
+   */
+  showAllMarkers() {
+    Object.values(this.markers).forEach(marker => {
+      marker.addTo(this.map);
+    });
+    console.log('✅ Marcadores de paragens mostrados');
   }
 
   /**
