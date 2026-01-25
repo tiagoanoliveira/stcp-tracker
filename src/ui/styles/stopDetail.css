@@ -257,7 +257,7 @@
 /* Responsive - Mobile */
 @media (max-width: 480px) {
   .next-arrivals {
-    height: 60vh;
+    height: 50vh;
   }
 
   .next-arrivals-header {
@@ -288,7 +288,7 @@
   }
 
   .next-arrivals-content {
-    padding: 8px;
+    padding: 0 8px;
   }
 
   .arrival-item {
