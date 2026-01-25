@@ -1,11 +1,12 @@
 /**
  * StopsMapApp - Aplicação de mapa de paragens
- * Usa: MapManager, StopMarkerManager, BusMarkerManager, NextArrivals
+ * Usa: MapManager, StopMarkerManager, BusMarkerManager, NextArrivals, vehicleService
  */
 
 import { geolocationService } from '../core/geolocationService.js';
 import { apiService } from '../core/apiService.js';
 import { stopService } from '../services/stopService.js';
+import { vehicleService } from '../services/vehicleService.js';
 import { MapManager } from '../map/MapManager.js';
 import { StopMarkerManager } from '../map/markers/StopMarkerManager.js';
 import { BusMarkerManager } from '../map/markers/BusMarkerManager.js';
@@ -241,10 +242,10 @@ export class StopsMapApp {
     const busPositions = [];
 
     arrivals.forEach(arrival => {
-      const vehicle = this.matchVehicleToTrip(vehicles, arrival.trip_id);
+      const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
       
       if (vehicle) {
-        const location = this.extractVehicleLocation(vehicle);
+        const location = vehicleService.extractVehicleLocation(vehicle);
         
         if (location) {
           busesToShow.push({
@@ -267,31 +268,6 @@ export class StopsMapApp {
     if (busPositions.length > 0) {
       this.mapManager.fitBounds(busPositions, { padding: [50, 50], maxZoom: 16 });
     }
-  }
-
-  matchVehicleToTrip(vehicles, tripId) {
-    if (!vehicles || !tripId) return null;
-    
-    return vehicles.find(vehicle => {
-      const annotations = vehicle['vehicle-tracking:annotations'];
-      if (!annotations || !annotations.value) return false;
-      
-      try {
-        const data = JSON.parse(annotations.value);
-        return data.tripId === tripId;
-      } catch (e) {
-        return false;
-      }
-    });
-  }
-
-  extractVehicleLocation(vehicle) {
-    if (!vehicle.location?.value?.coordinates) return null;
-    
-    const [longitude, latitude] = vehicle.location.value.coordinates;
-    const speed = vehicle.speed?.value || 0;
-    
-    return { latitude, longitude, speed };
   }
 
   handleArrivalClick(data) {
