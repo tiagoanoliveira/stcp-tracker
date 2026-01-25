@@ -15,10 +15,7 @@ export function createBusMapControl(map, busMapUrl = 'index.html') {
       button.type = 'button';
       button.title = 'Ver mapa de autocarros';
       button.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="6" width="18" height="12" rx="2"/>
-          <path d="M7 10h.01M12 10h.01M17 10h.01"/>
-        </svg>
+        <img src="./resources/busmap.png" alt="Ver localização dos autocarros" />
       `;
 
       // Prevenir propagação de eventos do mapa
