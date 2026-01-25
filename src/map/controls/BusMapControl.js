@@ -2,7 +2,7 @@
  * BusMapControl - Controlo personalizado para navegar de volta ao mapa de autocarros
  */
 
-export function createBusMapControl(map, busMapUrl = 'index.html') {
+export function createBusMapControl(map, busMapUrl = '') {
   const BusMapControl = L.Control.extend({
     options: {
       position: 'bottomleft'
