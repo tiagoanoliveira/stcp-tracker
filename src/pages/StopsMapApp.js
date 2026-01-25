@@ -61,7 +61,7 @@ export class StopsMapApp {
       this.stopMarkerManager = new StopMarkerManager(this.mapManager.map);
       
       // 6. Inicializar bus marker manager
-      this.busMarkerManager = new BusMarkerManager(this.mapManager.map, iconCache);
+      this.busMarkerManager = new BusMarkerManager(this.mapManager.map);
 
       // 7. Inicializar NextArrivals panel
       this.nextArrivals = new NextArrivals();
@@ -237,7 +237,7 @@ export class StopsMapApp {
       return;
     }
 
-    // Filtrar veículos que correspondem às chegadas
+    // Filtrar e processar veículos que correspondem às chegadas
     const busesToShow = [];
     const busPositions = [];
 
@@ -245,16 +245,12 @@ export class StopsMapApp {
       const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
       
       if (vehicle) {
-        const location = vehicleService.extractVehicleLocation(vehicle);
+        // Processar veículo usando vehicleService.processBusData()
+        const processedBus = vehicleService.processBusData(vehicle, arrival.trip_headsign);
         
-        if (location) {
-          busesToShow.push({
-            id: vehicle.id,
-            ...vehicle,
-            arrival: arrival // Adicionar info da chegada
-          });
-          
-          busPositions.push([location.latitude, location.longitude]);
+        if (processedBus) {
+          busesToShow.push(processedBus);
+          busPositions.push([processedBus.latitude, processedBus.longitude]);
         }
       }
     });
@@ -262,11 +258,27 @@ export class StopsMapApp {
     console.log(`🚌 Mostrando ${busesToShow.length} autocarros no mapa`);
 
     // Atualizar marcadores de autocarros
-    this.busMarkerManager.updateBusMarkers(busesToShow);
+    if (busesToShow.length > 0) {
+      this.busMarkerManager.updateBusMarkers(busesToShow);
 
-    // Ajustar zoom do mapa para mostrar todos os autocarros
-    if (busPositions.length > 0) {
-      this.mapManager.fitBounds(busPositions, { padding: [50, 50], maxZoom: 16 });
+      // Ajustar zoom do mapa para mostrar todos os autocarros
+      // Adicionar pequeno delay para garantir que os marcadores foram criados
+      setTimeout(() => {
+        if (busPositions.length === 1) {
+          // Se for apenas 1 autocarro, centrar nele com zoom 16
+          this.mapManager.centerOn(busPositions[0], 16);
+        } else if (busPositions.length > 1) {
+          // Se forem vários, ajustar bounds para ver todos
+          this.mapManager.fitBounds(busPositions, { 
+            padding: [80, 80],
+            maxZoom: 15
+          });
+        }
+      }, 100);
+    } else {
+      // Nenhum autocarro encontrado - limpar mapa
+      this.busMarkerManager.clearAllMarkers();
+      console.log('⚠ Nenhum autocarro com localização encontrado para esta paragem');
     }
   }
 
