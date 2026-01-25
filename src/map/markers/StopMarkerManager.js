@@ -120,6 +120,25 @@ export class StopMarkerManager {
   }
 
   /**
+   * Mostrar apenas um marcador específico (esconder todos os outros)
+   * @param {string} stopId - ID da paragem a manter visível
+   */
+  showOnlyMarker(stopId) {
+    Object.entries(this.markers).forEach(([id, marker]) => {
+      if (id === stopId) {
+        // Manter este marker no mapa
+        if (!this.map.hasLayer(marker)) {
+          marker.addTo(this.map);
+        }
+      } else {
+        // Esconder todos os outros
+        marker.remove();
+      }
+    });
+    console.log(`📍 Mostrando apenas marcador da paragem ${stopId}`);
+  }
+
+  /**
    * Remover marcador de paragem
    */
   removeStopMarker(stopId) {
