@@ -3,6 +3,8 @@
  * Aparece na metade inferior do ecrã sobre o mapa
  */
 
+import { vehicleService } from '../../services/vehicleService.js';
+
 export class NextArrivals {
   constructor() {
     this.element = null;
@@ -105,7 +107,7 @@ export class NextArrivals {
     listContainer.innerHTML = '';
 
     arrivals.forEach(arrival => {
-      const vehicle = this.matchVehicleToTrip(vehicles, arrival.trip_id);
+      const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
       const arrivalElement = this.createArrivalElement(arrival, vehicle);
       listContainer.appendChild(arrivalElement);
     });
@@ -115,13 +117,17 @@ export class NextArrivals {
 
   createArrivalElement(arrival, vehicle) {
     const statusClass = arrival.status === 'ON_TIME' ? 'status-ontime' : 'status-delayed';
-    const lineColors = this.getLineColors(arrival.route_short_name);
+    
+    // Usar cores da API (route_color e route_text_color)
+    const busColor = arrival.route_color || '#0072C6';
+    const textColor = arrival.route_text_color || '#FFFFFF';
     
     const div = document.createElement('div');
     div.className = 'arrival-item';
     
+    // Se há veículo, adicionar click handler
     if (vehicle) {
-      const location = this.extractVehicleLocation(vehicle);
+      const location = vehicleService.extractVehicleLocation(vehicle);
       if (location) {
         div.style.cursor = 'pointer';
         div.setAttribute('data-vehicle-id', vehicle.id);
@@ -138,7 +144,7 @@ export class NextArrivals {
     }
     
     div.innerHTML = `
-      <div class="arrival-line" style="background-color: ${lineColors.busColor}; color: ${lineColors.textColor};">
+      <div class="arrival-line" style="background-color: ${busColor}; color: ${textColor};">
         ${arrival.route_short_name}
       </div>
       <div class="arrival-info">
@@ -154,54 +160,6 @@ export class NextArrivals {
     `;
     
     return div;
-  }
-
-  matchVehicleToTrip(vehicles, tripId) {
-    if (!vehicles || !tripId) return null;
-    
-    return vehicles.find(vehicle => {
-      const annotations = vehicle['vehicle-tracking:annotations'];
-      if (!annotations || !annotations.value) return false;
-      
-      try {
-        const data = JSON.parse(annotations.value);
-        return data.tripId === tripId;
-      } catch (e) {
-        return false;
-      }
-    });
-  }
-
-  extractVehicleLocation(vehicle) {
-    if (!vehicle.location?.value?.coordinates) return null;
-    
-    const [longitude, latitude] = vehicle.location.value.coordinates;
-    const speed = vehicle.speed?.value || 0;
-    
-    return { latitude, longitude, speed };
-  }
-
-  getLineColors(line) {
-    // Import colors from busColors.js ou usar default
-    const BUS_COLORS = {
-      '2': { busColor: '#E30613', textColor: '#fff' },
-      '3': { busColor: '#FFCD00', textColor: '#000' },
-      '5': { busColor: '#00A651', textColor: '#fff' },
-      '6': { busColor: '#662D91', textColor: '#fff' },
-      '7': { busColor: '#FF6600', textColor: '#fff' },
-      '8': { busColor: '#00AEEF', textColor: '#fff' },
-      '9': { busColor: '#E30613', textColor: '#fff' },
-      'Z': { busColor: '#000000', textColor: '#fff' },
-      'M': { busColor: '#0072C6', textColor: '#fff' },
-    };
-
-    if (!line) return { busColor: '#0072C6', textColor: '#fff' };
-    if (BUS_COLORS[line]) return BUS_COLORS[line];
-    
-    const prefix = line[0];
-    if (BUS_COLORS[prefix]) return BUS_COLORS[prefix];
-    
-    return { busColor: '#0072C6', textColor: '#fff' };
   }
 
   getStatusText(status) {
