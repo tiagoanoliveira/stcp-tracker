@@ -2,7 +2,7 @@
  * StopsControl - Controlo personalizado para navegar para o mapa de paragens
  */
 
-export function createStopsControl(map, stopsMapUrl = 'stopsmap.html') {
+export function createStopsControl(map, stopsMapUrl = 'stopsmap') {
   const StopsControl = L.Control.extend({
     options: {
       position: 'bottomleft'
