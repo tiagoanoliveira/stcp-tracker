@@ -100,7 +100,6 @@ export class NextArrivals {
 
     this.element.classList.add('visible');
     this.isVisible = true;
-    console.log('✅ NextArrivals aberto');
   }
 
   hide() {
@@ -108,8 +107,7 @@ export class NextArrivals {
       this.element.classList.remove('visible');
       this.isVisible = false;
       this.currentStopId = null;
-      console.log('🚫 NextArrivals fechado');
-      
+
       if (this.onCloseCallback) {
         this.onCloseCallback();
       }
@@ -141,8 +139,6 @@ export class NextArrivals {
       const arrivalElement = this.createArrivalElement(arrival, vehicle);
       listContainer.appendChild(arrivalElement);
     });
-
-    console.log(`✓ ${arrivals.length} chegadas mostradas no painel`);
   }
 
   createArrivalElement(arrival, vehicle) {

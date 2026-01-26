@@ -22,7 +22,6 @@ export class StopMarkerManager {
     
     this.clearAllMarkers();
     stops.forEach(stop => this.addStopMarker(stop, showDistance));
-    console.log(`✓ ${stops.length} marcadores de paragens atualizados`);
   }
 
   /**
@@ -106,7 +105,6 @@ export class StopMarkerManager {
     Object.values(this.markers).forEach(marker => {
       marker.remove();
     });
-    console.log('🚫 Marcadores de paragens escondidos');
   }
 
   /**
@@ -116,7 +114,6 @@ export class StopMarkerManager {
     Object.values(this.markers).forEach(marker => {
       marker.addTo(this.map);
     });
-    console.log('✅ Marcadores de paragens mostrados');
   }
 
   /**
@@ -135,7 +132,6 @@ export class StopMarkerManager {
         marker.remove();
       }
     });
-    console.log(`📍 Mostrando apenas marcador da paragem ${stopId}`);
   }
 
   /**
@@ -169,7 +165,6 @@ export class StopMarkerManager {
    */
   clearAllMarkers() {
     Object.keys(this.markers).forEach(id => this.removeStopMarker(id));
-    console.log('🗑️ Todos os marcadores de paragens removidos');
   }
 
   /**

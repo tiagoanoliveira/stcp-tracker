@@ -150,8 +150,6 @@ class PlannedArrivalsService {
             trip_id: trip.trip_id || null,
             status: 'SCHEDULED'
           });
-        } else {
-          console.log(`  ❌ [${route.route_short_name}] IGNORADA: fora do intervalo`);
         }
       }
     }
