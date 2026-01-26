@@ -108,7 +108,8 @@ class PlannedArrivalsService {
 
   /**
    * Extrair próximas viagens do schedule
-   * @param {Object} schedule - Objeto com horas como chaves (ex: { "21": [...], "22": [...] })
+   * Suporta horários após 24h (a STCP usa 24, 25, 26 para horários após meia-noite)
+   * @param {Object} schedule - Objeto com horas como chaves (ex: { "21": [...], "24": [...] })
    * @param {number} maxMinutes - Minutos máximos para procurar
    * @param {Object} route - Informação da rota
    */
@@ -121,39 +122,84 @@ class PlannedArrivalsService {
     
     const upcomingTrips = [];
     
-    // Iterar sobre as horas do schedule
-    for (let hour = currentHour; hour <= 23 && (hour * 60) <= maxTotalMinutes; hour++) {
-      const hourKey = hour.toString();
-      const trips = schedule[hourKey];
-      
-      if (!trips || trips.length === 0) {
-        continue;
-      }
-
-      // Iterar sobre as viagens dessa hora
-      for (const trip of trips) {
-        // A API retorna apenas 'minute', precisamos extrair a hora do arrival_time ou usar a hora do loop
-        const tripMinute = parseInt(trip.minute);
-        const tripTotalMinutes = hour * 60 + tripMinute;
-
-        // Verificar se a viagem está no futuro e dentro do limite
-        if (tripTotalMinutes >= currentTotalMinutes && tripTotalMinutes <= maxTotalMinutes) {
-          const minutesUntilArrival = tripTotalMinutes - currentTotalMinutes;
-
-          upcomingTrips.push({
-            route_short_name: route.route_short_name,
-            route_color: route.route_color,
-            route_text_color: route.route_text_color,
-            trip_headsign: trip.headsign, // A API retorna 'headsign' não 'trip_headsign'
-            arrival_minutes: minutesUntilArrival,
-            arrival_time: `${hour.toString().padStart(2, '0')}:${trip.minute.padStart(2, '0')}`,
-            trip_id: trip.trip_id || null,
-            status: 'SCHEDULED'
-          });
-        }
+    // Determinar intervalo de horas a verificar
+    // Se estamos perto da meia-noite (23h-24h), precisamos verificar horários 24h+
+    const startHour = currentHour;
+    let endHour = Math.min(23, Math.floor(maxTotalMinutes / 60));
+    
+    // Se maxTotalMinutes ultrapassa a meia-noite (>= 1440), verificar horários 24h+
+    const checkAfterMidnight = maxTotalMinutes >= 1440;
+    const afterMidnightEndHour = checkAfterMidnight ? Math.floor((maxTotalMinutes - 1440) / 60) + 24 : 0;
+    
+    // Processar horas normais (0-23)
+    for (let hour = startHour; hour <= endHour; hour++) {
+      this.processHourTrips(schedule, hour, currentTotalMinutes, maxTotalMinutes, route, upcomingTrips);
+    }
+    
+    // Processar horas após meia-noite (24, 25, 26, etc.) se necessário
+    if (checkAfterMidnight) {
+      for (let hour = 24; hour <= afterMidnightEndHour; hour++) {
+        this.processHourTrips(schedule, hour, currentTotalMinutes, maxTotalMinutes, route, upcomingTrips);
       }
     }
+    
     return upcomingTrips;
+  }
+
+  /**
+   * Processar viagens de uma hora específica
+   */
+  processHourTrips(schedule, hour, currentTotalMinutes, maxTotalMinutes, route, upcomingTrips) {
+    const hourKey = hour.toString();
+    const trips = schedule[hourKey];
+    
+    if (!trips || trips.length === 0) {
+      return;
+    }
+
+    for (const trip of trips) {
+      const tripMinute = parseInt(trip.minute);
+      
+      // Calcular minutos totais desde meia-noite
+      // Para horas >= 24, representa horários do dia seguinte
+      const tripTotalMinutes = hour * 60 + tripMinute;
+      
+      // Ajustar comparação se a viagem for depois da meia-noite (hora >= 24)
+      let adjustedTripMinutes = tripTotalMinutes;
+      let adjustedCurrentMinutes = currentTotalMinutes;
+      
+      if (hour >= 24) {
+        // Viagem é no "dia seguinte" (após 24h)
+        // Se hora atual é >= 23h, ajustar para considerar continuidade
+        if (currentTotalMinutes >= 23 * 60) {
+          // Estamos entre 23h-24h, então 24h é o futuro próximo
+          adjustedCurrentMinutes = currentTotalMinutes;
+        } else {
+          // Estamos entre 0h-1h, tripTotalMinutes já está correto (>= 1440)
+          // mas currentTotalMinutes precisa ser ajustado para 1440 + hora_atual
+          adjustedCurrentMinutes = 1440 + currentTotalMinutes;
+        }
+      }
+
+      // Verificar se a viagem está no futuro e dentro do limite
+      if (adjustedTripMinutes >= adjustedCurrentMinutes && adjustedTripMinutes <= maxTotalMinutes) {
+        const minutesUntilArrival = adjustedTripMinutes - adjustedCurrentMinutes;
+        
+        // Formatar hora de exibição (converter 24h+ para 0h+)
+        const displayHour = hour >= 24 ? hour - 24 : hour;
+        
+        upcomingTrips.push({
+          route_short_name: route.route_short_name,
+          route_color: route.route_color,
+          route_text_color: route.route_text_color,
+          trip_headsign: trip.headsign,
+          arrival_minutes: minutesUntilArrival,
+          arrival_time: `${displayHour.toString().padStart(2, '0')}:${trip.minute.padStart(2, '0')}`,
+          trip_id: trip.trip_id || null,
+          status: 'SCHEDULED'
+        });
+      }
+    }
   }
 
   /**
@@ -177,6 +223,7 @@ class PlannedArrivalsService {
   /**
    * Combinar chegadas tempo real + programadas, removendo duplicados
    * Critério de duplicado: mesma linha + mesmo destino + tempo próximo (±5 min)
+   * IMPORTANTE: Para tempo real, usa (arrival_minutes - delay_minutes) para comparar com schedule
    */
   combineArrivals(realtimeArrivals, scheduledArrivals) {
     const combined = [...realtimeArrivals];
@@ -187,7 +234,11 @@ class PlannedArrivalsService {
         const sameRoute = realtime.route_short_name === scheduled.route_short_name;
         const sameHeadsign = this.normalizeHeadsign(realtime.trip_headsign) === 
                              this.normalizeHeadsign(scheduled.trip_headsign);
-        const timeDiff = Math.abs(realtime.arrival_minutes - scheduled.arrival_minutes);
+        
+        // Ajustar tempo real para hora programada: arrival_minutes - delay_minutes
+        // Se o autocarro está atrasado 5min e chega em 10min, deveria ter chegado em 5min (10-5)
+        const realtimeScheduledTime = realtime.arrival_minutes - realtime.delay_minutes;
+        const timeDiff = Math.abs(realtimeScheduledTime - scheduled.arrival_minutes);
         const closeInTime = timeDiff <= 5; // ±5 minutos
         
         return sameRoute && sameHeadsign && closeInTime;
