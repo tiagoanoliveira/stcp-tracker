@@ -7,7 +7,7 @@ import { geolocationService } from '../core/geolocationService.js';
 import { apiService } from '../core/apiService.js';
 import { stopService } from '../services/stopService.js';
 import { vehicleService } from '../services/vehicleService.js';
-import { arrivalsPredictionService } from '../services/arrivalsPredictionService.js';
+import { plannedArrivalsService } from '../services/plannedArrivalsService.js';
 import { MapManager } from '../map/MapManager.js';
 import { StopMarkerManager } from '../map/markers/StopMarkerManager.js';
 import { BusMarkerManager } from '../map/markers/BusMarkerManager.js';
@@ -210,8 +210,8 @@ export class StopsMapApp {
     try {
       console.log('🔄 A carregar chegadas para paragem:', stopId);
       
-      // NOVO: Usar o serviço de predição para obter chegadas combinadas (realtime + programadas)
-      const arrivals = await arrivalsPredictionService.getNextArrivals(stopId, 60);
+      // Usar o serviço de chegadas planeadas para obter chegadas combinadas (realtime + programadas)
+      const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60);
       
       if (arrivals.length === 0) {
         console.log('⚠ Nenhuma chegada prevista');
