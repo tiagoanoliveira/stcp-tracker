@@ -1,6 +1,6 @@
 /**
  * Core API Service - Centraliza todas as chamadas API
- * Responsável por: fetch de dados FIWARE, trips, calendar, stops, com retry logic
+ * Responsável por: fetch de dados FIWARE, trips, calendar, stops, routes, schedules, com retry logic
  */
 
 class ApiService {
@@ -59,7 +59,7 @@ class ApiService {
    */
   async fetchStopRealtime(stopId) {
     try {
-      const url = `${this.proxyUrl}/${stopId}`;
+      const url = `${this.proxyUrl}/${stopId}/realtime`;
       console.log(`🔄 Buscando dados da paragem ${stopId} via proxy...`);
       
       const data = await this.fetchWithRetry(url);
@@ -67,6 +67,47 @@ class ApiService {
       return data;
     } catch (error) {
       console.error(`❌ Erro ao obter dados da paragem ${stopId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch de rotas que servem uma paragem via proxy
+   * @param {string} stopId - Código da paragem
+   * @returns {Promise<Object>} Objeto com display_routes e dropdown_routes
+   */
+  async fetchStopRoutes(stopId) {
+    try {
+      const url = `${this.proxyUrl}/${stopId}/routes`;
+      console.log(`🔄 Buscando rotas da paragem ${stopId}...`);
+      
+      const data = await this.fetchWithRetry(url);
+      console.log(`✓ Rotas da paragem ${stopId} recebidas`);
+      return data;
+    } catch (error) {
+      console.error(`❌ Erro ao obter rotas da paragem ${stopId}:`, error);
+      return { display_routes: [], dropdown_routes: [] };
+    }
+  }
+
+  /**
+   * Fetch de horário programado de uma rota numa paragem via proxy
+   * @param {string} stopId - Código da paragem
+   * @param {string} routeId - ID da rota (ex: "200")
+   * @param {string} serviceId - ID do serviço (ex: "DIAS UTEIS", "SAB", "DOM")
+   * @returns {Promise<Object>} Objeto com schedule por hora
+   */
+  async fetchStopSchedule(stopId, routeId, serviceId) {
+    try {
+      const encodedServiceId = encodeURIComponent(serviceId);
+      const url = `${this.proxyUrl}/${stopId}/schedule?route_id=${routeId}&service_id=${encodedServiceId}`;
+      console.log(`🔄 Buscando schedule ${routeId} (${serviceId}) para ${stopId}...`);
+      
+      const data = await this.fetchWithRetry(url);
+      console.log(`✓ Schedule ${routeId} da paragem ${stopId} recebido`);
+      return data;
+    } catch (error) {
+      console.error(`❌ Erro ao obter schedule de ${routeId} (${serviceId}) para ${stopId}:`, error);
       return null;
     }
   }
