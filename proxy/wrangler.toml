@@ -9,10 +9,10 @@ compatibility_flags = ["nodejs_compat"]
 # Worker settings
 workers_dev = true
 
-# Routes - Adicionar quando tiveres custom domain configurado
-# [[routes]]
-# pattern = "stcp-worker.tiagoanoliveira.pt/*"
-# zone_name = "tiagoanoliveira.pt"
+# Custom Domain Routes
+[[routes]]
+pattern = "stcp-worker.tiagoanoliveira.pt/*"
+zone_name = "tiagoanoliveira.pt"
 
 # Environment variables (se necessário no futuro)
 # [vars]
