@@ -212,10 +212,18 @@
 .arrival-time {
   font-weight: 700;
   font-size: 18px;
-  color: #0072c6;
   min-width: 70px;
   text-align: right;
   flex-shrink: 0;
+}
+
+/* Cores dos minutos: Verde para tempo real, Azul para programado */
+.arrival-time-realtime {
+  color: #22C55E;
+}
+
+.arrival-time-scheduled {
+  color: #3B82F6;
 }
 
 .next-arrivals-footer {
