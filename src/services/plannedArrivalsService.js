@@ -1,6 +1,6 @@
 /**
  * Planned Arrivals Service - Combina chegadas em tempo real com horários programados
- * Usa: apiService, scheduleService, vehicleService
+ * Usa: apiService, scheduleService
  */
 
 import { apiService } from '../core/apiService.js';
@@ -42,7 +42,9 @@ class PlannedArrivalsService {
       
       // 3. Buscar schedules de cada rota
       const scheduledArrivals = [];
-      const currentServiceId = scheduleService.getCurrentServiceId();
+      const currentServiceId = scheduleService.getServiceIdAtual();
+      
+      console.log(`📅 Service ID atual: ${currentServiceId}`);
       
       for (const route of routes) {
         const schedule = await this.getStopSchedule(stopId, route.route_id, currentServiceId);
