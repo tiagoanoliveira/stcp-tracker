@@ -1,6 +1,21 @@
 // mapInitializer.js - Wrapper em torno do Leaflet para inicializar mapas
 
-import { createUserMarker } from '../../../realtime_bus_map/mapUtils.js';
+export function createUserMarker(map, position) {
+  const userIcon = L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34]
+  });
+
+  const marker = L.marker(position, {
+    icon: userIcon,
+    title: "Você está aqui"
+  }).addTo(map);
+
+  marker.bindPopup("Localização Atual");
+  return marker;
+}
 
 export class MapInitializer {
   constructor(elementId, center=[41.1579,-8.6291], zoom=13) {
