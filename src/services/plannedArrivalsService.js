@@ -1,12 +1,10 @@
 /**
  * Planned Arrivals Service - Combina chegadas em tempo real com horários programados
- * Usa: apiService, scheduleService, vehicleService, dateHelpers
+ * Usa: apiService, scheduleService, vehicleService
  */
 
 import { apiService } from '../core/apiService.js';
 import { scheduleService } from './scheduleService.js';
-import { vehicleService } from './vehicleService.js';
-import { dateHelpers } from '../utils/dateHelpers.js';
 
 class PlannedArrivalsService {
   constructor() {
