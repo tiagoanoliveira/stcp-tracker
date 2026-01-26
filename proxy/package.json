@@ -1,0 +1,24 @@
+{
+  "name": "stcp-worker",
+  "version": "2.0.0",
+  "description": "Cloudflare Worker - CORS Proxy para STCP API",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail",
+    "dry-run": "wrangler publish --dry-run"
+  },
+  "keywords": [
+    "cloudflare",
+    "worker",
+    "stcp",
+    "cors",
+    "proxy"
+  ],
+  "author": "Tiago Oliveira",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

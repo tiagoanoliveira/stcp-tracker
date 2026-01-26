@@ -1,0 +1,25 @@
+# Wrangler configuration for STCP API Proxy Worker
+# https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "stcp"
+main = "index.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Worker settings
+workers_dev = true
+
+# Custom Domain Routes
+[[routes]]
+pattern = "stcp-worker.tiagoanoliveira.pt/*"
+zone_name = "tiagoanoliveira.pt"
+
+# Environment variables (se necessário no futuro)
+# [vars]
+# STCP_API_BASE = "https://stcp.pt/api"
+
+# Deploy commands:
+# npx wrangler deploy                    # Deploy to production
+# npx wrangler dev                       # Run locally
+# npx wrangler tail                      # View logs
+# npx wrangler publish --dry-run         # Test deploy without publishing

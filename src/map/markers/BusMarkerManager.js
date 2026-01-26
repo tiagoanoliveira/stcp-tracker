@@ -41,8 +41,6 @@ export class BusMarkerManager {
         this.removeBusMarker(id);
       }
     });
-
-    console.log(`✓ ${busData.length} marcadores de autocarros atualizados`);
   }
 
   /**
@@ -101,7 +99,6 @@ export class BusMarkerManager {
    */
   clearAllMarkers() {
     Object.keys(this.markers).forEach(id => this.removeBusMarker(id));
-    console.log('🖮 Todos os marcadores de autocarros removidos');
   }
 
   /**

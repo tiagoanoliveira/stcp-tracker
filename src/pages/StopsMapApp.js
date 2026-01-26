@@ -7,6 +7,7 @@ import { geolocationService } from '../core/geolocationService.js';
 import { apiService } from '../core/apiService.js';
 import { stopService } from '../services/stopService.js';
 import { vehicleService } from '../services/vehicleService.js';
+import { plannedArrivalsService } from '../services/plannedArrivalsService.js';
 import { MapManager } from '../map/MapManager.js';
 import { StopMarkerManager } from '../map/markers/StopMarkerManager.js';
 import { BusMarkerManager } from '../map/markers/BusMarkerManager.js';
@@ -37,13 +38,11 @@ export class StopsMapApp {
 
       // 1. Carregar dados de paragens
       await stopService.loadStopsData();
-      console.log('✓ Dados de paragens carregados');
 
       // 2. Inicializar mapa
       this.mapManager = new MapManager(this.mapElementId);
       this.mapManager.initialize();
       await this.mapManager.waitForReady();
-      console.log('✓ Mapa inicializado');
 
       // 3. Adicionar controlo de centrar
       this.centerControl = createCenterControl(
@@ -51,12 +50,10 @@ export class StopsMapApp {
         () => this.mapManager.getUserPosition()
       );
       this.centerControl.addTo(this.mapManager.map);
-      console.log('✓ Controlo de centrar adicionado');
 
       // 4. Adicionar controlo de voltar ao busmap
       this.busMapControl = createBusMapControl(this.mapManager.map);
       this.busMapControl.addTo(this.mapManager.map);
-      console.log('✓ Controlo de busmap adicionado');
 
       // 5. Inicializar stop marker manager
       this.stopMarkerManager = new StopMarkerManager(this.mapManager.map);
@@ -82,7 +79,6 @@ export class StopsMapApp {
       // 10. Mostrar paragens
       this.displayAllStops();
 
-      console.log('✅ StopsMapApp inicializado com sucesso');
     } catch (error) {
       console.error('❌ Erro na inicialização:', error);
       this.showError('Erro ao inicializar aplicação');
@@ -92,7 +88,6 @@ export class StopsMapApp {
   setupGeolocation() {
     geolocationService.getCurrentPosition()
       .then(position => {
-        console.log('✓ Localização obtida:', position);
         this.mapManager.updateUserMarker(position);
         this.displayNearbyStops();
       })
@@ -129,7 +124,6 @@ export class StopsMapApp {
     this.stopMarkerManager.updateStopMarkers(stops, false, (stop) => {
       this.handleStopClick(stop);
     });
-    console.log(`📍 ${stops.length} paragens mostradas`);
   }
 
   displayNearbyStops() {
@@ -146,7 +140,6 @@ export class StopsMapApp {
         this.handleStopClick(stop);
       });
       this.mapManager.centerOn(userPos, 15);
-      console.log(`📍 ${nearbyStops.length} paragens próximas mostradas`);
     } else {
       this.displayAllStops();
     }
@@ -165,14 +158,12 @@ export class StopsMapApp {
     
     if (results.length === 0) {
       this.stopMarkerManager.clearAllMarkers();
-      console.log('🔍 Nenhuma paragem encontrada');
       return;
     }
 
     this.stopMarkerManager.updateStopMarkers(results, false, (stop) => {
       this.handleStopClick(stop);
     });
-    console.log(`🔍 ${results.length} paragens encontradas`);
 
     if (results.length === 1) {
       this.mapManager.centerOn([results[0].latitude, results[0].longitude], 16);
@@ -183,8 +174,6 @@ export class StopsMapApp {
   }
 
   async handleStopClick(stop) {
-    console.log('📍 Paragem clicada:', stop.stop_id, stop.stop_name);
-    
     this.currentStopId = stop.stop_id;
     this.currentStopPosition = [stop.latitude, stop.longitude];
     
@@ -196,8 +185,7 @@ export class StopsMapApp {
     
     // Fechar popup da paragem
     this.mapManager.map.closePopup();
-    console.log('✓ Popup da paragem fechado');
-    
+
     // Carregar e mostrar chegadas
     await this.loadStopArrivals(stop.stop_id);
     
@@ -207,30 +195,25 @@ export class StopsMapApp {
 
   async loadStopArrivals(stopId) {
     try {
-      console.log('🔄 A carregar chegadas para paragem:', stopId);
+      // Usar o serviço de chegadas planeadas para obter chegadas combinadas (realtime + programadas)
+      const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60);
       
-      // Buscar dados de chegadas
-      const stopData = await apiService.fetchStopRealtime(stopId);
-      
-      if (!stopData || !stopData.arrivals || stopData.arrivals.length === 0) {
-        console.log('⚠ Nenhuma chegada prevista');
+      if (arrivals.length === 0) {
         this.nextArrivals.setArrivals([], []);
         this.busMarkerManager.clearAllMarkers();
         this.nextArrivals.updateLastUpdate();
         return;
       }
       
-      // Buscar dados de veículos
+      // Buscar dados de veículos (para mostrar localização dos autocarros)
       const vehicles = await apiService.fetchBusData();
-      
-      console.log(`✓ ${stopData.arrivals.length} chegadas, ${vehicles.length} veículos`);
-      
-      // Atualizar painel com chegadas
-      this.nextArrivals.setArrivals(stopData.arrivals, vehicles);
+
+      // Atualizar painel com TODAS as chegadas
+      this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
       
       // Filtrar e mostrar apenas autocarros que vão à paragem
-      this.updateBusMap(stopData.arrivals, vehicles);
+      this.updateBusMap(arrivals, vehicles);
       
     } catch (error) {
       console.error('❌ Erro ao carregar chegadas:', error);
@@ -249,6 +232,9 @@ export class StopsMapApp {
     const busPositions = [];
 
     arrivals.forEach(arrival => {
+      // Apenas tentar fazer match para chegadas em tempo real
+      if (!arrival.is_realtime) return;
+      
       const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
       
       if (vehicle) {
@@ -261,8 +247,6 @@ export class StopsMapApp {
         }
       }
     });
-
-    console.log(`🚌 Mostrando ${busesToShow.length} autocarros no mapa`);
 
     // Atualizar marcadores de autocarros
     if (busesToShow.length > 0) {
@@ -290,15 +274,12 @@ export class StopsMapApp {
     } else {
       // Nenhum autocarro encontrado - limpar mapa
       this.busMarkerManager.clearAllMarkers();
-      console.log('⚠ Nenhum autocarro com localização encontrado para esta paragem');
     }
   }
 
   handleArrivalClick(data) {
     const { vehicleId, location } = data;
-    
-    console.log('🚌 Autocarro clicado:', vehicleId);
-    
+
     if (!location || !this.mapManager) return;
     
     // Fazer zoom no autocarro (na metade superior do ecrã)
@@ -314,14 +295,11 @@ export class StopsMapApp {
 
   handleRefreshArrivals() {
     if (this.currentStopId) {
-      console.log('🔄 Refresh manual...');
       this.loadStopArrivals(this.currentStopId);
     }
   }
 
   handleCloseArrivals() {
-    console.log('🚫 Fechando painel de chegadas');
-    
     // Parar auto-refresh
     this.stopAutoRefresh();
     
@@ -334,7 +312,6 @@ export class StopsMapApp {
     // Voltar à paragem que foi consultada
     if (this.currentStopPosition) {
       this.mapManager.centerOn(this.currentStopPosition, 16);
-      console.log('✓ Mapa centrado na paragem consultada');
     }
     
     // Limpar estado
@@ -347,19 +324,15 @@ export class StopsMapApp {
     
     this.refreshInterval = setInterval(() => {
       if (this.currentStopId) {
-        console.log('🔄 Auto-refresh...');
         this.loadStopArrivals(this.currentStopId);
       }
     }, 5000); // 5 segundos
-    
-    console.log('✓ Auto-refresh iniciado (5s)');
   }
 
   stopAutoRefresh() {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
-      console.log('✓ Auto-refresh parado');
     }
   }
 
@@ -394,8 +367,6 @@ export class StopsMapApp {
     if (this.mapManager) {
       this.mapManager.cleanup();
     }
-    
-    console.log('🗑 StopsMapApp cleanup concluído');
   }
 }
 

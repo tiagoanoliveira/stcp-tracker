@@ -1,6 +1,6 @@
 /**
  * Core API Service - Centraliza todas as chamadas API
- * Responsável por: fetch de dados FIWARE, trips, calendar, stops, com retry logic
+ * Responsável por: fetch de dados FIWARE, trips, calendar, stops, routes, schedules, com retry logic
  */
 
 class ApiService {
@@ -38,7 +38,6 @@ class ApiService {
    */
   async fetchBusData() {
     try {
-      console.log('⏳ Buscando dados de autocarros da API FIWARE...');
       const data = await this.fetchWithRetry(this.fiwareUrl);
       
       if (!Array.isArray(data)) {
@@ -46,7 +45,6 @@ class ApiService {
         return [];
       }
       
-      console.log(`✓ ${data.length} autocarros carregados`);
       return data;
     } catch (error) {
       console.error('❌ Erro ao obter dados dos autocarros:', error);
@@ -59,14 +57,46 @@ class ApiService {
    */
   async fetchStopRealtime(stopId) {
     try {
-      const url = `${this.proxyUrl}/${stopId}`;
-      console.log(`🔄 Buscando dados da paragem ${stopId} via proxy...`);
-      
-      const data = await this.fetchWithRetry(url);
-      console.log(`✓ Dados da paragem ${stopId} recebidos`);
-      return data;
+      const url = `${this.proxyUrl}/${stopId}/realtime`;
+
+      return await this.fetchWithRetry(url);
     } catch (error) {
       console.error(`❌ Erro ao obter dados da paragem ${stopId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch de rotas que servem uma paragem via proxy
+   * @param {string} stopId - Código da paragem
+   * @returns {Promise<Object>} Objeto com display_routes e dropdown_routes
+   */
+  async fetchStopRoutes(stopId) {
+    try {
+      const url = `${this.proxyUrl}/${stopId}/routes`;
+
+      return await this.fetchWithRetry(url);
+    } catch (error) {
+      console.error(`❌ Erro ao obter rotas da paragem ${stopId}:`, error);
+      return { display_routes: [], dropdown_routes: [] };
+    }
+  }
+
+  /**
+   * Fetch de horário programado de uma rota numa paragem via proxy
+   * @param {string} stopId - Código da paragem
+   * @param {string} routeId - ID da rota (ex: "200")
+   * @param {string} serviceId - ID do serviço (ex: "DIAS UTEIS", "SAB", "DOM")
+   * @returns {Promise<Object>} Objeto com schedule por hora
+   */
+  async fetchStopSchedule(stopId, routeId, serviceId) {
+    try {
+      const encodedServiceId = encodeURIComponent(serviceId);
+      const url = `${this.proxyUrl}/${stopId}/schedule?route_id=${routeId}&service_id=${encodedServiceId}`;
+
+      return await this.fetchWithRetry(url);
+    } catch (error) {
+      console.error(`❌ Erro ao obter schedule de ${routeId} (${serviceId}) para ${stopId}:`, error);
       return null;
     }
   }
@@ -89,7 +119,6 @@ class ApiService {
    * Fetch de trips.json
    */
   async fetchTripsData() {
-    console.log('⏳ Carregando trips.json...');
     return await this.fetchJSON('./resources/trips.json');
   }
 
@@ -97,7 +126,6 @@ class ApiService {
    * Fetch de calendar.json
    */
   async fetchCalendarData() {
-    console.log('⏳ Carregando calendar.json...');
     return await this.fetchJSON('./resources/calendar.json');
   }
 
@@ -105,7 +133,6 @@ class ApiService {
    * Fetch de stops.json
    */
   async fetchStopsData() {
-    console.log('⏳ Carregando stops.json...');
     return await this.fetchJSON('./resources/stops.json');
   }
 }

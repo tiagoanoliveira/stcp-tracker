@@ -100,7 +100,6 @@ export class NextArrivals {
 
     this.element.classList.add('visible');
     this.isVisible = true;
-    console.log('✅ NextArrivals aberto');
   }
 
   hide() {
@@ -108,8 +107,7 @@ export class NextArrivals {
       this.element.classList.remove('visible');
       this.isVisible = false;
       this.currentStopId = null;
-      console.log('🚫 NextArrivals fechado');
-      
+
       if (this.onCloseCallback) {
         this.onCloseCallback();
       }
@@ -134,23 +132,30 @@ export class NextArrivals {
     listContainer.innerHTML = '';
 
     arrivals.forEach(arrival => {
-      const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
+      // Apenas tentar match de veículo para chegadas em tempo real
+      const vehicle = arrival.is_realtime ? 
+        vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id) : null;
+      
       const arrivalElement = this.createArrivalElement(arrival, vehicle);
       listContainer.appendChild(arrivalElement);
     });
-
-    console.log(`✓ ${arrivals.length} chegadas mostradas no painel`);
   }
 
   createArrivalElement(arrival, vehicle) {
-    const statusClass = arrival.status === 'ON_TIME' ? 'status-ontime' : ('ARRIVING' ? 'status-ontime' :  'status-delayed');
+    const statusClass = arrival.status === 'ON_TIME' ? 'status-ontime' : 
+                        (arrival.status === 'SCHEDULED' ? 'status-scheduled' : 'status-delayed');
     
     // Usar cores da API (route_color e route_text_color)
     const busColor = arrival.route_color || '#0072C6';
     const textColor = arrival.route_text_color || '#FFFFFF';
     
-    // Verificar se há localização do autocarro
-    const hasLocation = vehicle && vehicleService.extractVehicleLocation(vehicle) !== null;
+    // Verificar se é tempo real ou programado
+    const isRealtime = arrival.is_realtime === true;
+    
+    // Verificar se há localização do autocarro (só para realtime)
+    const hasLocation = isRealtime && vehicle && 
+                        vehicleService.extractVehicleLocation(vehicle) !== null;
+    
     const locationIcon = hasLocation ? this.getActiveLocationIcon() : this.getInactiveLocationIcon();
     
     const div = document.createElement('div');
@@ -172,6 +177,22 @@ export class NextArrivals {
       });
     }
     
+    // Determinar o texto do status
+    let statusText = '';
+    if (!isRealtime) {
+      // Para chegadas programadas
+      statusText = 'Planeado - localização desconhecida';
+    } else {
+      // Para tempo real
+      statusText = this.getStatusText(arrival.status);
+      if (arrival.delay_minutes > 1) {
+        statusText += ` <span class="status-badge ${statusClass}">+${Math.round(arrival.delay_minutes)} min</span>`;
+      }
+    }
+    
+    // Classe CSS para a cor dos minutos (verde para realtime, azul para programado)
+    const timeClass = isRealtime ? 'arrival-time-realtime' : 'arrival-time-scheduled';
+    
     div.innerHTML = `
       <div class="arrival-line" style="background-color: ${busColor}; color: ${textColor};">
         ${arrival.route_short_name}
@@ -179,15 +200,14 @@ export class NextArrivals {
       <div class="arrival-info">
         <div class="arrival-destination">${arrival.trip_headsign}</div>
         <div class="arrival-status">
-          ${this.getStatusText(arrival.status)}
-          ${arrival.delay_minutes > 1 ? `<span class="status-badge ${statusClass}">+${Math.round(arrival.delay_minutes)} min</span>` : ''}
+          ${statusText}
         </div>
       </div>
       <div class="arrival-time-container">
         <div class="arrival-location-icon">
           ${locationIcon}
         </div>
-        <div class="arrival-time">
+        <div class="arrival-time ${timeClass}">
           ${this.formatArrivalTime(arrival.arrival_minutes)}
         </div>
       </div>
@@ -295,7 +315,8 @@ export class NextArrivals {
       'ON_TIME': 'No horário',
       'DELAYED': 'Atrasado',
       'EARLY': 'Adiantado',
-      'SCHEDULED': 'Programado'
+      'SCHEDULED': 'Programado',
+      'ARRIVING': 'A chegar'
     };
     return statusMap[status] || status;
   }
