@@ -182,7 +182,8 @@ class PlannedArrivalsService {
       }
 
       // Verificar se a viagem está no futuro e dentro do limite
-      if (adjustedTripMinutes >= adjustedCurrentMinutes && adjustedTripMinutes <= maxTotalMinutes) {
+      // Usar < ao invés de <= para excluir exatamente maxMinutes
+      if (adjustedTripMinutes >= adjustedCurrentMinutes && adjustedTripMinutes < maxTotalMinutes) {
         const minutesUntilArrival = adjustedTripMinutes - adjustedCurrentMinutes;
         
         // Formatar hora de exibição (converter 24h+ para 0h+)
