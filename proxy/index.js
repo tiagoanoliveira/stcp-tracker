@@ -1,4 +1,6 @@
 // Cloudflare Worker - CORS Proxy para STCP API
+// ES Module syntax (moderna)
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
@@ -139,6 +141,9 @@ async function handleRequest(request) {
   }
 }
 
-addEventListener('fetch', event => {
-  event.respondWith(handleRequest(event.request));
-});
+// ES Module export (sintaxe moderna requerida pela Cloudflare)
+export default {
+  async fetch(request, env, ctx) {
+    return await handleRequest(request);
+  }
+};
