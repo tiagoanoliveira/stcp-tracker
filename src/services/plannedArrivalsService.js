@@ -1,231 +1,235 @@
 /**
  * Planned Arrivals Service - Combina chegadas em tempo real com horários programados
- * Usa apiService para todas as chamadas API
+ * Usa: apiService, scheduleService, vehicleService, dateHelpers
  */
 
 import { apiService } from '../core/apiService.js';
 import { scheduleService } from './scheduleService.js';
 import { vehicleService } from './vehicleService.js';
-import { getCurrentDayType } from '../utils/dateHelpers.js';
+import { dateHelpers } from '../utils/dateHelpers.js';
 
 class PlannedArrivalsService {
   constructor() {
-    this.routesCache = new Map(); // Cache de rotas por paragem
-    this.schedulesCache = new Map(); // Cache de horários
-    this.cacheTimeout = 30 * 60 * 1000; // 30 minutos
+    // Cache de rotas e schedules (válido por 30 minutos)
+    this.routesCache = new Map(); // stopId -> { data, timestamp }
+    this.schedulesCache = new Map(); // `${stopId}_${routeId}_${serviceId}` -> { data, timestamp }
+    this.cacheTTL = 30 * 60 * 1000; // 30 minutos
   }
 
   /**
-   * Obtém as próximas chegadas combinando tempo real + programadas
+   * Obtém próximas chegadas combinando tempo real + programadas
    * @param {string} stopId - Código da paragem
-   * @param {number} timeWindow - Janela de tempo em minutos (default: 60)
-   * @returns {Promise<Array>} Lista de chegadas ordenadas por tempo
+   * @param {number} maxMinutes - Tempo máximo para olhar à frente (ex: 60 minutos)
+   * @returns {Promise<Array>} Array de chegadas ordenadas por tempo
    */
-  async getNextArrivals(stopId, timeWindow = 60) {
+  async getNextArrivals(stopId, maxMinutes = 60) {
     try {
+      console.log(`🔍 A combinar chegadas tempo real + programadas para ${stopId} (próximos ${maxMinutes}min)...`);
+      
       // 1. Buscar chegadas em tempo real
       const realtimeData = await apiService.fetchStopRealtime(stopId);
       const realtimeArrivals = realtimeData?.arrivals || [];
       
-      // Marcar todas as chegadas em tempo real com is_realtime: true
-      realtimeArrivals.forEach(arrival => {
-        arrival.is_realtime = true;
-      });
-
+      console.log(`✓ ${realtimeArrivals.length} chegadas em tempo real`);
+      
       // 2. Buscar rotas que servem esta paragem
       const routes = await this.getStopRoutes(stopId);
       
-      if (!routes || routes.length === 0) {
+      if (routes.length === 0) {
         console.log('⚠ Nenhuma rota encontrada para esta paragem');
-        return this.sortArrivals(realtimeArrivals);
+        return this.formatArrivals(realtimeArrivals, true);
       }
-
-      // 3. Buscar horários programados para cada rota
-      const scheduledArrivals = await this.getScheduledArrivals(stopId, routes, timeWindow);
+      
+      console.log(`✓ ${routes.length} rotas encontradas`);
+      
+      // 3. Buscar schedules de cada rota
+      const scheduledArrivals = [];
+      const currentServiceId = scheduleService.getCurrentServiceId();
+      
+      for (const route of routes) {
+        const schedule = await this.getStopSchedule(stopId, route.route_id, currentServiceId);
+        
+        if (schedule) {
+          // Extrair próximas chegadas do schedule
+          const upcomingTrips = this.extractUpcomingTrips(schedule, maxMinutes, route);
+          scheduledArrivals.push(...upcomingTrips);
+        }
+      }
+      
+      console.log(`✓ ${scheduledArrivals.length} chegadas programadas encontradas`);
       
       // 4. Combinar e remover duplicados
-      const combinedArrivals = this.mergeArrivals(realtimeArrivals, scheduledArrivals);
+      const combined = this.combineArrivals(
+        this.formatArrivals(realtimeArrivals, true),
+        this.formatArrivals(scheduledArrivals, false)
+      );
       
-      // 5. Ordenar por tempo de chegada
-      return this.sortArrivals(combinedArrivals);
+      console.log(`✅ ${combined.length} chegadas totais (sem duplicados)`);
+      
+      return combined;
       
     } catch (error) {
-      console.error('❌ Erro ao obter chegadas:', error);
+      console.error(`❌ Erro ao obter chegadas para ${stopId}:`, error);
       return [];
     }
   }
 
   /**
-   * Obtém rotas que servem uma paragem (com cache)
+   * Buscar rotas que servem uma paragem (com cache)
    */
   async getStopRoutes(stopId) {
-    const cacheKey = stopId;
-    const cached = this.routesCache.get(cacheKey);
+    const cached = this.routesCache.get(stopId);
+    const now = Date.now();
     
-    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-      console.log(`✓ Rotas da paragem ${stopId} em cache`);
+    // Verificar se cache é válido
+    if (cached && (now - cached.timestamp) < this.cacheTTL) {
+      console.log(`✓ Rotas de ${stopId} obtidas do cache`);
       return cached.data;
     }
-
-    try {
-      const routesData = await apiService.fetchStopRoutes(stopId);
-      const routes = routesData.dropdown_routes || [];
-      
-      this.routesCache.set(cacheKey, {
-        data: routes,
-        timestamp: Date.now()
-      });
-      
-      return routes;
-    } catch (error) {
-      console.error(`❌ Erro ao obter rotas da paragem ${stopId}:`, error);
-      return [];
-    }
-  }
-
-  /**
-   * Obtém horários programados para as rotas de uma paragem
-   */
-  async getScheduledArrivals(stopId, routes, timeWindow) {
-    const dayType = getCurrentDayType();
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const endMinutes = currentMinutes + timeWindow;
     
-    const allScheduledArrivals = [];
-
-    for (const route of routes) {
-      try {
-        const cacheKey = `${stopId}_${route.route_id}_${dayType}`;
-        let scheduleData = this.schedulesCache.get(cacheKey);
-        
-        // Verificar cache
-        if (!scheduleData || Date.now() - scheduleData.timestamp >= this.cacheTimeout) {
-          scheduleData = await apiService.fetchStopSchedule(stopId, route.route_id, dayType);
-          
-          if (scheduleData) {
-            this.schedulesCache.set(cacheKey, {
-              data: scheduleData,
-              timestamp: Date.now()
-            });
-          }
-        } else {
-          scheduleData = scheduleData.data;
-        }
-
-        if (!scheduleData) continue;
-
-        // Processar horários
-        const arrivals = this.extractScheduledArrivals(
-          scheduleData,
-          route,
-          currentMinutes,
-          endMinutes
-        );
-        
-        allScheduledArrivals.push(...arrivals);
-        
-      } catch (error) {
-        console.error(`❌ Erro ao processar rota ${route.route_id}:`, error);
-      }
-    }
-
-    return allScheduledArrivals;
+    // Buscar da API
+    const result = await apiService.fetchStopRoutes(stopId);
+    const routes = result?.display_routes || [];
+    
+    // Guardar em cache
+    this.routesCache.set(stopId, { data: routes, timestamp: now });
+    
+    return routes;
   }
 
   /**
-   * Extrai chegadas programadas do schedule data
+   * Buscar schedule de uma rota numa paragem (com cache)
    */
-  extractScheduledArrivals(scheduleData, route, currentMinutes, endMinutes) {
-    const arrivals = [];
+  async getStopSchedule(stopId, routeId, serviceId) {
+    const cacheKey = `${stopId}_${routeId}_${serviceId}`;
+    const cached = this.schedulesCache.get(cacheKey);
+    const now = Date.now();
+    
+    // Verificar se cache é válido
+    if (cached && (now - cached.timestamp) < this.cacheTTL) {
+      console.log(`✓ Schedule de ${routeId} (${serviceId}) para ${stopId} obtido do cache`);
+      return cached.data;
+    }
+    
+    // Buscar da API
+    const data = await apiService.fetchStopSchedule(stopId, routeId, serviceId);
+    
+    // Guardar em cache
+    if (data) {
+      this.schedulesCache.set(cacheKey, { data, timestamp: now });
+    }
+    
+    return data;
+  }
+
+  /**
+   * Extrair próximas viagens do schedule
+   */
+  extractUpcomingTrips(schedule, maxMinutes, route) {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTotalMinutes = currentHour * 60 + currentMinute;
+    const maxTotalMinutes = currentTotalMinutes + maxMinutes;
+    
+    const upcomingTrips = [];
     
     // Iterar sobre as horas do schedule
-    for (const [hour, scheduleInfo] of Object.entries(scheduleData)) {
-      if (hour === 'pattern_colors') continue;
+    for (let hour = currentHour; hour <= 23 && (hour * 60) <= maxTotalMinutes; hour++) {
+      const hourKey = hour.toString();
+      const trips = schedule[hourKey];
       
-      const hourNum = parseInt(hour);
-      const times = scheduleInfo.times || [];
+      if (!trips || trips.length === 0) continue;
       
-      times.forEach(time => {
-        const [h, m] = time.split(':').map(Number);
-        const totalMinutes = h * 60 + m;
+      // Iterar sobre as viagens dessa hora
+      for (const trip of trips) {
+        const tripHour = parseInt(trip.hour);
+        const tripMinute = parseInt(trip.minute);
+        const tripTotalMinutes = tripHour * 60 + tripMinute;
         
-        // Filtrar apenas chegadas dentro da janela de tempo
-        if (totalMinutes >= currentMinutes && totalMinutes <= endMinutes) {
-          const minutesUntilArrival = totalMinutes - currentMinutes;
+        // Verificar se a viagem está no futuro e dentro do limite
+        if (tripTotalMinutes >= currentTotalMinutes && tripTotalMinutes <= maxTotalMinutes) {
+          const minutesUntilArrival = tripTotalMinutes - currentTotalMinutes;
           
-          arrivals.push({
-            route_short_name: route.route_id,
-            route_color: route.route_color || '#0072C6',
-            route_text_color: route.route_text_color || '#FFFFFF',
-            trip_headsign: route.route_long_name || route.route_id,
-            arrival_time: time,
+          upcomingTrips.push({
+            route_short_name: route.route_short_name,
+            route_color: route.route_color,
+            route_text_color: route.route_text_color,
+            trip_headsign: trip.trip_headsign,
             arrival_minutes: minutesUntilArrival,
-            status: 'SCHEDULED',
-            is_realtime: false,
-            trip_id: null, // Não temos trip_id para programados
-            delay_minutes: 0
+            arrival_time: `${trip.hour.padStart(2, '0')}:${trip.minute.padStart(2, '0')}`,
+            trip_id: trip.trip_id || null,
+            status: 'SCHEDULED'
           });
         }
-      });
-    }
-    
-    return arrivals;
-  }
-
-  /**
-   * Combina chegadas em tempo real com programadas, removendo duplicados
-   * Critério de duplicação: mesma linha + mesmo destino + tempo próximo (±5 min)
-   */
-  mergeArrivals(realtimeArrivals, scheduledArrivals) {
-    const merged = [...realtimeArrivals];
-    
-    for (const scheduled of scheduledArrivals) {
-      const isDuplicate = realtimeArrivals.some(realtime => {
-        return (
-          realtime.route_short_name === scheduled.route_short_name &&
-          this.normalizeHeadsign(realtime.trip_headsign) === this.normalizeHeadsign(scheduled.trip_headsign) &&
-          Math.abs(realtime.arrival_minutes - scheduled.arrival_minutes) <= 5
-        );
-      });
-      
-      if (!isDuplicate) {
-        merged.push(scheduled);
       }
     }
     
-    return merged;
+    return upcomingTrips;
   }
 
   /**
-   * Normaliza headsign para comparação (remove espaços, acentos, maiúsculas)
+   * Formatar chegadas num formato consistente
+   */
+  formatArrivals(arrivals, isRealtime) {
+    return arrivals.map(arr => ({
+      route_short_name: arr.route_short_name,
+      route_color: arr.route_color || '#0072C6',
+      route_text_color: arr.route_text_color || '#FFFFFF',
+      trip_headsign: arr.trip_headsign,
+      arrival_minutes: arr.arrival_minutes,
+      arrival_time: arr.arrival_time,
+      trip_id: arr.trip_id,
+      status: arr.status || 'SCHEDULED',
+      delay_minutes: arr.delay_minutes || 0,
+      is_realtime: isRealtime
+    }));
+  }
+
+  /**
+   * Combinar chegadas tempo real + programadas, removendo duplicados
+   * Critério de duplicado: mesma linha + mesmo destino + tempo próximo (±5 min)
+   */
+  combineArrivals(realtimeArrivals, scheduledArrivals) {
+    const combined = [...realtimeArrivals];
+    
+    for (const scheduled of scheduledArrivals) {
+      // Verificar se já existe uma chegada em tempo real semelhante
+      const isDuplicate = realtimeArrivals.some(realtime => {
+        const sameRoute = realtime.route_short_name === scheduled.route_short_name;
+        const sameHeadsign = this.normalizeHeadsign(realtime.trip_headsign) === 
+                             this.normalizeHeadsign(scheduled.trip_headsign);
+        const timeDiff = Math.abs(realtime.arrival_minutes - scheduled.arrival_minutes);
+        const closeInTime = timeDiff <= 5; // ±5 minutos
+        
+        return sameRoute && sameHeadsign && closeInTime;
+      });
+      
+      // Se não for duplicado, adicionar
+      if (!isDuplicate) {
+        combined.push(scheduled);
+      }
+    }
+    
+    // Ordenar por tempo de chegada
+    return combined.sort((a, b) => a.arrival_minutes - b.arrival_minutes);
+  }
+
+  /**
+   * Normalizar headsign para comparação (remover espaços extras, maiúsculas, etc.)
    */
   normalizeHeadsign(headsign) {
     if (!headsign) return '';
-    return headsign
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return headsign.trim().toUpperCase().replace(/\s+/g, ' ');
   }
 
   /**
-   * Ordena chegadas por tempo de chegada
-   */
-  sortArrivals(arrivals) {
-    return arrivals.sort((a, b) => {
-      return (a.arrival_minutes || 0) - (b.arrival_minutes || 0);
-    });
-  }
-
-  /**
-   * Limpa caches
+   * Limpar cache (opcional, para forçar refresh)
    */
   clearCache() {
     this.routesCache.clear();
     this.schedulesCache.clear();
-    console.log('✓ Cache de rotas e horários limpo');
+    console.log('🗑 Cache limpo');
   }
 }
 
