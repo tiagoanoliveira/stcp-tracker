@@ -6,7 +6,7 @@
 class ApiService {
   constructor() {
     this.fiwareUrl = 'https://broker.fiware.urbanplatform.portodigital.pt/v2/entities?q=vehicleType==bus&limit=1000';
-    this.proxyUrl = 'https://stcp.up202007448.workers.dev';
+    this.proxyUrl = 'https://stcp-tracker.tiagoanoliveira.pt;
     this.retries = 3;
     this.delayMs = 500;
     this.timeoutMs = 1000;
