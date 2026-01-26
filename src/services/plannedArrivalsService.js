@@ -52,7 +52,10 @@ class PlannedArrivalsService {
         if (schedule) {
           // Extrair próximas chegadas do schedule
           const upcomingTrips = this.extractUpcomingTrips(schedule, maxMinutes, route);
+          console.log(`🔍 Rota ${route.route_short_name}: ${upcomingTrips.length} viagens encontradas`);
           scheduledArrivals.push(...upcomingTrips);
+        } else {
+          console.log(`⚠ Nenhum schedule encontrado para rota ${route.route_short_name}`);
         }
       }
       
@@ -132,6 +135,9 @@ class PlannedArrivalsService {
     const currentTotalMinutes = currentHour * 60 + currentMinute;
     const maxTotalMinutes = currentTotalMinutes + maxMinutes;
     
+    console.log(`🕰️ [${route.route_short_name}] Hora atual: ${currentHour}:${currentMinute} (${currentTotalMinutes}min), procurando até ${maxTotalMinutes}min`);
+    console.log(`📄 [${route.route_short_name}] Chaves do schedule:`, Object.keys(schedule));
+    
     const upcomingTrips = [];
     
     // Iterar sobre as horas do schedule
@@ -139,7 +145,12 @@ class PlannedArrivalsService {
       const hourKey = hour.toString();
       const trips = schedule[hourKey];
       
-      if (!trips || trips.length === 0) continue;
+      if (!trips || trips.length === 0) {
+        console.log(`⚠ [${route.route_short_name}] Nenhuma viagem na hora ${hour}`);
+        continue;
+      }
+      
+      console.log(`✓ [${route.route_short_name}] Hora ${hour}: ${trips.length} viagens`);
       
       // Iterar sobre as viagens dessa hora
       for (const trip of trips) {
@@ -147,9 +158,13 @@ class PlannedArrivalsService {
         const tripMinute = parseInt(trip.minute);
         const tripTotalMinutes = tripHour * 60 + tripMinute;
         
+        console.log(`  🚌 [${route.route_short_name}] Viagem ${tripHour}:${tripMinute} (${tripTotalMinutes}min) - Atual: ${currentTotalMinutes}min`);
+        
         // Verificar se a viagem está no futuro e dentro do limite
         if (tripTotalMinutes >= currentTotalMinutes && tripTotalMinutes <= maxTotalMinutes) {
           const minutesUntilArrival = tripTotalMinutes - currentTotalMinutes;
+          
+          console.log(`  ✅ [${route.route_short_name}] ADICIONADA: ${trip.trip_headsign} em ${minutesUntilArrival}min`);
           
           upcomingTrips.push({
             route_short_name: route.route_short_name,
@@ -161,10 +176,13 @@ class PlannedArrivalsService {
             trip_id: trip.trip_id || null,
             status: 'SCHEDULED'
           });
+        } else {
+          console.log(`  ❌ [${route.route_short_name}] IGNORADA: fora do intervalo`);
         }
       }
     }
     
+    console.log(`📋 [${route.route_short_name}] Total de viagens próximas: ${upcomingTrips.length}`);
     return upcomingTrips;
   }
 
