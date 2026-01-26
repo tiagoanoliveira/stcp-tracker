@@ -47,11 +47,11 @@ class PlannedArrivalsService {
       console.log(`📅 Service ID atual: ${currentServiceId}`);
       
       for (const route of routes) {
-        const schedule = await this.getStopSchedule(stopId, route.route_id, currentServiceId);
+        const scheduleData = await this.getStopSchedule(stopId, route.route_id, currentServiceId);
         
-        if (schedule) {
+        if (scheduleData && scheduleData.schedule) {
           // Extrair próximas chegadas do schedule
-          const upcomingTrips = this.extractUpcomingTrips(schedule, maxMinutes, route);
+          const upcomingTrips = this.extractUpcomingTrips(scheduleData.schedule, maxMinutes, route);
           console.log(`🔍 Rota ${route.route_short_name}: ${upcomingTrips.length} viagens encontradas`);
           scheduledArrivals.push(...upcomingTrips);
         } else {
@@ -127,6 +127,9 @@ class PlannedArrivalsService {
 
   /**
    * Extrair próximas viagens do schedule
+   * @param {Object} schedule - Objeto com horas como chaves (ex: { "21": [...], "22": [...] })
+   * @param {number} maxMinutes - Minutos máximos para procurar
+   * @param {Object} route - Informação da rota
    */
   extractUpcomingTrips(schedule, maxMinutes, route) {
     const now = new Date();
@@ -136,7 +139,7 @@ class PlannedArrivalsService {
     const maxTotalMinutes = currentTotalMinutes + maxMinutes;
     
     console.log(`🕰️ [${route.route_short_name}] Hora atual: ${currentHour}:${currentMinute} (${currentTotalMinutes}min), procurando até ${maxTotalMinutes}min`);
-    console.log(`📄 [${route.route_short_name}] Chaves do schedule:`, Object.keys(schedule));
+    console.log(`📄 [${route.route_short_name}] Horas disponíveis no schedule:`, Object.keys(schedule));
     
     const upcomingTrips = [];
     
@@ -146,7 +149,6 @@ class PlannedArrivalsService {
       const trips = schedule[hourKey];
       
       if (!trips || trips.length === 0) {
-        console.log(`⚠ [${route.route_short_name}] Nenhuma viagem na hora ${hour}`);
         continue;
       }
       
@@ -154,25 +156,25 @@ class PlannedArrivalsService {
       
       // Iterar sobre as viagens dessa hora
       for (const trip of trips) {
-        const tripHour = parseInt(trip.hour);
+        // A API retorna apenas 'minute', precisamos extrair a hora do arrival_time ou usar a hora do loop
         const tripMinute = parseInt(trip.minute);
-        const tripTotalMinutes = tripHour * 60 + tripMinute;
+        const tripTotalMinutes = hour * 60 + tripMinute;
         
-        console.log(`  🚌 [${route.route_short_name}] Viagem ${tripHour}:${tripMinute} (${tripTotalMinutes}min) - Atual: ${currentTotalMinutes}min`);
+        console.log(`  🚌 [${route.route_short_name}] Viagem ${hour}:${trip.minute} (${tripTotalMinutes}min) - Atual: ${currentTotalMinutes}min`);
         
         // Verificar se a viagem está no futuro e dentro do limite
         if (tripTotalMinutes >= currentTotalMinutes && tripTotalMinutes <= maxTotalMinutes) {
           const minutesUntilArrival = tripTotalMinutes - currentTotalMinutes;
           
-          console.log(`  ✅ [${route.route_short_name}] ADICIONADA: ${trip.trip_headsign} em ${minutesUntilArrival}min`);
+          console.log(`  ✅ [${route.route_short_name}] ADICIONADA: ${trip.headsign} em ${minutesUntilArrival}min`);
           
           upcomingTrips.push({
             route_short_name: route.route_short_name,
             route_color: route.route_color,
             route_text_color: route.route_text_color,
-            trip_headsign: trip.trip_headsign,
+            trip_headsign: trip.headsign, // A API retorna 'headsign' não 'trip_headsign'
             arrival_minutes: minutesUntilArrival,
-            arrival_time: `${trip.hour.padStart(2, '0')}:${trip.minute.padStart(2, '0')}`,
+            arrival_time: `${hour.toString().padStart(2, '0')}:${trip.minute.padStart(2, '0')}`,
             trip_id: trip.trip_id || null,
             status: 'SCHEDULED'
           });
