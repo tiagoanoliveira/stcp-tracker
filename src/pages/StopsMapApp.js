@@ -7,6 +7,7 @@ import { geolocationService } from '../core/geolocationService.js';
 import { apiService } from '../core/apiService.js';
 import { stopService } from '../services/stopService.js';
 import { vehicleService } from '../services/vehicleService.js';
+import { arrivalsPredictionService } from '../services/arrivalsPredictionService.js';
 import { MapManager } from '../map/MapManager.js';
 import { StopMarkerManager } from '../map/markers/StopMarkerManager.js';
 import { BusMarkerManager } from '../map/markers/BusMarkerManager.js';
@@ -209,10 +210,10 @@ export class StopsMapApp {
     try {
       console.log('🔄 A carregar chegadas para paragem:', stopId);
       
-      // Buscar dados de chegadas
-      const stopData = await apiService.fetchStopRealtime(stopId);
+      // NOVO: Usar o serviço de predição para obter chegadas combinadas (realtime + programadas)
+      const arrivals = await arrivalsPredictionService.getNextArrivals(stopId, 60);
       
-      if (!stopData || !stopData.arrivals || stopData.arrivals.length === 0) {
+      if (arrivals.length === 0) {
         console.log('⚠ Nenhuma chegada prevista');
         this.nextArrivals.setArrivals([], []);
         this.busMarkerManager.clearAllMarkers();
@@ -220,17 +221,17 @@ export class StopsMapApp {
         return;
       }
       
-      // Buscar dados de veículos
+      // Buscar dados de veículos (para mostrar localização dos autocarros)
       const vehicles = await apiService.fetchBusData();
       
-      console.log(`✓ ${stopData.arrivals.length} chegadas, ${vehicles.length} veículos`);
+      console.log(`✓ ${arrivals.length} chegadas (tempo real + programadas), ${vehicles.length} veículos`);
       
-      // Atualizar painel com chegadas
-      this.nextArrivals.setArrivals(stopData.arrivals, vehicles);
+      // Atualizar painel com TODAS as chegadas
+      this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
       
       // Filtrar e mostrar apenas autocarros que vão à paragem
-      this.updateBusMap(stopData.arrivals, vehicles);
+      this.updateBusMap(arrivals, vehicles);
       
     } catch (error) {
       console.error('❌ Erro ao carregar chegadas:', error);
@@ -249,6 +250,9 @@ export class StopsMapApp {
     const busPositions = [];
 
     arrivals.forEach(arrival => {
+      // Apenas tentar fazer match para chegadas em tempo real
+      if (!arrival.is_realtime) return;
+      
       const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
       
       if (vehicle) {
