@@ -38,7 +38,6 @@ class ApiService {
    */
   async fetchBusData() {
     try {
-      console.log('⏳ Buscando dados de autocarros da API FIWARE...');
       const data = await this.fetchWithRetry(this.fiwareUrl);
       
       if (!Array.isArray(data)) {
@@ -46,7 +45,6 @@ class ApiService {
         return [];
       }
       
-      console.log(`✓ ${data.length} autocarros carregados`);
       return data;
     } catch (error) {
       console.error('❌ Erro ao obter dados dos autocarros:', error);
@@ -60,11 +58,8 @@ class ApiService {
   async fetchStopRealtime(stopId) {
     try {
       const url = `${this.proxyUrl}/${stopId}/realtime`;
-      console.log(`🔄 Buscando dados da paragem ${stopId} via proxy...`);
-      
-      const data = await this.fetchWithRetry(url);
-      console.log(`✓ Dados da paragem ${stopId} recebidos`);
-      return data;
+
+      return await this.fetchWithRetry(url);
     } catch (error) {
       console.error(`❌ Erro ao obter dados da paragem ${stopId}:`, error);
       return null;
@@ -79,11 +74,8 @@ class ApiService {
   async fetchStopRoutes(stopId) {
     try {
       const url = `${this.proxyUrl}/${stopId}/routes`;
-      console.log(`🔄 Buscando rotas da paragem ${stopId}...`);
-      
-      const data = await this.fetchWithRetry(url);
-      console.log(`✓ Rotas da paragem ${stopId} recebidas`);
-      return data;
+
+      return await this.fetchWithRetry(url);
     } catch (error) {
       console.error(`❌ Erro ao obter rotas da paragem ${stopId}:`, error);
       return { display_routes: [], dropdown_routes: [] };
@@ -101,11 +93,8 @@ class ApiService {
     try {
       const encodedServiceId = encodeURIComponent(serviceId);
       const url = `${this.proxyUrl}/${stopId}/schedule?route_id=${routeId}&service_id=${encodedServiceId}`;
-      console.log(`🔄 Buscando schedule ${routeId} (${serviceId}) para ${stopId}...`);
-      
-      const data = await this.fetchWithRetry(url);
-      console.log(`✓ Schedule ${routeId} da paragem ${stopId} recebido`);
-      return data;
+
+      return await this.fetchWithRetry(url);
     } catch (error) {
       console.error(`❌ Erro ao obter schedule de ${routeId} (${serviceId}) para ${stopId}:`, error);
       return null;
@@ -130,7 +119,6 @@ class ApiService {
    * Fetch de trips.json
    */
   async fetchTripsData() {
-    console.log('⏳ Carregando trips.json...');
     return await this.fetchJSON('./resources/trips.json');
   }
 
@@ -138,7 +126,6 @@ class ApiService {
    * Fetch de calendar.json
    */
   async fetchCalendarData() {
-    console.log('⏳ Carregando calendar.json...');
     return await this.fetchJSON('./resources/calendar.json');
   }
 
@@ -146,7 +133,6 @@ class ApiService {
    * Fetch de stops.json
    */
   async fetchStopsData() {
-    console.log('⏳ Carregando stops.json...');
     return await this.fetchJSON('./resources/stops.json');
   }
 }
