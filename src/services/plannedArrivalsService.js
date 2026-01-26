@@ -22,53 +22,36 @@ class PlannedArrivalsService {
    */
   async getNextArrivals(stopId, maxMinutes = 60) {
     try {
-      console.log(`🔍 A combinar chegadas tempo real + programadas para ${stopId} (próximos ${maxMinutes}min)...`);
-      
       // 1. Buscar chegadas em tempo real
       const realtimeData = await apiService.fetchStopRealtime(stopId);
       const realtimeArrivals = realtimeData?.arrivals || [];
-      
-      console.log(`✓ ${realtimeArrivals.length} chegadas em tempo real`);
-      
+
       // 2. Buscar rotas que servem esta paragem
       const routes = await this.getStopRoutes(stopId);
       
       if (routes.length === 0) {
-        console.log('⚠ Nenhuma rota encontrada para esta paragem');
         return this.formatArrivals(realtimeArrivals, true);
       }
-      
-      console.log(`✓ ${routes.length} rotas encontradas`);
-      
+
       // 3. Buscar schedules de cada rota
       const scheduledArrivals = [];
       const currentServiceId = scheduleService.getServiceIdAtual();
-      
-      console.log(`📅 Service ID atual: ${currentServiceId}`);
-      
+
       for (const route of routes) {
         const scheduleData = await this.getStopSchedule(stopId, route.route_id, currentServiceId);
         
         if (scheduleData && scheduleData.schedule) {
           // Extrair próximas chegadas do schedule
           const upcomingTrips = this.extractUpcomingTrips(scheduleData.schedule, maxMinutes, route);
-          console.log(`🔍 Rota ${route.route_short_name}: ${upcomingTrips.length} viagens encontradas`);
           scheduledArrivals.push(...upcomingTrips);
-        } else {
-          console.log(`⚠ Nenhum schedule encontrado para rota ${route.route_short_name}`);
         }
       }
-      
-      console.log(`✓ ${scheduledArrivals.length} chegadas programadas encontradas`);
-      
       // 4. Combinar e remover duplicados
       const combined = this.combineArrivals(
         this.formatArrivals(realtimeArrivals, true),
         this.formatArrivals(scheduledArrivals, false)
       );
-      
-      console.log(`✅ ${combined.length} chegadas totais (sem duplicados)`);
-      
+
       return combined;
       
     } catch (error) {
@@ -86,7 +69,6 @@ class PlannedArrivalsService {
     
     // Verificar se cache é válido
     if (cached && (now - cached.timestamp) < this.cacheTTL) {
-      console.log(`✓ Rotas de ${stopId} obtidas do cache`);
       return cached.data;
     }
     
@@ -110,7 +92,6 @@ class PlannedArrivalsService {
     
     // Verificar se cache é válido
     if (cached && (now - cached.timestamp) < this.cacheTTL) {
-      console.log(`✓ Schedule de ${routeId} (${serviceId}) para ${stopId} obtido do cache`);
       return cached.data;
     }
     
@@ -138,9 +119,6 @@ class PlannedArrivalsService {
     const currentTotalMinutes = currentHour * 60 + currentMinute;
     const maxTotalMinutes = currentTotalMinutes + maxMinutes;
     
-    console.log(`🕰️ [${route.route_short_name}] Hora atual: ${currentHour}:${currentMinute} (${currentTotalMinutes}min), procurando até ${maxTotalMinutes}min`);
-    console.log(`📄 [${route.route_short_name}] Horas disponíveis no schedule:`, Object.keys(schedule));
-    
     const upcomingTrips = [];
     
     // Iterar sobre as horas do schedule
@@ -151,23 +129,17 @@ class PlannedArrivalsService {
       if (!trips || trips.length === 0) {
         continue;
       }
-      
-      console.log(`✓ [${route.route_short_name}] Hora ${hour}: ${trips.length} viagens`);
-      
+
       // Iterar sobre as viagens dessa hora
       for (const trip of trips) {
         // A API retorna apenas 'minute', precisamos extrair a hora do arrival_time ou usar a hora do loop
         const tripMinute = parseInt(trip.minute);
         const tripTotalMinutes = hour * 60 + tripMinute;
-        
-        console.log(`  🚌 [${route.route_short_name}] Viagem ${hour}:${trip.minute} (${tripTotalMinutes}min) - Atual: ${currentTotalMinutes}min`);
-        
+
         // Verificar se a viagem está no futuro e dentro do limite
         if (tripTotalMinutes >= currentTotalMinutes && tripTotalMinutes <= maxTotalMinutes) {
           const minutesUntilArrival = tripTotalMinutes - currentTotalMinutes;
-          
-          console.log(`  ✅ [${route.route_short_name}] ADICIONADA: ${trip.headsign} em ${minutesUntilArrival}min`);
-          
+
           upcomingTrips.push({
             route_short_name: route.route_short_name,
             route_color: route.route_color,
@@ -183,8 +155,6 @@ class PlannedArrivalsService {
         }
       }
     }
-    
-    console.log(`📋 [${route.route_short_name}] Total de viagens próximas: ${upcomingTrips.length}`);
     return upcomingTrips;
   }
 
@@ -249,7 +219,6 @@ class PlannedArrivalsService {
   clearCache() {
     this.routesCache.clear();
     this.schedulesCache.clear();
-    console.log('🗑 Cache limpo');
   }
 }
 
