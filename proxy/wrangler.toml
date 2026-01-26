@@ -1,7 +1,7 @@
 # Wrangler configuration for STCP API Proxy Worker
 # https://developers.cloudflare.com/workers/wrangler/configuration/
 
-name = "stcp-worker"
+name = "stcp"
 main = "index.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
