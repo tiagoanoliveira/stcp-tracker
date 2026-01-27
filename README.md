@@ -2,23 +2,18 @@
 
 > **Rastreamento em tempo real dos autocarros da STCP no Porto e arredores**
 
-Aplicação web progessiva (PWA) que permite visualizar a localização em tempo real dos autocarros da STCP, consultar paragens próximas e ver as próximas chegadas.
+Aplicação web progressiva (PWA) que permite visualizar a localização em tempo real dos autocarros da STCP, consultar paragens próximas e ver as próximas chegadas combinando dados em **tempo real** com **horários programados**.
 
 ---
 
 ## 📚 Índice
 
 - [Visão Geral](#-visão-geral)
+- [Novidades](#-novidades)
 - [Estrutura do Projeto](#-estrutura-do-projeto)
 - [Páginas HTML](#-páginas-html)
 - [Módulos JavaScript](#-módulos-javascript)
-  - [Core Services](#1-core-services-srccore)
-  - [Business Services](#2-business-services-srcservices)
-  - [Map Management](#3-map-management-srcmap)
-  - [UI Components](#4-ui-components-srcui)
-  - [Pages (Apps)](#5-pages-aplicacoes-srcpages)
-  - [Utils](#6-utils-srcutils)
-- [Recursos Estáticos](#-recursos-estáticos)
+- [Cloudflare Worker Proxy](#-cloudflare-worker-proxy)
 - [Service Worker](#-service-worker)
 - [Fluxo de Dados](#-fluxo-de-dados)
 - [Como Usar](#-como-usar)
@@ -32,8 +27,9 @@ Aplicação web progessiva (PWA) que permite visualizar a localização em tempo
 - **Frontend**: Vanilla JavaScript (ES6 modules)
 - **Mapas**: Leaflet.js
 - **APIs**: 
-  - FIWARE Urban Platform (dados em tempo real)
-  - Cloudflare Worker (proxy para GTFS Realtime)
+  - FIWARE Urban Platform (dados em tempo real dos autocarros)
+  - STCP API (horários programados, rotas)
+  - Cloudflare Worker (proxy CORS)
 - **PWA**: Service Worker, Manifest, Cache API
 - **Arquitetura**: Modular, orientada a serviços
 
@@ -41,9 +37,37 @@ Aplicação web progessiva (PWA) que permite visualizar a localização em tempo
 
 1. **Bus Map** (`index.html`) - Mapa com todos os autocarros em circulação
 2. **Stops Map** (`stopsmap.html`) - Mapa de paragens com próximas chegadas
-3. **Geolocalização** - Localização do utilizador
-4. **Atualização automática** - Dados em tempo real
-5. **Offline-first** - Funciona sem Internet (Service Worker)
+3. **Chegadas Híbridas** - Combina tempo real + horários programados
+4. **Suporte 24h+** - Horários após meia-noite (24:00-01:00)
+5. **Detecção de Atrasos** - Calcula atrasos em tempo real
+6. **Geolocatização** - Localização do utilizador
+7. **Atualização automática** - Dados em tempo real
+8. **Offline-first** - Funciona sem Internet (Service Worker)
+
+---
+
+## ✨ Novidades
+
+### 🆕 Sistema de Horários Programados
+
+- **plannedArrivalsService**: Combina chegadas em tempo real com horários programados
+- **scheduleService**: Determina automaticamente o tipo de dia (UTEIS, SAB, DOM, FÉRIAS, FERIADOS)
+- **Remoção de duplicados**: Elimina chegadas duplicadas entre tempo real e schedule (±5 min)
+- **Suporte 24h+**: Horários após meia-noite (API STCP usa 24, 25, 26 para 00h, 01h, 02h)
+
+### 🌐 Cloudflare Worker Proxy
+
+- **3 endpoints**: `/realtime`, `/routes`, `/schedule`
+- **Cache inteligente**: 10s (realtime), 30min (routes/schedule)
+- **CORS habilitado**: Permite chamadas do frontend
+- **Deploy automático**: Integração GitHub → Cloudflare
+- **Domínio personalizado**: `stcp-worker.tiagoanoliveira.pt`
+
+### 🕒 Cálculo de Atrasos
+
+- Compara tempo real com horário programado
+- Fórmula: `arrival_minutes - delay_minutes = scheduled_time`
+- Evita duplicados mesmo com atrasos
 
 ---
 
@@ -55,12 +79,17 @@ stcp-tracker/
 ├── stopsmap.html           # Página de paragens (Stops Map)
 ├── manifest.json           # Manifesto PWA
 ├── sw.js                   # Service Worker
+├── proxy/                  # ⭐ Cloudflare Worker
+│   ├── index.js            # Código do worker
+│   ├── wrangler.toml       # Configuração
+│   ├── package.json        # Dependências
+│   └── .gitignore
 ├── resources/              # Recursos estáticos
 │   ├── favicon.svg
-│   ├── header.js          # Header comum HTML
-│   ├── stops.json         # Dados de paragens GTFS
-│   ├── trips.json         # Dados de viagens GTFS
-│   └── calendar.json      # Calendário GTFS
+│   ├── header.js
+│   ├── stops.json          # Paragens GTFS
+│   ├── trips.json          # Viagens GTFS
+│   └── calendar.json       # Calendário GTFS
 └── src/
     ├── core/              # Serviços fundamentais
     │   ├── apiService.js
@@ -70,13 +99,14 @@ stcp-tracker/
     ├── services/          # Lógica de negócio
     │   ├── vehicleService.js
     │   ├── stopService.js
-    │   └── scheduleService.js
+    │   ├── scheduleService.js       # ⭐ Determina tipo de dia
+    │   └── plannedArrivalsService.js # ⭐ Combina tempo real + schedule
     ├── map/               # Gestão de mapas
     │   ├── MapManager.js
-    │   ├── markers/       # Managers de marcadores
+    │   ├── markers/
     │   │   ├── BusMarkerManager.js
     │   │   └── StopMarkerManager.js
-    │   ├── controls/      # Controlos do mapa
+    │   ├── controls/
     │   │   ├── BusMapControl.js
     │   │   ├── CenterControl.js
     │   │   └── StopsControl.js
@@ -84,12 +114,12 @@ stcp-tracker/
     │       ├── mapInitializer.js
     │       └── distanceCalculator.js
     ├── ui/                # Interface de utilizador
-    │   ├── components/    # Componentes reutilizáveis
+    │   ├── components/
     │   │   ├── NextArrivals.js
     │   │   └── LastUpdateDisplay.js
     │   ├── design/
     │   │   └── iconCache.js
-    │   └── styles/        # CSS modular
+    │   └── styles/
     │       ├── base.css
     │       ├── busmap.css
     │       ├── stopsmap.css
@@ -105,378 +135,86 @@ stcp-tracker/
 
 ---
 
-## 📝 Páginas HTML
+## 🔄 Cloudflare Worker Proxy
 
-### `index.html` - Bus Map
+### Localização: `proxy/`
 
-**Objetivo**: Visualizar todos os autocarros em circulação em tempo real.
+O Cloudflare Worker atua como proxy CORS para a API da STCP, resolvendo problemas de cross-origin e adicionando cache inteligente.
 
-**Componentes**:
-- Header com navegação
-- Filtro por linha de autocarro
-- Mapa Leaflet (fullscreen)
-- Controlo de centrar na localização
-- Controlo para navegar para Stops Map
-- Rodapé com última atualização e contador de autocarros
+### Endpoints Disponíveis
 
-**Estilos**:
-- `src/ui/styles/base.css`
-- `src/ui/styles/busmap.css`
-- `src/ui/styles/layout.css`
-- `src/ui/styles/components.css`
+#### 1. **GET `/{STOP_ID}/realtime`**
+Chegadas em tempo real de uma paragem.
 
-**Script principal**: `src/pages/BusMapApp.js`
+- **Cache**: 10 segundos
+- **Exemplo**: `https://stcp-worker.tiagoanoliveira.pt/PLNT1/realtime`
+- **Resposta**: Dados GTFS Realtime
 
----
+#### 2. **GET `/{STOP_ID}/routes`**
+Rotas que servem uma paragem.
 
-### `stopsmap.html` - Stops Map
+- **Cache**: 30 minutos
+- **Exemplo**: `https://stcp-worker.tiagoanoliveira.pt/PLNT1/routes`
+- **Resposta**:
+  ```json
+  {
+    "display_routes": [
+      {
+        "route_id": "200",
+        "route_short_name": "200",
+        "route_color": "#FFD700",
+        "route_text_color": "#000000"
+      }
+    ]
+  }
+  ```
 
-**Objetivo**: Ver paragens próximas e consultar próximas chegadas.
+#### 3. **GET `/{STOP_ID}/schedule?route_id={ROUTE}&service_id={SERVICE}`**
+Horário programado de uma rota numa paragem.
 
-**Componentes**:
-- Header com navegação
-- Barra de pesquisa de paragens
-- Mapa Leaflet com marcadores de paragens
-- Painel NextArrivals (metade inferior do ecrã)
-- Controlo de centrar na localização
-- Controlo para voltar ao Bus Map
+- **Cache**: 30 minutos
+- **Exemplo**: `https://stcp-worker.tiagoanoliveira.pt/PLNT1/schedule?route_id=200&service_id=DIAS%20UTEIS`
+- **Resposta**:
+  ```json
+  {
+    "stop_id": "PLNT1",
+    "route_id": "200",
+    "service_id": "DIAS UTEIS",
+    "schedule": {
+      "6": [{"minute": "30", "headsign": "Campanhaã", ...}],
+      "7": [{"minute": "00", ...}, {"minute": "30", ...}],
+      "24": [{"minute": "15", "headsign": "...", ...}]
+    }
+  }
+  ```
 
-**Estilos**:
-- `src/ui/styles/base.css`
-- `src/ui/styles/stopsmap.css`
-- `src/ui/styles/stopDetail.css`
-- `src/ui/styles/layout.css`
+### Suporte 24h+
 
-**Script principal**: `src/pages/StopsMapApp.js`
+A API da STCP usa horas >= 24 para horários após meia-noite:
+- **24:00** = 00:00 (meia-noite)
+- **24:30** = 00:30
+- **25:15** = 01:15
+
+O `plannedArrivalsService` trata automaticamente estes casos.
+
+### Deploy
+
+```bash
+cd proxy
+npx wrangler deploy
+```
+
+Deploy automático configurado via GitHub Actions.
 
 ---
 
 ## 🛠️ Módulos JavaScript
 
-### 1. Core Services (`src/core/`)
-
-Serviços fundamentais da aplicação, independentes da lógica de negócio.
-
----
-
-#### **`apiService.js`**
-
-**Descrição**: Centraliza todas as chamadas à API. Implementa retry logic, timeout e tratamento de erros.
-
-**Classe**: `ApiService`
-
-**Propriedades**:
-- `fiwareUrl` - URL da API FIWARE
-- `proxyUrl` - URL do Cloudflare Worker (proxy GTFS Realtime)
-- `retries` - Número de tentativas (3)
-- `delayMs` - Delay entre tentativas (500ms)
-- `timeoutMs` - Timeout por pedido (1000ms)
-
-**Métodos**:
-
-```javascript
-fetchWithRetry(url, options, retries, delayMs, timeoutMs)
-```
-- **Parâmetros**: URL, opções fetch, número de retries, delay, timeout
-- **Retorna**: Promise com dados JSON
-- **Descrição**: Fetch genérico com retry automático e timeout
-
-```javascript
-fetchBusData()
-```
-- **Retorna**: `Array<Object>` - Lista de autocarros da API FIWARE
-- **Descrição**: Obtém dados em tempo real de todos os autocarros
-
-```javascript
-fetchStopRealtime(stopId)
-```
-- **Parâmetros**: `stopId` (string) - Código da paragem
-- **Retorna**: `Object` - Dados da paragem (arrivals, stop_times)
-- **Descrição**: Obtém próximas chegadas de uma paragem via proxy
-
-```javascript
-fetchJSON(filePath)
-```
-- **Parâmetros**: `filePath` (string) - Caminho do ficheiro JSON
-- **Retorna**: `Object|Array` - Dados parseados
-- **Descrição**: Carrega ficheiro JSON estático
-
-```javascript
-fetchTripsData()
-```
-- **Retorna**: `Array` - Dados de trips.json
-- **Descrição**: Carrega informação de viagens GTFS
-
-```javascript
-fetchCalendarData()
-```
-- **Retorna**: `Object` - Dados de calendar.json
-- **Descrição**: Carrega calendário GTFS
-
-```javascript
-fetchStopsData()
-```
-- **Retorna**: `Array` - Dados de stops.json
-- **Descrição**: Carrega informação de paragens GTFS
-
-**Exportação**: `export const apiService = new ApiService()`
-
----
-
-#### **`geolocationService.js`**
-
-**Descrição**: Gestão de geolocalização do utilizador. Emite eventos via EventBus.
-
-**Classe**: `GeolocationService`
-
-**Propriedades**:
-- `userPosition` - `[lat, lon]` ou `null`
-- `watchId` - ID do watch (navigator.geolocation.watchPosition)
-- `isWatching` - Boolean indicando se está a monitorizar
-
-**Métodos**:
-
-```javascript
-getCurrentPosition(options)
-```
-- **Parâmetros**: `options` (object) - Opções de geolocação
-- **Retorna**: `Promise<[lat, lon]>`
-- **Descrição**: Obtém localização atual uma única vez
-- **Eventos**: Emite `geolocation:update` ou `geolocation:error`
-
-```javascript
-watchPosition(options)
-```
-- **Parâmetros**: `options` (object)
-- **Descrição**: Monitoriza localização em tempo real
-- **Eventos**: Emite `geolocation:update` continuamente
-
-```javascript
-stopWatching()
-```
-- **Descrição**: Para de monitorizar localização
-
-```javascript
-getPosition()
-```
-- **Retorna**: `[lat, lon]` ou `null`
-- **Descrição**: Obtém localização em cache (sem fazer novo pedido)
-
-```javascript
-isAvailable()
-```
-- **Retorna**: `boolean`
-- **Descrição**: Verifica se a localização está disponível
-
-**Exportação**: `export const geolocationService = new GeolocationService()`
-
----
-
-#### **`eventBus.js`**
-
-**Descrição**: Sistema de eventos pub/sub para comunicação entre módulos.
-
-**Classe**: `EventBus`
-
-**Métodos**:
-
-```javascript
-on(eventName, callback)
-```
-- **Parâmetros**: Nome do evento, função callback
-- **Descrição**: Subscreve a um evento
-
-```javascript
-off(eventName, callback)
-```
-- **Descrição**: Remove subscrição de evento
-
-```javascript
-emit(eventName, data)
-```
-- **Descrição**: Emite um evento com dados
-
-**Eventos Principais**:
-- `geolocation:update` - Localização atualizada
-- `geolocation:error` - Erro na geolocalização
-- `buses:updated` - Lista de autocarros atualizada
-- `map:ready` - Mapa inicializado
-
-**Exportação**: `export const eventBus = new EventBus()`
-
----
-
-#### **`autoRefreshManager.js`**
-
-**Descrição**: Gestão de atualizações automáticas periódicas.
-
-**Classe**: `AutoRefreshManager`
-
-**Métodos**:
-
-```javascript
-start(callback, interval)
-```
-- **Parâmetros**: Função a executar, intervalo em ms
-- **Descrição**: Inicia refresh automático
-
-```javascript
-stop()
-```
-- **Descrição**: Para o refresh automático
-
-```javascript
-restart()
-```
-- **Descrição**: Reinicia o timer
-
-**Exportação**: `export const autoRefreshManager = new AutoRefreshManager()`
-
----
-
-### 2. Business Services (`src/services/`)
-
-Lógica de negócio específica da aplicação.
-
----
-
-#### **`vehicleService.js`**
-
-**Descrição**: Processamento e extração de dados de veículos da API FIWARE.
-
-**Classe**: `VehicleService`
-
-**Métodos**:
-
-```javascript
-extractAnnotation(bus, prefix)
-```
-- **Parâmetros**: Objeto do autocarro, prefixo da anotação
-- **Retorna**: `string|null`
-- **Descrição**: Extrai anotação do autocarro (ex: "stcp:route:")
-
-```javascript
-extractLineNumber(bus)
-```
-- **Retorna**: `string|null` - Número da linha
-- **Descrição**: Extrai número da linha (ex: "500", "207")
-
-```javascript
-extractDirection(bus)
-```
-- **Retorna**: `string|null` - Sentido (0 ou 1)
-- **Descrição**: Extrai sentido/direção do autocarro
-
-```javascript
-extractTripId(bus)
-```
-- **Retorna**: `string|null` - Trip ID
-- **Descrição**: Extrai ID da viagem
-
-```javascript
-matchVehicleToTrip(vehicles, tripId)
-```
-- **Parâmetros**: Array de veículos, trip_id
-- **Retorna**: `Object|null` - Veículo correspondente
-- **Descrição**: Encontra veículo que corresponde a um trip_id
-
-```javascript
-extractVehicleLocation(vehicle)
-```
-- **Retorna**: `{latitude, longitude, bearing, speed}|null`
-- **Descrição**: Extrai coordenadas e informação de movimento
-
-```javascript
-processBusData(bus, destination)
-```
-- **Parâmetros**: Objeto raw do autocarro, destino
-- **Retorna**: `Object|null` - Autocarro processado e pronto a usar
-- **Descrição**: Processa todos os dados do autocarro numa estrutura consistente
-- **Estrutura retornada**:
-  ```javascript
-  {
-    id: string,
-    line: string,
-    latitude: number,
-    longitude: number,
-    speed: number,
-    busNumber: string,
-    destination: string,
-    direction: string,
-    tripId: string
-  }
-  ```
-
-```javascript
-shouldIncludeBus(bus, filterValue)
-```
-- **Parâmetros**: Autocarro processado, valor de filtro
-- **Retorna**: `boolean`
-- **Descrição**: Verifica se autocarro deve ser incluído (filtro)
-
-**Exportação**: `export const vehicleService = new VehicleService()`
-
----
-
-#### **`stopService.js`**
-
-**Descrição**: Gestão de paragens usando dados de stops.json.
-
-**Classe**: `StopService`
-
-**Propriedades**:
-- `stops` - Array de todas as paragens
-
-**Métodos**:
-
-```javascript
-loadStopsData()
-```
-- **Retorna**: `Promise<Array>` - Lista de paragens
-- **Descrição**: Carrega e processa stops.json
-- **Estrutura da paragem**:
-  ```javascript
-  {
-    stop_id: string,
-    stop_name: string,
-    latitude: number,
-    longitude: number,
-    stop_url: string
-  }
-  ```
-
-```javascript
-getAllStops()
-```
-- **Retorna**: `Array` - Todas as paragens
-
-```javascript
-getNearbyStops(userLat, userLon, maxDistance)
-```
-- **Parâmetros**: Latitude, longitude, distância máxima em metros (padrão: 1000)
-- **Retorna**: `Array` - Paragens próximas ordenadas por distância
-- **Descrição**: Encontra paragens num raio específico
-
-```javascript
-searchStops(query)
-```
-- **Parâmetros**: Texto de pesquisa
-- **Retorna**: `Array` - Paragens que correspondem à pesquisa
-- **Descrição**: Pesquisa por nome ou código de paragem
-
-```javascript
-getStopById(id)
-```
-- **Parâmetros**: ID da paragem
-- **Retorna**: `Object|null` - Paragem encontrada
-
-**Exportação**: `export const stopService = new StopService()`
-
----
+### ⭐ Novos Serviços
 
 #### **`scheduleService.js`**
 
-**Descrição**: Processamento de horários GTFS (trips.json, calendar.json).
+**Descrição**: Determina automaticamente o tipo de serviço (service_id) com base na data atual.
 
 **Classe**: `ScheduleService`
 
@@ -485,663 +223,143 @@ getStopById(id)
 ```javascript
 loadScheduleData()
 ```
-- **Descrição**: Carrega trips.json e calendar.json
+- Carrega `trips.json` e `calendar.json`
 
 ```javascript
-getHeadsignForTrip(tripId)
+getServiceIdAtual()
 ```
-- **Parâmetros**: Trip ID
+- **Retorna**: `string` - Código do serviço atual
+- **Possíveis valores**:
+  - `UTEIS` - Dias úteis (segunda a sexta)
+  - `SAB` - Sábado
+  - `DOM` - Domingo
+  - Feriados usam `DOM`
+  - Férias escolares: `F` (dias úteis), `G` (sábado), `H` (domingo)
+- **Descrição**: Verifica calendário para feriados e férias escolares
+- **Cache**: Resultado cacheado por dia
+
+```javascript
+getDestination(line, direction)
+```
+- **Parâmetros**: Número da linha, direção (0 ou 1)
 - **Retorna**: `string` - Destino da viagem (headsign)
+- **Descrição**: Obtém destino considerando service_id atual
 
 ```javascript
-getServiceForTrip(tripId)
+isHoliday(yyyyMMdd)
 ```
-- **Retorna**: `Object` - Informação do service_id
+- **Retorna**: `boolean`
 
 ```javascript
-isTripActiveToday(tripId)
+isSchoolHoliday(yyyyMMdd)
 ```
-- **Retorna**: `boolean` - Se a viagem está ativa hoje
+- **Retorna**: `boolean`
+
+```javascript
+clearCache()
+```
+- Força recalcular service_id
 
 **Exportação**: `export const scheduleService = new ScheduleService()`
 
 ---
 
-### 3. Map Management (`src/map/`)
+#### **`plannedArrivalsService.js`** ⭐
 
-Gestão de mapas Leaflet e marcadores.
+**Descrição**: Combina chegadas em tempo real com horários programados, removendo duplicados e suportando horários 24h+.
 
----
-
-#### **`MapManager.js`**
-
-**Descrição**: Classe base para todos os mapas. API unificada para operações comuns.
-
-**Classe**: `MapManager`
-
-**Construtor**:
-```javascript
-constructor(elementId, options = {})
-```
-- **Parâmetros**: ID do elemento HTML, opções (center, zoom)
+**Classe**: `PlannedArrivalsService`
 
 **Propriedades**:
-- `map` - Instância do Leaflet
-- `markers` - Objeto com todos os marcadores
-- `userMarker` - Marcador do utilizador
-- `userPosition` - `[lat, lon]`
+- `routesCache` - Cache de rotas por paragem (30 min)
+- `schedulesCache` - Cache de horários (30 min)
 
 **Métodos**:
 
 ```javascript
-initialize(getUserPosition)
+getNextArrivals(stopId, maxMinutes = 60)
 ```
-- **Retorna**: Instância do mapa Leaflet
-- **Descrição**: Inicializa o mapa
+- **Parâmetros**: Código da paragem, tempo máximo em minutos
+- **Retorna**: `Promise<Array>` - Chegadas ordenadas por tempo
+- **Descrição**: 
+  1. Busca chegadas em tempo real
+  2. Busca rotas que servem a paragem
+  3. Para cada rota, busca schedule
+  4. Extrai próximas viagens (até 59min)
+  5. Combina tempo real + programadas
+  6. Remove duplicados (±5 min)
+  7. Ordena por tempo de chegada
 
+**Exemplo de chegada retornada**:
 ```javascript
-waitForReady()
-```
-- **Retorna**: `Promise`
-- **Descrição**: Aguarda que o mapa esteja completamente carregado
-
-```javascript
-addMarker(id, position, icon, popupContent)
-```
-- **Parâmetros**: ID único, [lat, lon], ícone Leaflet, HTML do popup
-- **Retorna**: Marcador Leaflet
-- **Descrição**: Adiciona marcador genérico ao mapa
-
-```javascript
-removeMarker(id)
-```
-- **Descrição**: Remove marcador pelo ID
-
-```javascript
-updateMarker(id, position, icon, popupContent)
-```
-- **Descrição**: Atualiza posição e/ou ícone de um marcador
-
-```javascript
-centerOn(position, zoom)
-```
-- **Parâmetros**: [lat, lon], nível de zoom (opcional)
-- **Descrição**: Centra o mapa numa posição
-
-```javascript
-fitBounds(positions, options)
-```
-- **Parâmetros**: Array de [lat, lon], opções (padding, maxZoom)
-- **Descrição**: Ajusta zoom para mostrar todos os pontos
-
-```javascript
-setUserPosition(lat, lon)
-```
-- **Descrição**: Define localização do utilizador
-
-```javascript
-getUserPosition()
-```
-- **Retorna**: `[lat, lon]|null`
-
-```javascript
-updateUserMarker(position)
-```
-- **Descrição**: Cria/atualiza marcador azul do utilizador
-
-```javascript
-centerOnUser(zoom)
-```
-- **Descrição**: Centra mapa na localização do utilizador
-
-```javascript
-clearAllMarkers()
-```
-- **Descrição**: Remove todos os marcadores
-
-```javascript
-cleanup()
-```
-- **Descrição**: Limpeza completa (marcadores + mapa)
-
-**Exportação**: `export { MapManager }`
-
----
-
-#### **`markers/BusMarkerManager.js`**
-
-**Descrição**: Gestão especializada de marcadores de autocarros.
-
-**Classe**: `BusMarkerManager`
-
-**Métodos**:
-
-```javascript
-updateBusMarkers(buses)
-```
-- **Parâmetros**: Array de autocarros processados
-- **Descrição**: Atualiza marcadores (adiciona novos, atualiza existentes, remove antigos)
-
-```javascript
-createBusIcon(line, bearing)
-```
-- **Retorna**: Ícone Leaflet customizado
-- **Descrição**: Cria ícone de autocarro com rotação
-
-```javascript
-createBusPopup(bus)
-```
-- **Retorna**: HTML string
-- **Descrição**: Cria conteúdo do popup do autocarro
-
-```javascript
-clearAllMarkers()
-```
-- **Descrição**: Remove todos os marcadores de autocarros
-
-**Exportação**: `export { BusMarkerManager }`
-
----
-
-#### **`markers/StopMarkerManager.js`**
-
-**Descrição**: Gestão especializada de marcadores de paragens.
-
-**Classe**: `StopMarkerManager`
-
-**Métodos**:
-
-```javascript
-updateStopMarkers(stops, showDistance, onClickCallback)
-```
-- **Parâmetros**: Array de paragens, mostrar distância?, callback ao clicar
-- **Descrição**: Atualiza todos os marcadores de paragens
-
-```javascript
-addStopMarker(stop, showDistance)
-```
-- **Descrição**: Adiciona marcador de uma paragem
-
-```javascript
-createStopIcon()
-```
-- **Retorna**: Ícone Leaflet (formato paragem de autocarro)
-
-```javascript
-createPopupContent(stop, showDistance)
-```
-- **Retorna**: HTML string
-
-```javascript
-hideAllMarkers()
-```
-- **Descrição**: Esconde marcadores (sem remover)
-
-```javascript
-showAllMarkers()
-```
-- **Descrição**: Mostra marcadores escondidos
-
-```javascript
-showOnlyMarker(stopId)
-```
-- **Descrição**: Mostra apenas um marcador específico (esconde outros)
-
-```javascript
-openPopup(stopId)
-```
-- **Descrição**: Abre popup de uma paragem
-
-```javascript
-clearAllMarkers()
-```
-
-**Exportação**: `export { StopMarkerManager }`
-
----
-
-#### **`controls/`**
-
-**`BusMapControl.js`** - Botão para navegar para o Bus Map
-
-**`CenterControl.js`** - Botão para centrar na localização do utilizador
-
-**`StopsControl.js`** - Botão para navegar para o Stops Map
-
-**Funções exportadas**:
-```javascript
-createBusMapControl(map)
-createCenterControl(map, getUserPosition)
-createStopsControl(map)
-```
-- **Retorna**: Controlo Leaflet
-- **Descrição**: Cria controlo customizado para o mapa
-
----
-
-#### **`utils/`**
-
-**`mapInitializer.js`** - Inicialização de mapas Leaflet
-
-**`distanceCalculator.js`** - Cálculo de distância Haversine
-
-```javascript
-calculateDistance(lat1, lon1, lat2, lon2)
-```
-- **Retorna**: Distância em metros
-
----
-
-### 4. UI Components (`src/ui/`)
-
-Componentes de interface reutilizáveis.
-
----
-
-#### **`components/NextArrivals.js`**
-
-**Descrição**: Painel de próximas chegadas (metade inferior do ecrã).
-
-**Classe**: `NextArrivals`
-
-**Métodos**:
-
-```javascript
-create()
-```
-- **Descrição**: Cria elemento HTML do painel
-
-```javascript
-show(stopName, stopId)
-```
-- **Parâmetros**: Nome da paragem, código da paragem
-- **Descrição**: Mostra o painel com animação
-
-```javascript
-hide()
-```
-- **Descrição**: Esconde o painel
-
-```javascript
-setArrivals(arrivals, vehicles)
-```
-- **Parâmetros**: Array de chegadas, array de veículos
-- **Descrição**: Renderiza lista de próximas chegadas com ícones de localização
-
-```javascript
-updateLastUpdate()
-```
-- **Descrição**: Atualiza timestamp da última atualização
-
-```javascript
-onClose(callback)
-```
-- **Descrição**: Define callback para botão fechar
-
-```javascript
-onRefresh(callback)
-```
-- **Descrição**: Define callback para botão refresh
-
-```javascript
-onArrivalClick(callback)
-```
-- **Descrição**: Define callback ao clicar numa chegada
-
-```javascript
-getActiveLocationIcon()
-```
-- **Retorna**: SVG string
-- **Descrição**: Ícone verde animado (autocarro com GPS)
-
-```javascript
-getInactiveLocationIcon()
-```
-- **Retorna**: SVG string
-- **Descrição**: Ícone vermelho (autocarro sem GPS)
-
-```javascript
-destroy()
-```
-- **Descrição**: Remove componente do DOM
-
-**Exportação**: `export { NextArrivals }`
-
----
-
-#### **`components/LastUpdateDisplay.js`**
-
-**Descrição**: Componente de exibição de última atualização.
-
-**Classe**: `LastUpdateDisplay`
-
-**Métodos**:
-```javascript
-update()
-```
-- **Descrição**: Atualiza timestamp para agora
-
-**Exportação**: `export { LastUpdateDisplay }`
-
----
-
-#### **`design/iconCache.js`**
-
-**Descrição**: Cache de ícones SVG inline para melhor performance.
-
-**Objeto**: `iconCache`
-
-**Propriedades**:
-- `bus` - Ícone SVG de autocarro
-- `stop` - Ícone SVG de paragem
-- `user` - Ícone SVG de utilizador
-
-**Exportação**: `export { iconCache }`
-
----
-
-### 5. Pages (Aplicações) (`src/pages/`)
-
-Aplicações principais que orquestram todos os módulos.
-
----
-
-#### **`BusMapApp.js`**
-
-**Descrição**: Aplicação do mapa de autocarros (`index.html`).
-
-**Classe**: `BusMapApp`
-
-**Fluxo**:
-1. Inicializa MapManager
-2. Adiciona controlos (centrar, navegar para stops)
-3. Configura geolocalização
-4. Carrega dados de trips/calendar
-5. Inicia auto-refresh (30s)
-6. Renderiza autocarros no mapa
-7. Aplica filtro de linha
-
-**Métodos principais**:
-
-```javascript
-initialize()
-```
-- **Descrição**: Inicializa toda a aplicação
-
-```javascript
-loadBusData()
-```
-- **Descrição**: Carrega dados dos autocarros da API
-
-```javascript
-processAndDisplayBuses(buses)
-```
-- **Descrição**: Processa e renderiza autocarros no mapa
-
-```javascript
-setupEventListeners()
-```
-- **Descrição**: Configura listeners (filtro, geoloocação)
-
-```javascript
-startAutoRefresh()
-```
-- **Descrição**: Inicia refresh automático de 30 em 30s
-
-```javascript
-cleanup()
-```
-- **Descrição**: Limpeza ao sair da página
-
-**Auto-inicialização**: Executa automaticamente quando DOM está pronto
-
----
-
-#### **`StopsMapApp.js`**
-
-**Descrição**: Aplicação do mapa de paragens (`stopsmap.html`).
-
-**Classe**: `StopsMapApp`
-
-**Fluxo**:
-1. Inicializa MapManager
-2. Carrega stops.json
-3. Adiciona controlos
-4. Configura geolocalização
-5. Mostra paragens no mapa
-6. Ao clicar numa paragem:
-   - Abre painel NextArrivals
-   - Mostra apenas marcador da paragem selecionada
-   - Fecha popup da paragem
-   - Carrega próximas chegadas
-   - Mostra autocarros que vão à paragem
-   - Inicia auto-refresh (5s)
-7. Ao fechar painel:
-   - Para auto-refresh
-   - Limpa autocarros
-   - Mostra todas as paragens
-   - Centra na paragem consultada
-
-**Métodos principais**:
-
-```javascript
-initialize()
-```
-
-```javascript
-setupGeolocation()
-```
-
-```javascript
-displayAllStops()
-```
-- **Descrição**: Mostra todas as paragens no mapa
-
-```javascript
-displayNearbyStops()
-```
-- **Descrição**: Mostra paragens num raio de 2km
-
-```javascript
-handleSearch()
-```
-- **Descrição**: Pesquisa de paragens
-
-```javascript
-handleStopClick(stop)
-```
-- **Descrição**: Gestor ao clicar numa paragem
-
-```javascript
-loadStopArrivals(stopId)
-```
-- **Descrição**: Carrega próximas chegadas da paragem
-
-```javascript
-updateBusMap(arrivals, vehicles)
-```
-- **Descrição**: Filtra e mostra autocarros que vão à paragem
-
-```javascript
-handleArrivalClick(data)
-```
-- **Descrição**: Faz zoom no autocarro ao clicar na chegada
-
-```javascript
-handleCloseArrivals()
-```
-- **Descrição**: Fecha painel e volta ao estado inicial
-
-```javascript
-startAutoRefresh()
-```
-- **Descrição**: Auto-refresh de 5 em 5s
-
-```javascript
-cleanup()
-```
-
-**Auto-inicialização**: Executa automaticamente quando DOM está pronto
-
----
-
-### 6. Utils (`src/utils/`)
-
-Funções auxiliares.
-
----
-
-#### **`dateHelpers.js`**
-
-**Funções**:
-
-```javascript
-formatTime(date)
-```
-- **Retorna**: String "HH:MM"
-
-```javascript
-formatDate(date)
-```
-- **Retorna**: String "DD/MM/YYYY"
-
-```javascript
-formatDateTime(date)
-```
-- **Retorna**: String "DD/MM/YYYY HH:MM"
-
-```javascript
-getCurrentTime()
-```
-- **Retorna**: String "HH:MM:SS"
-
-```javascript
-timeAgo(date)
-```
-- **Retorna**: String "há X segundos/minutos/horas"
-
----
-
-## 💾 Recursos Estáticos
-
-### `resources/`
-
-#### **`stops.json`**
-Dados GTFS de todas as paragens da STCP.
-
-**Estrutura**:
-```json
-[
-  {
-    "stop_code": "HER1",
-    "stop_name": "Heroismo",
-    "stop_lat": 41.157,
-    "stop_lon": -8.629,
-    "stop_url": "https://..."
-  }
-]
-```
-
-#### **`trips.json`**
-Dados GTFS de viagens (trip_id, headsign, route_id, service_id).
-
-**Estrutura**:
-```json
-[
-  {
-    "trip_id": "500_1_1",
-    "trip_headsign": "Matosinhos Sul",
-    "route_id": "500",
-    "service_id": "1",
-    "direction_id": "1"
-  }
-]
-```
-
-#### **`calendar.json`**
-Calendário GTFS (dias de operação dos serviços).
-
-**Estrutura**:
-```json
 {
-  "1": {
-    "monday": 1,
-    "tuesday": 1,
-    "wednesday": 1,
-    "thursday": 1,
-    "friday": 1,
-    "saturday": 0,
-    "sunday": 0,
-    "start_date": "20240101",
-    "end_date": "20241231"
-  }
+  route_short_name: "200",
+  route_color: "#FFD700",
+  route_text_color: "#000000",
+  trip_headsign: "Campanhaã",
+  arrival_minutes: 15,
+  arrival_time: "14:35",
+  trip_id: "200_1_14:35",
+  status: "SCHEDULED",  // ou "ON_TIME", "DELAYED"
+  delay_minutes: 0,
+  is_realtime: false
 }
 ```
 
-#### **`header.js`**
-Header HTML comum injetado em ambas as páginas.
+```javascript
+extractUpcomingTrips(schedule, maxMinutes, route)
+```
+- **Descrição**: Extrai viagens futuras do schedule
+- **Suporte 24h+**: 
+  - Se estamos às 23:30 e `maxMinutes=60`, verifica:
+    - Hora 23 (restantes 30min)
+    - Hora 24 (primeiros 30min do dia seguinte)
+  - Converte hora de exibição: 24 → 00, 25 → 01
 
-#### **`favicon.svg`**
-Ícone da aplicação.
+```javascript
+combineArrivals(realtimeArrivals, scheduledArrivals)
+```
+- **Descrição**: Combina e remove duplicados
+- **Critério de duplicado**:
+  - Mesma linha
+  - Mesmo destino (normalizado)
+  - Tempo próximo (±5 min)
+  - **Importante**: Para tempo real, usa `arrival_minutes - delay_minutes` para comparar
+- **Exemplo**:
+  - Tempo real: linha 200, chega em 15min, atraso 5min → `scheduled_time = 15 - 5 = 10min`
+  - Schedule: linha 200, mesmo destino, 9min → `|10 - 9| = 1 ≤ 5` → **Duplicado!**
+
+**Exportação**: `export const plannedArrivalsService = new PlannedArrivalsService()`
 
 ---
 
-## 👷 Service Worker
+### apiService.js (Atualizado)
 
-### `sw.js`
+**Novos métodos**:
 
-**Versão**: `stcp-live-v4`
+```javascript
+fetchStopRealtime(stopId)
+```
+- **URL**: `{proxyUrl}/{stopId}/realtime`
+- **Retorna**: Chegadas em tempo real da STCP
 
-**Estratégia de Cache**:
+```javascript
+fetchStopRoutes(stopId)
+```
+- **URL**: `{proxyUrl}/{stopId}/routes`
+- **Retorna**: Rotas que servem a paragem
 
-1. **Recursos Estáticos** - Cache First + Stale-While-Revalidate
-   - HTML, CSS, JS, JSON estáticos
-   - Serve de cache imediatamente
-   - Atualiza cache em background
-
-2. **APIs** - Network Only (sem cache)
-   - FIWARE Urban Platform
-   - Cloudflare Worker (GTFS Realtime)
-   - Dados sempre frescos
-
-3. **Offline Fallback**
-   - Se API falhar offline, retorna erro JSON apropriado
-
-**Ficheiros Cacheados** (23 ficheiros):
-- Páginas HTML
-- Módulos JavaScript (todos)
-- Estilos CSS (todos)
-- Recursos (favicon, header, manifest, JSONs)
-
-**Limpeza Automática**:
-- Remove caches antigas (v1, v2, v3) ao ativar v4
+```javascript
+fetchStopSchedule(stopId, routeId, serviceId)
+```
+- **URL**: `{proxyUrl}/{stopId}/schedule?route_id={routeId}&service_id={serviceId}`
+- **Retorna**: Horário programado
 
 ---
 
-## 🔄 Fluxo de Dados
+## 📊 Fluxo de Dados
 
-### Bus Map (index.html)
-
-```
-1. BusMapApp.initialize()
-   ↓
-2. apiService.fetchBusData() → API FIWARE
-   ↓
-3. scheduleService.loadScheduleData() → trips.json + calendar.json
-   ↓
-4. Para cada autocarro:
-   - vehicleService.processBusData()
-   - vehicleService.extractLineNumber()
-   - scheduleService.getHeadsignForTrip()
-   ↓
-5. busMarkerManager.updateBusMarkers()
-   ↓
-6. Renderiza marcadores no mapa
-   ↓
-7. Auto-refresh a cada 30s
-```
-
-### Stops Map (stopsmap.html)
+### Stops Map (stopsmap.html) - Atualizado
 
 ```
 1. StopsMapApp.initialize()
@@ -1156,7 +374,20 @@ Header HTML comum injetado em ambas as páginas.
    ↓
 6. Utilizador clica numa paragem:
    ↓
-7. apiService.fetchStopRealtime(stopId) → Proxy GTFS
+7. ⭐ plannedArrivalsService.getNextArrivals(stopId, 60)
+   ↓
+   7.1. apiService.fetchStopRealtime(stopId) → Tempo real
+   ↓
+   7.2. apiService.fetchStopRoutes(stopId) → Rotas
+   ↓
+   7.3. scheduleService.getServiceIdAtual() → "UTEIS"/"SAB"/"DOM"
+   ↓
+   7.4. Para cada rota:
+        apiService.fetchStopSchedule(stopId, routeId, serviceId)
+   ↓
+   7.5. extractUpcomingTrips() → Viagens futuras (suporta 24h+)
+   ↓
+   7.6. combineArrivals() → Remove duplicados (usa delay_minutes)
    ↓
 8. apiService.fetchBusData() → Veículos
    ↓
@@ -1192,47 +423,85 @@ npx http-server
 open http://localhost:8000
 ```
 
-### Deploy
+### Deploy do Worker
+
+```bash
+cd proxy
+npm install
+npx wrangler login
+npx wrangler deploy
+```
+
+### Deploy da Aplicação
 
 A aplicação é estática e pode ser hospedada em:
 - GitHub Pages
 - Netlify
 - Vercel
 - Cloudflare Pages
-- Qualquer servidor HTTP
-
-### Requisitos
-
-- Navegador moderno (suporte ES6 modules)
-- Ligação à Internet (para APIs)
-- Permissão de geolocalização (opcional)
 
 ---
 
-## 🛠️ Arquitetura
+## 🛡️ Service Worker
 
-### Princípios
+### `sw.js`
 
-1. **Modularidade**: Código organizado em módulos ES6
-2. **Separação de Responsabilidades**: Core, Services, UI, Map separados
-3. **Reutilização**: Componentes e serviços reutilizáveis
-4. **Single Responsibility**: Cada classe/ficheiro tem um propósito claro
-5. **Event-Driven**: Comunicação via EventBus
-6. **Progressive Enhancement**: Funciona mesmo sem geolocalização
+**Versão**: `stcp-live-v5`
 
-### Camadas
+**Estratégia de Cache**:
 
-```
-Presentação (UI)
-    ↓
-Aplicações (Pages)
-    ↓
-Serviços de Negócio (Services)
-    ↓
-Serviços Core (Core)
-    ↓
-APIs Externas (FIWARE, GTFS Realtime)
-```
+1. **Recursos Estáticos** - Cache First + Stale-While-Revalidate
+   - HTML, CSS, JS, JSON estáticos
+
+2. **APIs** - Network Only (sem cache)
+   - FIWARE Urban Platform
+   - Cloudflare Worker (sempre dados frescos)
+
+**Ficheiros Cacheados**:
+- Páginas HTML
+- Módulos JavaScript (incluindo novos serviços)
+- Estilos CSS
+- Recursos (favicon, header, manifest, JSONs)
+
+---
+
+## 📝 Features Principais
+
+### ✅ Chegadas Híbridas
+
+- Combina tempo real (GTFS Realtime) com horários programados (GTFS Static)
+- Remove duplicados inteligentemente
+- Mostra até 60 minutos de chegadas
+
+### ✅ Detecção Automática de Serviço
+
+- Identifica automaticamente se é dia útil, sábado ou domingo
+- Verifica feriados e férias escolares
+- Ajusta horários em conformidade
+
+### ✅ Suporte Horários 24h+
+
+- Trata corretamente horários após meia-noite
+- Às 23:30, mostra autocarros até 00:30 do dia seguinte
+- À 00:30, mostra autocarros até 01:30
+
+### ✅ Cálculo Preciso de Atrasos
+
+- Compara tempo estimado com horário programado
+- Evita duplicação mesmo com grandes atrasos
+- Visual: 🟢 No horário | 🔴 Atrasado
+
+---
+
+## 💻 Tecnologias
+
+- **Vanilla JavaScript** - ES6 modules, async/await
+- **Leaflet.js** - Mapas interativos
+- **GTFS Realtime** - Dados em tempo real
+- **GTFS Static** - Horários programados
+- **Cloudflare Workers** - Edge computing, CORS proxy
+- **Service Workers** - PWA, offline-first
+- **Geolocation API** - Localização do utilizador
 
 ---
 
@@ -1254,6 +523,20 @@ Contribuições são bem-vindas! Por favor:
 
 ---
 
+## 📡 APIs Utilizadas
+
+### FIWARE Urban Platform (Porto Digital)
+- **URL**: `https://broker.fiware.urbanplatform.portodigital.pt/v2/entities`
+- **Dados**: Localização em tempo real dos autocarros
+- **Atualização**: Aprox. a cada 30 segundos
+
+### STCP API (via Cloudflare Worker)
+- **URL**: `https://stcp-worker.tiagoanoliveira.pt`
+- **Endpoints**: `/realtime`, `/routes`, `/schedule`
+- **Dados**: Chegadas previstas, rotas, horários
+
+---
+
 ## 📞 Contacto
 
 **Autor**: Tiago Oliveira  
@@ -1262,4 +545,4 @@ Contribuições são bem-vindas! Por favor:
 
 ---
 
-**Última atualização**: 26 de Janeiro de 2026
+**Última atualização**: 27 de Janeiro de 2026
