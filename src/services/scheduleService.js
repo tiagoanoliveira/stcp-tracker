@@ -1,40 +1,42 @@
 /**
  * Schedule Service - Lógica de horários e serviços
- * Simplificado: determina sempre service_id por dia (U/S/D), consulta calendar para períodos especiais
+ * Usa: apiService
+ * Responsável por: determinar service_id, obter headsigns via API
  */
 
 import { apiService } from '../core/apiService.js';
 
 class ScheduleService {
   constructor() {
-    this.trips = [];
-    this.specialPeriods = []; // Feriados e férias escolares
+    // Cache de schedules de rotas
+    this.routeSchedulesCache = new Map(); // "route_service_dir" -> { data, timestamp }
+    this.cacheTTL = 30 * 60 * 1000; // 30 minutos
+    
+    // Períodos especiais (feriados, férias)
+    this.specialPeriods = [];
+    
+    // Cache de service_id por data
     this.cachedServiceId = null;
     this.cachedServiceDate = null;
   }
 
   /**
-   * Carregar todos os dados de horários
+   * Carregar calendário (ainda necessário para determinar tipo de dia)
    */
   async loadScheduleData() {
     try {
-      console.log('🔄 Carregando dados de horários...');
-      [this.trips, this.specialPeriods] = await Promise.all([
-        apiService.fetchTripsData(),
-        apiService.fetchCalendarData()
-      ]);
-      console.log(`✓ ${this.trips.length} trips carregadas`);
+      console.log('🔄 Carregando calendário...');
+      this.specialPeriods = await apiService.fetchCalendarData();
       console.log(`✓ ${this.specialPeriods.length} períodos especiais carregados`);
     } catch (error) {
-      console.error('❌ Erro ao carregar dados de horários:', error);
-      this.trips = [];
+      console.error('❌ Erro ao carregar calendário:', error);
       this.specialPeriods = [];
     }
   }
 
   /**
-   * Obter service_id para a data atual (simplificado)
-   * Retorna: U (Uteis), S (Sabado), D (Domingo), F (Uteis Ferias), G (Sabado Ferias), H (Domingo Ferias)
+   * Obter service_id para a data atual
+   * Retorna: "DIAS UTEIS", "SABADOS", "DOMINGOS|FERIADOS", "F", "G", "H"
    */
   getServiceIdAtual() {
     const dateNow = new Date();
@@ -45,7 +47,7 @@ class ScheduleService {
       return this.cachedServiceId;
     }
 
-    // Determinar tipo de dia base (U, S, D)
+    // Determinar tipo de dia base
     const weekday = dateNow.getDay();
     let serviceId;
     
@@ -64,11 +66,9 @@ class ScheduleService {
 
     if (specialPeriod) {
       if (specialPeriod.description === 'FERIADO') {
-        // Feriados usam horário de domingo
         serviceId = 'DOMINGOS|FERIADOS';
-        console.log(`🌟 FERIADO detectado - usando horário D (domingo)`);
+        console.log(`🌟 FERIADO detectado - usando horário de domingo`);
       } else if (specialPeriod.description === 'FERIAS') {
-        // Férias escolares: F (útil), G (sábado), H (domingo)
         if (weekday === 0) {
           serviceId = 'H';
         } else if (weekday === 6) {
@@ -89,38 +89,92 @@ class ScheduleService {
   }
 
   /**
-   * Obter destino/headsign para uma viagem específica
-   * @param {string} line - Número da linha
-   * @param {string} direction - Direção/sentido (0 ou 1)
-   * @returns {string} Destino ou "Destino Desconhecido"
+   * ⭐ NOVO: Obtém headsign de um trip_id via API
+   * @param {string} tripId - ID da viagem
+   * @param {string} routeId - ID da rota (ex: "200")
+   * @param {string|number} directionId - Direção (0 ou 1)
+   * @returns {Promise<string>} Headsign/destino
    */
-  getDestination(line, direction) {
-    const serviceId = this.getServiceIdAtual();
-    
-    if (!line || direction == null) {
-      console.warn(`⚠ Parâmetros inválidos: line=${line}, direction=${direction}`);
+  async getHeadsignForTrip(tripId, routeId, directionId) {
+    if (!tripId || !routeId || directionId == null) {
+      console.warn(`⚠️ Parâmetros inválidos: tripId=${tripId}, routeId=${routeId}, dir=${directionId}`);
       return 'Destino Desconhecido';
     }
 
-    const directionStr = direction.toString();
-    const trip = this.trips.find(t =>
-      t.route_id === line &&
-      t.direction_id === directionStr &&
-      t.service_id === serviceId
-    );
-
-    if (!trip) {
-      console.warn(`⚠ Nenhum trip encontrado para linha ${line}, direção ${direction}, service ${serviceId}`);
-      return `Destino Desconhecido (${serviceId})`;
+    try {
+      const serviceId = this.getServiceIdAtual();
+      const schedule = await this.getRouteSchedule(routeId, serviceId, directionId);
+      
+      if (!schedule || !schedule.schedule) {
+        console.warn(`⚠️ Sem schedule para ${routeId} (${serviceId}, dir ${directionId})`);
+        return 'Destino Desconhecido';
+      }
+      
+      // Procurar trip no schedule
+      const trip = schedule.schedule.find(t => t.trip_id === tripId);
+      
+      if (trip && trip.trip_headsign) {
+        return trip.trip_headsign;
+      }
+      
+      // Fallback: usar o primeiro trip da mesma direção
+      const firstTrip = schedule.schedule[0];
+      if (firstTrip && firstTrip.trip_headsign) {
+        console.warn(`⚠️ Trip ${tripId} não encontrado, usando fallback: ${firstTrip.trip_headsign}`);
+        return firstTrip.trip_headsign;
+      }
+      
+      return 'Destino Desconhecido';
+      
+    } catch (error) {
+      console.error(`❌ Erro ao obter headsign para trip ${tripId}:`, error);
+      return 'Destino Desconhecido';
     }
+  }
 
-    return trip.trip_headsign || 'Destino Desconhecido';
+  /**
+   * ⭐ NOVO: Obtém schedule completo de uma rota (com cache)
+   * @param {string} routeId - ID da rota
+   * @param {string} serviceId - ID do serviço
+   * @param {string|number} directionId - Direção
+   * @returns {Promise<Object>} Schedule da rota
+   */
+  async getRouteSchedule(routeId, serviceId, directionId) {
+    const cacheKey = `${routeId}_${serviceId}_${directionId}`;
+    const cached = this.routeSchedulesCache.get(cacheKey);
+    const now = Date.now();
+    
+    // Verificar cache
+    if (cached && (now - cached.timestamp) < this.cacheTTL) {
+      return cached.data;
+    }
+    
+    try {
+      // Buscar da API
+      const data = await apiService.fetchRouteSchedule(routeId, serviceId, directionId);
+      
+      if (data) {
+        // Guardar em cache
+        this.routeSchedulesCache.set(cacheKey, { data, timestamp: now });
+      }
+      
+      return data;
+      
+    } catch (error) {
+      console.error(`❌ Erro ao obter schedule de ${routeId}:`, error);
+      
+      // Retornar cache antigo se existir
+      if (cached) {
+        console.warn('⚠️ A usar cache expirado como fallback');
+        return cached.data;
+      }
+      
+      return null;
+    }
   }
 
   /**
    * Verificar se uma data é feriado
-   * @param {string} yyyyMMdd - Data no formato YYYYMMDD
-   * @returns {boolean}
    */
   isHoliday(yyyyMMdd) {
     return this.specialPeriods.some(period => 
@@ -132,8 +186,6 @@ class ScheduleService {
 
   /**
    * Verificar se uma data está em férias escolares
-   * @param {string} yyyyMMdd - Data no formato YYYYMMDD
-   * @returns {boolean}
    */
   isSchoolHoliday(yyyyMMdd) {
     return this.specialPeriods.some(period => 
@@ -144,12 +196,13 @@ class ScheduleService {
   }
 
   /**
-   * Limpar cache para forçar recalcular service_id
+   * Limpar cache
    */
   clearCache() {
     this.cachedServiceDate = null;
     this.cachedServiceId = null;
-    console.log('🖮 Cache de service_id limpo');
+    this.routeSchedulesCache.clear();
+    console.log('🧹 Cache de schedules limpo');
   }
 }
 
