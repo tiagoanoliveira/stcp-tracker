@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0; url=/">
+  <title>STCP Tracker - Redirecionando...</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #0072C6 0%, #005A9C 100%);
+      color: white;
+      text-align: center;
+    }
+    .redirect-message {
+      padding: 2rem;
+    }
+    .redirect-message h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    .redirect-message p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+    .redirect-message a {
+      color: white;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="redirect-message">
+    <h1>🚍 STCP Tracker</h1>
+    <p>A redirecionar para a página principal...</p>
+    <p><a href="/">Clique aqui</a> se não for redirecionado automaticamente.</p>
+  </div>
+  <script>
+    // Fallback JavaScript redirect
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 100);
+  </script>
+</body>
+</html>
