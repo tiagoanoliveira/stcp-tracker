@@ -9,7 +9,7 @@ class ApiService {
     this.proxyUrl = 'https://stcp-worker.tiagoanoliveira.pt';
     this.retries = 3;
     this.delayMs = 500;
-    this.timeoutMs = 1000;
+    this.timeoutMs = 10000; // 10s para APIs STCP (podem ser lentas)
   }
 
   /**
@@ -38,7 +38,7 @@ class ApiService {
    */
   async fetchBusData() {
     try {
-      const data = await this.fetchWithRetry(this.fiwareUrl);
+      const data = await this.fetchWithRetry(this.fiwareUrl, {}, this.retries, this.delayMs, 5000);
       
       if (!Array.isArray(data)) {
         console.error('❌ Dados inválidos recebidos da API FIWARE');
@@ -58,7 +58,6 @@ class ApiService {
   async fetchStopRealtime(stopId) {
     try {
       const url = `${this.proxyUrl}/${stopId}/realtime`;
-
       return await this.fetchWithRetry(url);
     } catch (error) {
       console.error(`❌ Erro ao obter dados da paragem ${stopId}:`, error);
@@ -74,7 +73,6 @@ class ApiService {
   async fetchStopRoutes(stopId) {
     try {
       const url = `${this.proxyUrl}/${stopId}/routes`;
-
       return await this.fetchWithRetry(url);
     } catch (error) {
       console.error(`❌ Erro ao obter rotas da paragem ${stopId}:`, error);
@@ -93,7 +91,6 @@ class ApiService {
     try {
       const encodedServiceId = encodeURIComponent(serviceId);
       const url = `${this.proxyUrl}/${stopId}/schedule?route_id=${routeId}&service_id=${encodedServiceId}`;
-
       return await this.fetchWithRetry(url);
     } catch (error) {
       console.error(`❌ Erro ao obter schedule de ${routeId} (${serviceId}) para ${stopId}:`, error);
@@ -102,7 +99,43 @@ class ApiService {
   }
 
   /**
+   * ⭐ NOVO: Fetch de paragens próximas via proxy
+   * @param {number} lat - Latitude
+   * @param {number} lng - Longitude
+   * @param {number} radius - Raio em metros
+   * @returns {Promise<Object>} Objeto com array de paragens ordenadas por distância
+   */
+  async fetchNearbyStops(lat, lng, radius) {
+    try {
+      const url = `${this.proxyUrl}/nearby/${lat}/${lng}/${radius}`;
+      return await this.fetchWithRetry(url);
+    } catch (error) {
+      console.error(`❌ Erro ao obter paragens próximas (${lat}, ${lng}, ${radius}m):`, error);
+      return { stops: [] };
+    }
+  }
+
+  /**
+   * ⭐ NOVO: Fetch de schedule completo de uma rota via proxy
+   * @param {string} routeId - ID da rota (ex: "200")
+   * @param {string} serviceId - ID do serviço (ex: "DIAS UTEIS")
+   * @param {string|number} directionId - Direção (0 ou 1)
+   * @returns {Promise<Object>} Objeto com schedule completo da rota
+   */
+  async fetchRouteSchedule(routeId, serviceId, directionId) {
+    try {
+      const encodedServiceId = encodeURIComponent(serviceId);
+      const url = `${this.proxyUrl}/route/${routeId}/schedule?service_id=${encodedServiceId}&direction_id=${directionId}`;
+      return await this.fetchWithRetry(url);
+    } catch (error) {
+      console.error(`❌ Erro ao obter schedule da rota ${routeId} (${serviceId}, dir ${directionId}):`, error);
+      return null;
+    }
+  }
+
+  /**
    * Fetch de ficheiro estático JSON
+   * DEPRECADO: Será removido após migração completa para APIs
    */
   async fetchJSON(filePath) {
     try {
@@ -116,24 +149,10 @@ class ApiService {
   }
 
   /**
-   * Fetch de trips.json
-   */
-  async fetchTripsData() {
-    return await this.fetchJSON('./resources/trips.json');
-  }
-
-  /**
-   * Fetch de calendar.json
+   * Fetch de calendar.json (ainda necessário para determinar tipo de dia)
    */
   async fetchCalendarData() {
     return await this.fetchJSON('./resources/calendar.json');
-  }
-
-  /**
-   * Fetch de stops.json
-   */
-  async fetchStopsData() {
-    return await this.fetchJSON('./resources/stops.json');
   }
 }
 
