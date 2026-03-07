@@ -291,8 +291,8 @@ export class StopsMapApp {
         // Múltiplos autocarros: usar paddingTopLeft/paddingBottomRight (API Leaflet correta)
         // padding é [left, top] para TopLeft e [right, bottom] para BottomRight
         this.mapManager.fitBounds(busPositions, {
-          paddingTopLeft: [60, 60],
-          paddingBottomRight: [60, panelHeight + 60],
+          paddingTopLeft: [20, 60],
+          paddingBottomRight: [20, panelHeight + 20],
           maxZoom: 15
         });
       }
