@@ -300,9 +300,9 @@ export class StopsMapApp {
       } else {
         // Vários autocarros: padding assimétrico correto (API Leaflet) + minZoom
         this.mapManager.fitBounds(busPositions, {
-          paddingTopLeft: [60, 60],
-          paddingBottomRight: [60, panelHeight + 60],
-          maxZoom: 16,
+          paddingTopLeft: [20, 60],
+          paddingBottomRight: [20, panelHeight],
+          maxZoom: 17,
           minZoom: 13  // evita zoom excessivamente afastado por causa do padding
         });
       }
