@@ -173,19 +173,19 @@ export class StopsMapApp {
    */
   calculateRadiusFromZoom(zoom) {
     // Zoom 18+ (muito próximo): 300m
-    if (zoom >= 18) return 300;
+    if (zoom >= 18) return 500;
     
     // Zoom 16-17 (próximo): 500m
-    if (zoom >= 16) return 500;
+    if (zoom >= 16) return 1000;
     
     // Zoom 14-15 (médio): 1000m
-    if (zoom >= 14) return 1000;
+    if (zoom >= 14) return 2000;
     
     // Zoom 12-13 (afastado): 2000m
-    if (zoom >= 12) return 2000;
+    if (zoom >= 12) return 4000;
     
     // Zoom < 12 (muito afastado): 3000m
-    return 3000;
+    return 6000;
   }
 
   /**
