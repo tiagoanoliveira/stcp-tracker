@@ -1,7 +1,7 @@
 /**
  * Stop Service - Gestão de paragens usando API STCP
  * Usa: apiService
- * Responsável por: obter paragens próximas via API, cache inteligente
+ * Responsável por: obter paragens próximas via API, pesquisa via API, cache inteligente
  */
 
 import { apiService } from '../core/apiService.js';
@@ -12,24 +12,18 @@ class StopService {
     this.nearbyCache = new Map(); // "lat_lng_radius" -> { data, timestamp }
     this.cacheTTL = 5 * 60 * 1000; // 5 minutos
     
-    // Cache global de paragens já vistas (para pesquisa)
+    // Cache global de paragens já vistas (para pesquisa local rápida)
     this.allStopsCache = new Map(); // stopId -> stop data
   }
 
   /**
-   * ⭐ PRINCIPAL: Obtém paragens próximas via API
-   * @param {number} lat - Latitude
-   * @param {number} lng - Longitude
-   * @param {number} radius - Raio em metros (padrão: 1000m)
-   * @returns {Promise<Array>} Array de paragens ordenadas por distância
+   * PRINCIPAL: Obtém paragens próximas via API
    */
   async getNearbyStops(lat, lng, radius = 1000) {
-    // Arredondar coordenadas para cache (4 casas decimais = ~11m precisão)
     const cacheKey = `${lat.toFixed(4)}_${lng.toFixed(4)}_${radius}`;
     const cached = this.nearbyCache.get(cacheKey);
     const now = Date.now();
     
-    // Verificar cache
     if (cached && (now - cached.timestamp) < this.cacheTTL) {
       console.log(`💾 Cache hit: ${cacheKey}`);
       return cached.data;
@@ -38,11 +32,9 @@ class StopService {
     console.log(`🌐 Fetching nearby stops: ${lat}, ${lng}, ${radius}m`);
     
     try {
-      // Buscar da API
       const response = await apiService.fetchNearbyStops(lat, lng, radius);
       const stops = response.stops || [];
       
-      // Normalizar estrutura
       const normalized = stops.map(s => {
         const stop = {
           stop_id: s.code || s.id,
@@ -52,63 +44,92 @@ class StopService {
           longitude: s.longitude,
           distance: s.distance,
           zone_id: s.zone_id,
-          routes: s.routes || [] // ✨ Já vem da API!
+          routes: s.routes || []
         };
-        
-        // Adicionar ao cache global
         this.allStopsCache.set(stop.stop_id, stop);
-        
         return stop;
       });
       
-      // Guardar em cache
       this.nearbyCache.set(cacheKey, { data: normalized, timestamp: now });
-      
       console.log(`✅ ${normalized.length} paragens carregadas`);
       return normalized;
       
     } catch (error) {
       console.error('❌ Erro ao obter paragens próximas:', error);
-      
-      // Retornar cache antigo se existir (melhor que nada)
       if (cached) {
         console.warn('⚠️ A usar cache expirado como fallback');
         return cached.data;
       }
-      
       return [];
     }
   }
 
   /**
-   * Pesquisa de paragens no cache local
-   * NOTA: Só pesquisa paragens já carregadas. Para pesquisa completa, use API search
+   * ⭐ Pesquisa de paragens por nome ou código.
+   * - Tenta primeiro o cache local (instantâneo)
+   * - Se não encontrar, faz pesquisa via API STCP (/search?q=...)
    * @param {string} query - Texto de pesquisa
-   * @returns {Array} Paragens que correspondem à pesquisa
+   * @returns {Promise<Array>} Array de paragens encontradas
    */
-  searchStops(query) {
+  async searchStops(query) {
     const lowerQuery = query.toLowerCase().trim();
     if (!lowerQuery) return [];
 
-    // Pesquisar no cache global
-    const results = [];
+    // 1. Pesquisa no cache local
+    const localResults = [];
     for (const stop of this.allStopsCache.values()) {
       if (
         stop.stop_name.toLowerCase().includes(lowerQuery) ||
-        stop.stop_code.toLowerCase().includes(lowerQuery) ||
+        (stop.stop_code && stop.stop_code.toLowerCase().includes(lowerQuery)) ||
         stop.stop_id.toLowerCase().includes(lowerQuery)
       ) {
-        results.push(stop);
+        localResults.push(stop);
       }
     }
     
-    return results;
+    if (localResults.length > 0) {
+      console.log(`💾 Pesquisa local: ${localResults.length} resultados para "${query}"`);
+      return localResults;
+    }
+
+    // 2. Cache local sem resultados → pesquisar via API STCP
+    console.log(`🌐 Pesquisa via API: "${query}"`);
+    try {
+      const response = await apiService.fetchSearchStops(query);
+      const stops = response.stops || [];
+      
+      if (stops.length === 0) {
+        console.warn(`⚠️ API não encontrou paragens para "${query}"`);
+        return [];
+      }
+
+      // Normalizar e adicionar ao cache global para futuras pesquisas locais
+      const normalized = stops.map(s => {
+        const stop = {
+          stop_id: s.stop_id || s.code || s.id,
+          stop_code: s.stop_code || s.code || s.id,
+          stop_name: s.stop_name || s.name,
+          latitude: s.latitude,
+          longitude: s.longitude,
+          distance: null,
+          zone_id: s.zone_id || null,
+          routes: s.routes || []
+        };
+        this.allStopsCache.set(stop.stop_id, stop);
+        return stop;
+      });
+
+      console.log(`✅ API encontrou ${normalized.length} paragens para "${query}"`);
+      return normalized;
+
+    } catch (error) {
+      console.error(`❌ Erro na pesquisa de paragens "${query}":`, error);
+      return [];
+    }
   }
 
   /**
    * Obtém paragem por ID (do cache)
-   * @param {string} id - ID da paragem
-   * @returns {Object|null} Paragem ou null
    */
   getStopById(id) {
     return this.allStopsCache.get(id) || null;

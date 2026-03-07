@@ -67,8 +67,6 @@ class ApiService {
 
   /**
    * Fetch de rotas que servem uma paragem via proxy
-   * @param {string} stopId - Código da paragem
-   * @returns {Promise<Object>} Objeto com display_routes e dropdown_routes
    */
   async fetchStopRoutes(stopId) {
     try {
@@ -82,10 +80,6 @@ class ApiService {
 
   /**
    * Fetch de horário programado de uma rota numa paragem via proxy
-   * @param {string} stopId - Código da paragem
-   * @param {string} routeId - ID da rota (ex: "200")
-   * @param {string} serviceId - ID do serviço (ex: "DIAS UTEIS", "SAB", "DOM")
-   * @returns {Promise<Object>} Objeto com schedule por hora
    */
   async fetchStopSchedule(stopId, routeId, serviceId) {
     try {
@@ -99,11 +93,7 @@ class ApiService {
   }
 
   /**
-   * ⭐ NOVO: Fetch de paragens próximas via proxy
-   * @param {number} lat - Latitude
-   * @param {number} lng - Longitude
-   * @param {number} radius - Raio em metros
-   * @returns {Promise<Object>} Objeto com array de paragens ordenadas por distância
+   * Fetch de paragens próximas via proxy
    */
   async fetchNearbyStops(lat, lng, radius) {
     try {
@@ -116,11 +106,24 @@ class ApiService {
   }
 
   /**
-   * ⭐ NOVO: Fetch de schedule completo de uma rota via proxy
-   * @param {string} routeId - ID da rota (ex: "200")
-   * @param {string} serviceId - ID do serviço (ex: "DIAS UTEIS")
-   * @param {string|number} directionId - Direção (0 ou 1)
-   * @returns {Promise<Object>} Objeto com schedule completo da rota
+   * ⭐ NOVO: Pesquisa de paragens por nome/código via proxy
+   * Usa o endpoint /search?q={query} do worker, que chama a STCP API
+   * @param {string} query - Texto de pesquisa (ex: "planetario", "PLNT1")
+   * @param {number} limit - Número máximo de resultados (padrão: 100)
+   * @returns {Promise<Object>} Objeto com array de paragens { stops: [...] }
+   */
+  async fetchSearchStops(query, limit = 100) {
+    try {
+      const url = `${this.proxyUrl}/search?q=${encodeURIComponent(query.trim())}&limit=${limit}`;
+      return await this.fetchWithRetry(url);
+    } catch (error) {
+      console.error(`❌ Erro ao pesquisar paragens "${query}":`, error);
+      return { stops: [] };
+    }
+  }
+
+  /**
+   * Fetch de schedule completo de uma rota via proxy
    */
   async fetchRouteSchedule(routeId, serviceId, directionId) {
     try {
@@ -135,7 +138,6 @@ class ApiService {
 
   /**
    * Fetch de ficheiro estático JSON
-   * DEPRECADO: Será removido após migração completa para APIs
    */
   async fetchJSON(filePath) {
     try {
