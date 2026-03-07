@@ -33,6 +33,10 @@ export class StopsMapApp {
     this.currentStopPosition = null;
     this.refreshInterval = null;
 
+    // ⭐ Flag: se o mapa já foi centrado nos autocarros desta paragem.
+    // Evita re-centrar no auto-refresh e causar oscilação de zoom.
+    this.busMapCentered = false;
+
     // Estado da pesquisa
     this.isSearchActive = false;
     this.suppressMapChangeUntil = 0;
@@ -101,7 +105,6 @@ export class StopsMapApp {
 
     let searchTimeout;
 
-    // Mostrar/esconder botão × e lançar pesquisa
     searchInput.addEventListener('input', () => {
       clearTimeout(searchTimeout);
       if (clearBtn) {
@@ -118,7 +121,6 @@ export class StopsMapApp {
       }
     });
 
-    // Botão × limpa a pesquisa
     if (clearBtn) {
       clearBtn.addEventListener('click', () => this.handleClearSearch());
     }
@@ -180,7 +182,7 @@ export class StopsMapApp {
 
     const generation = ++this._searchGeneration;
     const results = await stopService.searchStops(query);
-    if (generation !== this._searchGeneration) return; // descartado
+    if (generation !== this._searchGeneration) return;
 
     if (results.length === 0) {
       this.stopMarkerManager.clearAllMarkers();
@@ -198,23 +200,14 @@ export class StopsMapApp {
     }
   }
 
-  /**
-   * Limpa a caixa de pesquisa, esconde o botão × e volta ao modo normal.
-   * Usado tanto pelo click no botão × como pelo handleCloseArrivals.
-   * @param {boolean} focusInput - Se true, foca o input após limpar
-   * @param {number} reloadDelay - ms antes de recarregar as paragens próximas (0 = imediato)
-   */
   _clearSearch(focusInput = false, reloadDelay = 0) {
     const searchInput = document.getElementById('stop-search');
     const clearBtn = document.getElementById('search-clear');
-
     if (searchInput) searchInput.value = '';
     if (clearBtn) clearBtn.style.display = 'none';
     this.isSearchActive = false;
-    this._searchGeneration++; // cancelar qualquer pesquisa em curso
-
+    this._searchGeneration++;
     if (focusInput && searchInput) searchInput.focus();
-
     if (reloadDelay > 0) {
       setTimeout(() => this.loadNearbyStops(), reloadDelay);
     } else {
@@ -222,7 +215,6 @@ export class StopsMapApp {
     }
   }
 
-  /** Chamado pelo click no botão × */
   handleClearSearch() {
     this._clearSearch(true, 0);
   }
@@ -234,14 +226,25 @@ export class StopsMapApp {
   async handleStopClick(stop) {
     this.currentStopId = stop.stop_id;
     this.currentStopPosition = [stop.latitude, stop.longitude];
+
+    // ⭐ Resetar flag: a primeira carga desta paragem DEVE centrar o mapa
+    this.busMapCentered = false;
+
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     this.mapManager.map.closePopup();
-    await this.loadStopArrivals(stop.stop_id);
+
+    // Primeira carga: centerMap = true
+    await this.loadStopArrivals(stop.stop_id, true);
     this.startAutoRefresh();
   }
 
-  async loadStopArrivals(stopId) {
+  /**
+   * Carrega chegadas da paragem.
+   * @param {string} stopId
+   * @param {boolean} centerMap - Se true, centra o mapa nos autocarros (apenas na 1ª carga)
+   */
+  async loadStopArrivals(stopId, centerMap = false) {
     try {
       const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60);
       if (arrivals.length === 0) {
@@ -253,7 +256,7 @@ export class StopsMapApp {
       const vehicles = await apiService.fetchBusData();
       this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
-      await this.updateBusMap(arrivals, vehicles);
+      await this.updateBusMap(arrivals, vehicles, centerMap);
     } catch (error) {
       console.error('❌ Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
@@ -261,7 +264,12 @@ export class StopsMapApp {
     }
   }
 
-  async updateBusMap(arrivals, vehicles) {
+  /**
+   * Atualiza marcadores dos autocarros no mapa.
+   * Só centra o mapa se centerMap=true E ainda não foi centrado (busMapCentered=false).
+   * Nos refreshes automáticos centerMap=false, pelo que o mapa fica estático.
+   */
+  async updateBusMap(arrivals, vehicles, centerMap = false) {
     if (!arrivals || arrivals.length === 0) {
       this.busMarkerManager.clearAllMarkers();
       return;
@@ -287,26 +295,30 @@ export class StopsMapApp {
       return;
     }
 
+    // Atualizar marcadores (sempre, em cada refresh)
     this.busMarkerManager.updateBusMarkers(busesToShow);
 
-    setTimeout(() => {
-      const mapHeight = this.mapManager.map.getSize().y;
-      const panelHeight = mapHeight * 0.5; // NextArrivals ocupa ~50vh
+    // Centrar mapa APENAS na primeira carga (não nos refreshes)
+    if (centerMap && !this.busMapCentered) {
+      this.busMapCentered = true;
 
-      if (busPositions.length === 1) {
-        // 1 autocarro: offset para que fique na metade superior visível
-        const offsetY = Math.round(panelHeight * 0.5);
-        this.mapManager.centerOnWithOffset(busPositions[0], 16, offsetY);
-      } else {
-        // Vários autocarros: padding assimétrico correto (API Leaflet) + minZoom
-        this.mapManager.fitBounds(busPositions, {
-          paddingTopLeft: [20, 60],
-          paddingBottomRight: [20, panelHeight],
-          maxZoom: 17,
-          minZoom: 12
-        });
-      }
-    }, 150);
+      setTimeout(() => {
+        const mapHeight = this.mapManager.map.getSize().y;
+        const panelHeight = mapHeight * 0.5;
+
+        if (busPositions.length === 1) {
+          const offsetY = Math.round(panelHeight * 0.5);
+          this.mapManager.centerOnWithOffset(busPositions[0], 16, offsetY);
+        } else {
+          this.mapManager.fitBounds(busPositions, {
+            paddingTopLeft: [60, 60],
+            paddingBottomRight: [60, panelHeight + 60],
+            maxZoom: 16,
+            minZoom: 13
+          });
+        }
+      }, 150);
+    }
   }
 
   handleArrivalClick(data) {
@@ -321,12 +333,16 @@ export class StopsMapApp {
   }
 
   handleRefreshArrivals() {
-    if (this.currentStopId) this.loadStopArrivals(this.currentStopId);
+    // Refresh manual pelo utilizador: não re-centra o mapa
+    if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false);
   }
 
   handleCloseArrivals() {
     this.stopAutoRefresh();
     this.busMarkerManager.clearAllMarkers();
+
+    // ⭐ Resetar flag ao fechar
+    this.busMapCentered = false;
 
     const wasSearchActive = this.isSearchActive;
     const returnPosition = this.currentStopPosition;
@@ -334,18 +350,14 @@ export class StopsMapApp {
     this.currentStopId = null;
     this.currentStopPosition = null;
 
-    // Centrar sempre na posição da paragem que estava selecionada
     if (returnPosition) {
       this.suppressMapChangeUntil = Date.now() + 1800;
       this.mapManager.centerOn(returnPosition, 16);
     }
 
     if (wasSearchActive) {
-      // Pesquisa estava ativa: limpar e recarregar paragens normais
-      // Aguardar a animação do centerOn antes de recarregar
       this._clearSearch(false, 700);
     } else {
-      // Modo normal: mostrar paragens já carregadas
       this.stopMarkerManager.showAllMarkers();
     }
   }
@@ -357,7 +369,10 @@ export class StopsMapApp {
   startAutoRefresh() {
     this.stopAutoRefresh();
     this.refreshInterval = setInterval(() => {
-      if (this.currentStopId) this.loadStopArrivals(this.currentStopId);
+      if (this.currentStopId) {
+        // ⭐ centerMap=false: nunca re-centra o mapa nos refreshes automáticos
+        this.loadStopArrivals(this.currentStopId, false);
+      }
     }, 5000);
   }
 
