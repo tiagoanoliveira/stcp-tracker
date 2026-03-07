@@ -103,8 +103,8 @@ export class MapManager {
 
     const bounds = L.latLngBounds(positions);
     this.map.fitBounds(bounds, {
-      paddingTopLeft: [20, 20],
-      paddingBottomRight: [20, 20],
+      paddingTopLeft: [15, 15],
+      paddingBottomRight: [15, 15],
       maxZoom: 17,
       ...leafletOptions
     });

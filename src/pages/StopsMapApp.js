@@ -302,8 +302,8 @@ export class StopsMapApp {
         this.mapManager.fitBounds(busPositions, {
           paddingTopLeft: [20, 60],
           paddingBottomRight: [20, panelHeight],
-          maxZoom: 18,
-          minZoom: 13  // evita zoom excessivamente afastado por causa do padding
+          maxZoom: 17,
+          minZoom: 12
         });
       }
     }, 150);
