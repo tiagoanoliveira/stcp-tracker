@@ -33,10 +33,10 @@ export class StopsMapApp {
     this.currentStopPosition = null;
     this.refreshInterval = null;
 
-    // Flag: evita re-centrar no auto-refresh (só centra na 1ª carga)
+    // Flag: evita re-centrar no auto-refresh
     this.busMapCentered = false;
 
-    // ⭐ Posições dos autocarros atualmente visíveis (para re-centrar ao fechar popup)
+    // Posições dos autocarros atuais (para re-centrar ao fechar popup)
     this.currentBusPositions = [];
 
     // Estado da pesquisa
@@ -44,7 +44,7 @@ export class StopsMapApp {
     this.suppressMapChangeUntil = 0;
     this._searchGeneration = 0;
     
-    // Raio dinâmico
+    // Raio dinâmico e controlo de carregamento
     this.currentRadius = 1000;
     this.isLoadingStops = false;
     this.loadStopsDebounce = null;
@@ -134,11 +134,9 @@ export class StopsMapApp {
     this.mapManager.map.on('zoomend', () => this.handleMapChange());
     this.mapManager.map.on('moveend', () => this.handleMapChange());
 
-    // ⭐ Ao fechar popup de autocarro, re-centrar em todos os autocarros
+    // Ao fechar popup de autocarro, re-centrar em todos os autocarros
     this.mapManager.map.on('popupclose', () => {
-      // Só reagir se o painel de chegadas estiver aberto e houver autocarros
       if (this.nextArrivals?.isVisible && this.currentBusPositions.length > 0) {
-        // Pequeno delay para não colidir com a animação de fecho do popup
         setTimeout(() => this.recenterOnBuses(), 200);
       }
     });
@@ -167,8 +165,13 @@ export class StopsMapApp {
       const center = this.mapManager.map.getCenter();
       const zoom = this.mapManager.map.getZoom();
       this.currentRadius = this.calculateRadiusFromZoom(zoom);
-      console.log(`📍 Carregando paragens (${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}) raio: ${this.currentRadius}m`);
+
       const stops = await stopService.getNearbyStops(center.lat, center.lng, this.currentRadius);
+
+      // ⭐ Verificar DEPOIS do fetch: se entretanto o utilizador abriu uma paragem,
+      // descartar esta resposta para não sobrepor os marcadores ao showOnlyMarker.
+      if (this.nextArrivals?.isVisible) return;
+
       if (stops.length === 0) { this.stopMarkerManager.clearAllMarkers(); return; }
       this.stopMarkerManager.updateStopMarkers(stops, false, (stop) => this.handleStopClick(stop));
     } catch (error) {
@@ -241,6 +244,11 @@ export class StopsMapApp {
     this.busMapCentered = false;
     this.currentBusPositions = [];
 
+    // ⭐ Cancelar imediatamente qualquer debounce de loadNearbyStops pendente
+    // para evitar que uma resposta em-vôo sobrescreva o showOnlyMarker.
+    clearTimeout(this.loadStopsDebounce);
+    this.loadStopsDebounce = null;
+
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     this.mapManager.map.closePopup();
@@ -297,28 +305,19 @@ export class StopsMapApp {
       return;
     }
 
-    // Atualizar marcadores e guardar posições atuais
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this.currentBusPositions = busPositions;
 
-    // Centrar apenas na primeira carga (não nos refreshes automáticos)
     if (centerMap && !this.busMapCentered) {
       this.busMapCentered = true;
       setTimeout(() => this.recenterOnBuses(), 150);
     }
   }
 
-  /**
-   * Re-centra o mapa para mostrar todos os autocarros atuais,
-   * respeitando o espaço ocupado pelo painel NextArrivals (50vh em baixo).
-   * Usado na 1ª carga e ao fechar um popup de autocarro.
-   */
   recenterOnBuses() {
     if (!this.mapManager || this.currentBusPositions.length === 0) return;
-
     const mapHeight = this.mapManager.map.getSize().y;
     const panelHeight = mapHeight * 0.5;
-
     if (this.currentBusPositions.length === 1) {
       const offsetY = Math.round(panelHeight * 0.5);
       this.mapManager.centerOnWithOffset(this.currentBusPositions[0], 16, offsetY);
