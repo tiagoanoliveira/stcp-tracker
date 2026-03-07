@@ -33,9 +33,11 @@ export class StopsMapApp {
     this.currentStopPosition = null;
     this.refreshInterval = null;
 
-    // ⭐ Flag: se o mapa já foi centrado nos autocarros desta paragem.
-    // Evita re-centrar no auto-refresh e causar oscilação de zoom.
+    // Flag: evita re-centrar no auto-refresh (só centra na 1ª carga)
     this.busMapCentered = false;
+
+    // ⭐ Posições dos autocarros atualmente visíveis (para re-centrar ao fechar popup)
+    this.currentBusPositions = [];
 
     // Estado da pesquisa
     this.isSearchActive = false;
@@ -128,8 +130,18 @@ export class StopsMapApp {
 
   setupMapListeners() {
     if (!this.mapManager?.map) return;
+
     this.mapManager.map.on('zoomend', () => this.handleMapChange());
     this.mapManager.map.on('moveend', () => this.handleMapChange());
+
+    // ⭐ Ao fechar popup de autocarro, re-centrar em todos os autocarros
+    this.mapManager.map.on('popupclose', () => {
+      // Só reagir se o painel de chegadas estiver aberto e houver autocarros
+      if (this.nextArrivals?.isVisible && this.currentBusPositions.length > 0) {
+        // Pequeno delay para não colidir com a animação de fecho do popup
+        setTimeout(() => this.recenterOnBuses(), 200);
+      }
+    });
   }
 
   handleMapChange() {
@@ -226,24 +238,17 @@ export class StopsMapApp {
   async handleStopClick(stop) {
     this.currentStopId = stop.stop_id;
     this.currentStopPosition = [stop.latitude, stop.longitude];
-
-    // ⭐ Resetar flag: a primeira carga desta paragem DEVE centrar o mapa
     this.busMapCentered = false;
+    this.currentBusPositions = [];
 
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     this.mapManager.map.closePopup();
 
-    // Primeira carga: centerMap = true
     await this.loadStopArrivals(stop.stop_id, true);
     this.startAutoRefresh();
   }
 
-  /**
-   * Carrega chegadas da paragem.
-   * @param {string} stopId
-   * @param {boolean} centerMap - Se true, centra o mapa nos autocarros (apenas na 1ª carga)
-   */
   async loadStopArrivals(stopId, centerMap = false) {
     try {
       const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60);
@@ -264,14 +269,10 @@ export class StopsMapApp {
     }
   }
 
-  /**
-   * Atualiza marcadores dos autocarros no mapa.
-   * Só centra o mapa se centerMap=true E ainda não foi centrado (busMapCentered=false).
-   * Nos refreshes automáticos centerMap=false, pelo que o mapa fica estático.
-   */
   async updateBusMap(arrivals, vehicles, centerMap = false) {
     if (!arrivals || arrivals.length === 0) {
       this.busMarkerManager.clearAllMarkers();
+      this.currentBusPositions = [];
       return;
     }
 
@@ -292,32 +293,42 @@ export class StopsMapApp {
 
     if (busesToShow.length === 0) {
       this.busMarkerManager.clearAllMarkers();
+      this.currentBusPositions = [];
       return;
     }
 
-    // Atualizar marcadores (sempre, em cada refresh)
+    // Atualizar marcadores e guardar posições atuais
     this.busMarkerManager.updateBusMarkers(busesToShow);
+    this.currentBusPositions = busPositions;
 
-    // Centrar mapa APENAS na primeira carga (não nos refreshes)
+    // Centrar apenas na primeira carga (não nos refreshes automáticos)
     if (centerMap && !this.busMapCentered) {
       this.busMapCentered = true;
+      setTimeout(() => this.recenterOnBuses(), 150);
+    }
+  }
 
-      setTimeout(() => {
-        const mapHeight = this.mapManager.map.getSize().y;
-        const panelHeight = mapHeight * 0.5;
+  /**
+   * Re-centra o mapa para mostrar todos os autocarros atuais,
+   * respeitando o espaço ocupado pelo painel NextArrivals (50vh em baixo).
+   * Usado na 1ª carga e ao fechar um popup de autocarro.
+   */
+  recenterOnBuses() {
+    if (!this.mapManager || this.currentBusPositions.length === 0) return;
 
-        if (busPositions.length === 1) {
-          const offsetY = Math.round(panelHeight * 0.5);
-          this.mapManager.centerOnWithOffset(busPositions[0], 16, offsetY);
-        } else {
-          this.mapManager.fitBounds(busPositions, {
-            paddingTopLeft: [60, 60],
-            paddingBottomRight: [60, panelHeight + 60],
-            maxZoom: 16,
-            minZoom: 13
-          });
-        }
-      }, 150);
+    const mapHeight = this.mapManager.map.getSize().y;
+    const panelHeight = mapHeight * 0.5;
+
+    if (this.currentBusPositions.length === 1) {
+      const offsetY = Math.round(panelHeight * 0.5);
+      this.mapManager.centerOnWithOffset(this.currentBusPositions[0], 16, offsetY);
+    } else {
+      this.mapManager.fitBounds(this.currentBusPositions, {
+        paddingTopLeft: [60, 60],
+        paddingBottomRight: [60, panelHeight + 60],
+        maxZoom: 16,
+        minZoom: 13
+      });
     }
   }
 
@@ -333,16 +344,14 @@ export class StopsMapApp {
   }
 
   handleRefreshArrivals() {
-    // Refresh manual pelo utilizador: não re-centra o mapa
     if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false);
   }
 
   handleCloseArrivals() {
     this.stopAutoRefresh();
     this.busMarkerManager.clearAllMarkers();
-
-    // ⭐ Resetar flag ao fechar
     this.busMapCentered = false;
+    this.currentBusPositions = [];
 
     const wasSearchActive = this.isSearchActive;
     const returnPosition = this.currentStopPosition;
@@ -369,10 +378,7 @@ export class StopsMapApp {
   startAutoRefresh() {
     this.stopAutoRefresh();
     this.refreshInterval = setInterval(() => {
-      if (this.currentStopId) {
-        // ⭐ centerMap=false: nunca re-centra o mapa nos refreshes automáticos
-        this.loadStopArrivals(this.currentStopId, false);
-      }
+      if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false);
     }, 5000);
   }
 
