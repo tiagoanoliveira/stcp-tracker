@@ -23,11 +23,11 @@
   <!-- Mapa full-screen -->
   <div id="map"></div>
 
-  <!-- Logo no canto superior esquerdo -->
-  <div class="logo-overlay">
+  <!-- Logo no canto superior esquerdo (link para home) -->
+  <a href="/" class="logo-overlay" title="Ir para o início">
     <img src="./resources/favicon.svg" alt="STCP Live Map Logo">
     <span class="logo-text">Paragens STCP</span>
-  </div>
+  </a>
 
   <!-- Barra de pesquisa -->
   <div class="search-overlay">
@@ -43,6 +43,13 @@
         placeholder="Pesquisar paragem por nome ou código..."
         autocomplete="off"
       />
+      <!-- Botão de limpar pesquisa -->
+      <button id="search-clear" class="search-clear-btn" title="Limpar pesquisa" aria-label="Limpar pesquisa">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
     </div>
   </div>
 
@@ -57,7 +64,7 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
-  <!-- Nossa aplicação refatorizada -->
+  <!-- Nossa aplicação -->
   <script type="module" src="./src/pages/StopsMapApp.js"></script>
 </body>
 </html>

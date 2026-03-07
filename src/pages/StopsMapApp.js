@@ -1,6 +1,5 @@
 /**
  * StopsMapApp - Aplicação de mapa de paragens
- * Usa: MapManager, StopMarkerManager, BusMarkerManager, NextArrivals, LoadingSpinner
  */
 
 import { geolocationService } from '../core/geolocationService.js';
@@ -29,18 +28,17 @@ export class StopsMapApp {
     this.nextArrivals = null;
     this.loadingOverlay = null;
     
-    // Estado
+    // Estado da paragem atual
     this.currentStopId = null;
     this.currentStopPosition = null;
     this.refreshInterval = null;
 
-    // Controlo de pesquisa e supressão de reload
+    // Estado da pesquisa
     this.isSearchActive = false;
     this.suppressMapChangeUntil = 0;
-    // Evitar que duas pesquisas async corram ao mesmo tempo
     this._searchGeneration = 0;
     
-    // Raio dinâmico baseado no zoom
+    // Raio dinâmico
     this.currentRadius = 1000;
     this.isLoadingStops = false;
     this.loadStopsDebounce = null;
@@ -49,7 +47,6 @@ export class StopsMapApp {
   async initialize() {
     try {
       console.log('🚀 Inicializando StopsMapApp...');
-
       this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de paragens...');
 
       await scheduleService.loadScheduleData();
@@ -58,12 +55,8 @@ export class StopsMapApp {
       this.mapManager.initialize();
       await this.mapManager.waitForReady();
 
-      this.centerControl = createCenterControl(
-        this.mapManager.map,
-        () => this.mapManager.getUserPosition()
-      );
+      this.centerControl = createCenterControl(this.mapManager.map, () => this.mapManager.getUserPosition());
       this.centerControl.addTo(this.mapManager.map);
-
       this.busMapControl = createBusMapControl(this.mapManager.map);
       this.busMapControl.addTo(this.mapManager.map);
 
@@ -72,7 +65,6 @@ export class StopsMapApp {
 
       this.nextArrivals = new NextArrivals();
       this.nextArrivals.create();
-      
       this.nextArrivals.onArrivalClick((data) => this.handleArrivalClick(data));
       this.nextArrivals.onClose(() => this.handleCloseArrivals());
       this.nextArrivals.onRefresh(() => this.handleRefreshArrivals());
@@ -84,7 +76,6 @@ export class StopsMapApp {
 
       this.loadingOverlay.remove();
       this.loadingOverlay = null;
-
     } catch (error) {
       console.error('❌ Erro na inicialização:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();
@@ -105,12 +96,17 @@ export class StopsMapApp {
 
   setupEventListeners() {
     const searchInput = document.getElementById('stop-search');
+    const clearBtn = document.getElementById('search-clear');
     if (!searchInput) return;
 
     let searchTimeout;
 
+    // Mostrar/esconder botão × e lançar pesquisa
     searchInput.addEventListener('input', () => {
       clearTimeout(searchTimeout);
+      if (clearBtn) {
+        clearBtn.style.display = searchInput.value.length > 0 ? 'flex' : 'none';
+      }
       searchTimeout = setTimeout(() => this.handleSearch(), 300);
     });
 
@@ -121,6 +117,11 @@ export class StopsMapApp {
         this.handleSearch();
       }
     });
+
+    // Botão × limpa a pesquisa
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => this.handleClearSearch());
+    }
   }
 
   setupMapListeners() {
@@ -133,7 +134,6 @@ export class StopsMapApp {
     if (this.nextArrivals?.isVisible) return;
     if (this.isSearchActive) return;
     if (Date.now() < this.suppressMapChangeUntil) return;
-
     clearTimeout(this.loadStopsDebounce);
     this.loadStopsDebounce = setTimeout(() => this.loadNearbyStops(), 500);
   }
@@ -149,23 +149,14 @@ export class StopsMapApp {
   async loadNearbyStops() {
     if (this.isLoadingStops) return;
     this.isLoadingStops = true;
-
     try {
       const center = this.mapManager.map.getCenter();
       const zoom = this.mapManager.map.getZoom();
       this.currentRadius = this.calculateRadiusFromZoom(zoom);
-
-      console.log(`📍 Carregando paragens (${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}) raio: ${this.currentRadius}m, zoom: ${zoom}`);
-
+      console.log(`📍 Carregando paragens (${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}) raio: ${this.currentRadius}m`);
       const stops = await stopService.getNearbyStops(center.lat, center.lng, this.currentRadius);
-
-      if (stops.length === 0) {
-        this.stopMarkerManager.clearAllMarkers();
-        return;
-      }
-
+      if (stops.length === 0) { this.stopMarkerManager.clearAllMarkers(); return; }
       this.stopMarkerManager.updateStopMarkers(stops, false, (stop) => this.handleStopClick(stop));
-
     } catch (error) {
       console.error('❌ Erro ao carregar paragens:', error);
     } finally {
@@ -173,13 +164,13 @@ export class StopsMapApp {
     }
   }
 
-  /**
-   * ⭐ Pesquisa assíncrona: tenta cache local primeiro, cai para API se necessário
-   */
+  // -------------------------------------------------------------------------
+  // Pesquisa
+  // -------------------------------------------------------------------------
+
   async handleSearch() {
     const searchInput = document.getElementById('stop-search');
     const query = searchInput.value.trim();
-
     this.isSearchActive = Boolean(query);
 
     if (!query) {
@@ -187,14 +178,9 @@ export class StopsMapApp {
       return;
     }
 
-    // Geração de pesquisa: ignorar resultados de chamadas antigas se o utilizador
-    // continuou a escrever entretanto
     const generation = ++this._searchGeneration;
-
     const results = await stopService.searchStops(query);
-
-    // Descartar se já existe uma pesquisa mais recente
-    if (generation !== this._searchGeneration) return;
+    if (generation !== this._searchGeneration) return; // descartado
 
     if (results.length === 0) {
       this.stopMarkerManager.clearAllMarkers();
@@ -203,26 +189,54 @@ export class StopsMapApp {
     }
 
     this.stopMarkerManager.updateStopMarkers(results, false, (stop) => this.handleStopClick(stop));
-
-    // Suprimir reloads disparados pelo moveend/zoomend desta ação
     this.suppressMapChangeUntil = Date.now() + 1500;
 
     if (results.length === 1) {
       this.mapManager.centerOn([results[0].latitude, results[0].longitude], 16);
     } else {
-      const positions = results.map(s => [s.latitude, s.longitude]);
-      this.mapManager.fitBounds(positions);
+      this.mapManager.fitBounds(results.map(s => [s.latitude, s.longitude]));
     }
   }
+
+  /**
+   * Limpa a caixa de pesquisa, esconde o botão × e volta ao modo normal.
+   * Usado tanto pelo click no botão × como pelo handleCloseArrivals.
+   * @param {boolean} focusInput - Se true, foca o input após limpar
+   * @param {number} reloadDelay - ms antes de recarregar as paragens próximas (0 = imediato)
+   */
+  _clearSearch(focusInput = false, reloadDelay = 0) {
+    const searchInput = document.getElementById('stop-search');
+    const clearBtn = document.getElementById('search-clear');
+
+    if (searchInput) searchInput.value = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+    this.isSearchActive = false;
+    this._searchGeneration++; // cancelar qualquer pesquisa em curso
+
+    if (focusInput && searchInput) searchInput.focus();
+
+    if (reloadDelay > 0) {
+      setTimeout(() => this.loadNearbyStops(), reloadDelay);
+    } else {
+      this.loadNearbyStops();
+    }
+  }
+
+  /** Chamado pelo click no botão × */
+  handleClearSearch() {
+    this._clearSearch(true, 0);
+  }
+
+  // -------------------------------------------------------------------------
+  // Paragem / Chegadas
+  // -------------------------------------------------------------------------
 
   async handleStopClick(stop) {
     this.currentStopId = stop.stop_id;
     this.currentStopPosition = [stop.latitude, stop.longitude];
-    
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     this.mapManager.map.closePopup();
-
     await this.loadStopArrivals(stop.stop_id);
     this.startAutoRefresh();
   }
@@ -230,19 +244,16 @@ export class StopsMapApp {
   async loadStopArrivals(stopId) {
     try {
       const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60);
-      
       if (arrivals.length === 0) {
         this.nextArrivals.setArrivals([], []);
         this.busMarkerManager.clearAllMarkers();
         this.nextArrivals.updateLastUpdate();
         return;
       }
-      
       const vehicles = await apiService.fetchBusData();
       this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
       await this.updateBusMap(arrivals, vehicles);
-      
     } catch (error) {
       console.error('❌ Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
@@ -280,20 +291,19 @@ export class StopsMapApp {
 
     setTimeout(() => {
       const mapHeight = this.mapManager.map.getSize().y;
-      // O painel NextArrivals ocupa ~50vh — precisamos de deixar essa área livre em baixo
-      const panelHeight = mapHeight * 0.5;
+      const panelHeight = mapHeight * 0.5; // NextArrivals ocupa ~50vh
 
       if (busPositions.length === 1) {
-        // Autocarro único: centrar com offset para ficar na metade superior visível
-        const offsetY = Math.round(panelHeight * 0.5); // deslocar centro ~25% do ecrã para baixo
+        // 1 autocarro: offset para que fique na metade superior visível
+        const offsetY = Math.round(panelHeight * 0.5);
         this.mapManager.centerOnWithOffset(busPositions[0], 16, offsetY);
       } else {
-        // Múltiplos autocarros: usar paddingTopLeft/paddingBottomRight (API Leaflet correta)
-        // padding é [left, top] para TopLeft e [right, bottom] para BottomRight
+        // Vários autocarros: padding assimétrico correto (API Leaflet) + minZoom
         this.mapManager.fitBounds(busPositions, {
-          paddingTopLeft: [20, 60],
-          paddingBottomRight: [20, panelHeight + 20],
-          maxZoom: 15
+          paddingTopLeft: [60, 60],
+          paddingBottomRight: [60, panelHeight + 60],
+          maxZoom: 16,
+          minZoom: 13  // evita zoom excessivamente afastado por causa do padding
         });
       }
     }, 150);
@@ -302,13 +312,10 @@ export class StopsMapApp {
   handleArrivalClick(data) {
     const { vehicleId, location } = data;
     if (!location || !this.mapManager) return;
-
     const coords = [location.latitude, location.longitude];
     const mapHeight = this.mapManager.map.getSize().y;
     const offsetY = Math.round(mapHeight * 0.25);
-
     this.mapManager.centerOnWithOffset(coords, 17, offsetY);
-    
     const marker = this.busMarkerManager.markers[vehicleId];
     if (marker) marker.openPopup();
   }
@@ -320,15 +327,32 @@ export class StopsMapApp {
   handleCloseArrivals() {
     this.stopAutoRefresh();
     this.busMarkerManager.clearAllMarkers();
-    this.stopMarkerManager.showAllMarkers();
-    
-    if (this.currentStopPosition) {
-      this.mapManager.centerOn(this.currentStopPosition, 16);
-    }
-    
+
+    const wasSearchActive = this.isSearchActive;
+    const returnPosition = this.currentStopPosition;
+
     this.currentStopId = null;
     this.currentStopPosition = null;
+
+    // Centrar sempre na posição da paragem que estava selecionada
+    if (returnPosition) {
+      this.suppressMapChangeUntil = Date.now() + 1800;
+      this.mapManager.centerOn(returnPosition, 16);
+    }
+
+    if (wasSearchActive) {
+      // Pesquisa estava ativa: limpar e recarregar paragens normais
+      // Aguardar a animação do centerOn antes de recarregar
+      this._clearSearch(false, 700);
+    } else {
+      // Modo normal: mostrar paragens já carregadas
+      this.stopMarkerManager.showAllMarkers();
+    }
   }
+
+  // -------------------------------------------------------------------------
+  // Auto-refresh
+  // -------------------------------------------------------------------------
 
   startAutoRefresh() {
     this.stopAutoRefresh();
@@ -338,19 +362,16 @@ export class StopsMapApp {
   }
 
   stopAutoRefresh() {
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-      this.refreshInterval = null;
-    }
+    if (this.refreshInterval) { clearInterval(this.refreshInterval); this.refreshInterval = null; }
   }
 
   showError(message) {
     console.error('❌', message);
-    const errorElement = document.getElementById('error-message');
-    if (errorElement) {
-      errorElement.textContent = message;
-      errorElement.classList.add('show');
-      setTimeout(() => errorElement.classList.remove('show'), 5000);
+    const el = document.getElementById('error-message');
+    if (el) {
+      el.textContent = message;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 5000);
     }
   }
 
