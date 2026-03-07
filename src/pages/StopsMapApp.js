@@ -33,6 +33,10 @@ export class StopsMapApp {
     this.currentStopId = null;
     this.currentStopPosition = null;
     this.refreshInterval = null;
+
+    // ⭐ NOVO: estado da pesquisa e supressão de reload
+    this.isSearchActive = false;
+    this.suppressMapChangeUntil = 0;
     
     // ⭐ NOVO: Raio dinâmico baseado no zoom
     this.currentRadius = 1000; // Metro padrão
@@ -161,6 +165,16 @@ export class StopsMapApp {
       return;
     }
 
+    // Não recarregar enquanto há pesquisa ativa (para não "apagar" os resultados)
+    if (this.isSearchActive) {
+      return;
+    }
+
+    // Ignorar eventos imediatamente após ações programáticas (ex: centerOn da pesquisa)
+    if (Date.now() < this.suppressMapChangeUntil) {
+      return;
+    }
+
     // Debounce para evitar múltiplas chamadas
     clearTimeout(this.loadStopsDebounce);
     this.loadStopsDebounce = setTimeout(() => {
@@ -172,19 +186,19 @@ export class StopsMapApp {
    * ⭐ NOVO: Calcular raio dinâmico baseado no zoom
    */
   calculateRadiusFromZoom(zoom) {
-    // Zoom 18+ (muito próximo): 300m
+    // Zoom 18+ (muito próximo)
     if (zoom >= 18) return 500;
     
-    // Zoom 16-17 (próximo): 500m
+    // Zoom 16-17 (próximo)
     if (zoom >= 16) return 1000;
     
-    // Zoom 14-15 (médio): 1000m
+    // Zoom 14-15 (médio)
     if (zoom >= 14) return 2000;
     
-    // Zoom 12-13 (afastado): 2000m
+    // Zoom 12-13 (afastado)
     if (zoom >= 12) return 4000;
     
-    // Zoom < 12 (muito afastado): 3000m
+    // Zoom < 12 (muito afastado)
     return 6000;
   }
 
@@ -235,6 +249,8 @@ export class StopsMapApp {
     const searchInput = document.getElementById('stop-search');
     const query = searchInput.value.trim();
 
+    this.isSearchActive = Boolean(query);
+
     if (!query) {
       // Se pesquisa vazia, recarregar paragens da área atual
       this.loadNearbyStops();
@@ -253,6 +269,9 @@ export class StopsMapApp {
     this.stopMarkerManager.updateStopMarkers(results, false, (stop) => {
       this.handleStopClick(stop);
     });
+
+    // Suprimir reloads automáticos disparados pelo moveend/zoomend desta ação
+    this.suppressMapChangeUntil = Date.now() + 1200;
 
     if (results.length === 1) {
       this.mapManager.centerOn([results[0].latitude, results[0].longitude], 16);
@@ -327,7 +346,6 @@ export class StopsMapApp {
       const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
       
       if (vehicle) {
-        // processBusData agora é async
         const processedBus = await vehicleService.processBusData(vehicle);
         
         if (processedBus) {
@@ -343,12 +361,14 @@ export class StopsMapApp {
 
       // Ajustar zoom (considerando painel inferior de 50vh)
       setTimeout(() => {
+        const mapHeight = this.mapManager.map.getSize().y;
+        const panelHeight = mapHeight * 0.5;
+
         if (busPositions.length === 1) {
-          this.mapManager.centerOn(busPositions[0], 16);
+          // ⭐ IMPORTANTE: deslocar o centro para baixo para o autocarro ficar visível acima do painel
+          const offsetY = panelHeight * 0.5; // ~25% da altura total
+          this.mapManager.centerOnWithOffset(busPositions[0], 16, offsetY);
         } else if (busPositions.length > 1) {
-          const mapHeight = this.mapManager.map.getSize().y;
-          const panelHeight = mapHeight * 0.5;
-          
           this.mapManager.fitBounds(busPositions, { 
             padding: [60, 60, panelHeight + 60, 60],
             maxZoom: 15
@@ -364,9 +384,15 @@ export class StopsMapApp {
     const { vehicleId, location } = data;
 
     if (!location || !this.mapManager) return;
-    
+
     const coords = [location.latitude, location.longitude];
-    this.mapManager.centerOn(coords, 17);
+
+    // ⭐ IMPORTANTE: ao centrar num autocarro, aplicar o mesmo offset do painel inferior
+    const mapHeight = this.mapManager.map.getSize().y;
+    const panelHeight = mapHeight * 0.5;
+    const offsetY = panelHeight * 0.5;
+
+    this.mapManager.centerOnWithOffset(coords, 17, offsetY);
     
     const marker = this.busMarkerManager.markers[vehicleId];
     if (marker) {

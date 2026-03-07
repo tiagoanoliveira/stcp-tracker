@@ -109,6 +109,25 @@ export class MapManager {
   }
 
   /**
+   * Centrar mapa numa posição com offset (em pixels).
+   * Útil quando há UI a sobrepor o mapa (ex: bottom sheet com 50vh).
+   *
+   * Nota: offsetYPx positivo faz o marcador aparecer mais acima no ecrã
+   * (porque desloca o centro do mapa para baixo).
+   */
+  centerOnWithOffset(position, zoom = null, offsetYPx = 0, offsetXPx = 0) {
+    if (!this.map) return;
+
+    const targetZoom = zoom || this.map.getZoom();
+    const latlng = L.latLng(position[0], position[1]);
+    const point = this.map.project(latlng, targetZoom);
+    const shiftedPoint = point.add(L.point(offsetXPx, offsetYPx));
+    const shiftedLatLng = this.map.unproject(shiftedPoint, targetZoom);
+
+    this.map.setView(shiftedLatLng, targetZoom);
+  }
+
+  /**
    * Ajustar mapa para mostrar todos os pontos
    */
   fitBounds(positions, options = {}) {
