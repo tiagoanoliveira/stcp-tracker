@@ -20,33 +20,21 @@ export class MapManager {
     this.userPosition = null;
   }
 
-  /**
-   * Inicializar o mapa
-   */
   initialize(getUserPosition = null) {
     this.mapInitializer = new MapInitializer(
       this.elementId,
       this.options.center,
       this.options.zoom
     );
-    
-    // Se getUserPosition for null, usa this.getUserPosition.bind(this)
     const positionGetter = getUserPosition || (() => this.userPosition);
     this.map = this.mapInitializer.initialize(positionGetter);
-    
     console.log(`✓ MapManager inicializado para elemento #${this.elementId}`);
     return this.map;
   }
 
-  /**
-   * Aguardar que o mapa esteja pronto
-   */
   async waitForReady() {
     return new Promise((resolve) => {
-      if (this.map && this.map._loaded) {
-        resolve();
-        return;
-      }
+      if (this.map && this.map._loaded) { resolve(); return; }
       const checkInterval = setInterval(() => {
         if (this.map && this.map._loaded) {
           clearInterval(checkInterval);
@@ -61,26 +49,14 @@ export class MapManager {
     });
   }
 
-  /**
-   * Adicionar marcador genérico
-   */
   addMarker(id, position, icon, popupContent = null) {
-    if (!this.map) {
-      console.error('❌ Mapa não inicializado');
-      return null;
-    }
-
+    if (!this.map) { console.error('❌ Mapa não inicializado'); return null; }
     const marker = L.marker(position, { icon }).addTo(this.map);
-    if (popupContent) {
-      marker.bindPopup(popupContent);
-    }
+    if (popupContent) marker.bindPopup(popupContent);
     this.markers[id] = marker;
     return marker;
   }
 
-  /**
-   * Remover marcador
-   */
   removeMarker(id) {
     if (this.markers[id]) {
       this.map.removeLayer(this.markers[id]);
@@ -88,9 +64,6 @@ export class MapManager {
     }
   }
 
-  /**
-   * Atualizar posição de um marcador
-   */
   updateMarker(id, position, icon = null, popupContent = null) {
     if (this.markers[id]) {
       this.markers[id].setLatLng(position);
@@ -99,45 +72,56 @@ export class MapManager {
     }
   }
 
-  /**
-   * Centrar mapa numa posição
-   */
   centerOn(position, zoom = null) {
     if (!this.map) return;
-    const targetZoom = zoom || this.map.getZoom();
-    this.map.setView(position, targetZoom);
+    this.map.setView(position, zoom || this.map.getZoom());
   }
 
   /**
-   * Ajustar mapa para mostrar todos os pontos
+   * Centrar com offset em pixels — útil quando há UI (ex: bottom sheet) a tapar parte do mapa.
+   * offsetYPx positivo desloca o centro para baixo, fazendo o ponto aparecer mais acima no ecrã.
+   */
+  centerOnWithOffset(position, zoom = null, offsetYPx = 0, offsetXPx = 0) {
+    if (!this.map) return;
+    const targetZoom = zoom || this.map.getZoom();
+    const latlng = L.latLng(position[0], position[1]);
+    const point = this.map.project(latlng, targetZoom);
+    const shifted = point.add(L.point(offsetXPx, offsetYPx));
+    this.map.setView(this.map.unproject(shifted, targetZoom), targetZoom);
+  }
+
+  /**
+   * Ajustar mapa para mostrar todos os pontos.
+   * Suporta a opção extra `minZoom` (não nativa do Leaflet) que garante
+   * que o mapa não fica excessivamente afastado mesmo quando há padding grande.
    */
   fitBounds(positions, options = {}) {
     if (!this.map || !positions || positions.length === 0) return;
+
+    // Extrair minZoom das opções (não é suportado nativamente pelo Leaflet)
+    const { minZoom, ...leafletOptions } = options;
+
     const bounds = L.latLngBounds(positions);
     this.map.fitBounds(bounds, {
-      padding: [50, 50],
-      maxZoom: 16,
-      ...options
+      paddingTopLeft: [15, 15],
+      paddingBottomRight: [15, 15],
+      maxZoom: 17,
+      ...leafletOptions
     });
+
+    // Aplicar zoom mínimo após o Leaflet terminar a animação (~200ms)
+    if (minZoom !== undefined) {
+      setTimeout(() => {
+        if (this.map && this.map.getZoom() < minZoom) {
+          this.map.setZoom(minZoom, { animate: true });
+        }
+      }, 250);
+    }
   }
 
-  /**
-   * Definir posição do utilizador
-   */
-  setUserPosition(lat, lon) {
-    this.userPosition = [lat, lon];
-  }
+  setUserPosition(lat, lon) { this.userPosition = [lat, lon]; }
+  getUserPosition() { return this.userPosition; }
 
-  /**
-   * Obter posição do utilizador
-   */
-  getUserPosition() {
-    return this.userPosition;
-  }
-
-  /**
-   * Criar/atualizar marcador do utilizador
-   */
   updateUserMarker(position) {
     this.userPosition = position;
     if (!this.userMarker) {
@@ -147,9 +131,6 @@ export class MapManager {
     }
   }
 
-  /**
-   * Centrar no utilizador
-   */
   centerOnUser(zoom = 16) {
     if (this.userPosition) {
       this.centerOn(this.userPosition, zoom);
@@ -158,25 +139,13 @@ export class MapManager {
     }
   }
 
-  /**
-   * Limpar todos os marcadores
-   */
   clearAllMarkers() {
     Object.keys(this.markers).forEach(id => this.removeMarker(id));
   }
 
-  /**
-   * Cleanup
-   */
   cleanup() {
     this.clearAllMarkers();
-    if (this.userMarker) {
-      this.map.removeLayer(this.userMarker);
-      this.userMarker = null;
-    }
-    if (this.map) {
-      this.map.remove();
-      this.map = null;
-    }
+    if (this.userMarker) { this.map.removeLayer(this.userMarker); this.userMarker = null; }
+    if (this.map) { this.map.remove(); this.map = null; }
   }
 }

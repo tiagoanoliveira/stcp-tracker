@@ -9,7 +9,7 @@ class ApiService {
     this.proxyUrl = 'https://stcp-worker.tiagoanoliveira.pt';
     this.retries = 3;
     this.delayMs = 500;
-    this.timeoutMs = 1000;
+    this.timeoutMs = 10000; // 10s para APIs STCP (podem ser lentas)
   }
 
   /**
@@ -38,7 +38,7 @@ class ApiService {
    */
   async fetchBusData() {
     try {
-      const data = await this.fetchWithRetry(this.fiwareUrl);
+      const data = await this.fetchWithRetry(this.fiwareUrl, {}, this.retries, this.delayMs, 5000);
       
       if (!Array.isArray(data)) {
         console.error('❌ Dados inválidos recebidos da API FIWARE');
@@ -58,7 +58,6 @@ class ApiService {
   async fetchStopRealtime(stopId) {
     try {
       const url = `${this.proxyUrl}/${stopId}/realtime`;
-
       return await this.fetchWithRetry(url);
     } catch (error) {
       console.error(`❌ Erro ao obter dados da paragem ${stopId}:`, error);
@@ -68,13 +67,10 @@ class ApiService {
 
   /**
    * Fetch de rotas que servem uma paragem via proxy
-   * @param {string} stopId - Código da paragem
-   * @returns {Promise<Object>} Objeto com display_routes e dropdown_routes
    */
   async fetchStopRoutes(stopId) {
     try {
       const url = `${this.proxyUrl}/${stopId}/routes`;
-
       return await this.fetchWithRetry(url);
     } catch (error) {
       console.error(`❌ Erro ao obter rotas da paragem ${stopId}:`, error);
@@ -84,19 +80,58 @@ class ApiService {
 
   /**
    * Fetch de horário programado de uma rota numa paragem via proxy
-   * @param {string} stopId - Código da paragem
-   * @param {string} routeId - ID da rota (ex: "200")
-   * @param {string} serviceId - ID do serviço (ex: "DIAS UTEIS", "SAB", "DOM")
-   * @returns {Promise<Object>} Objeto com schedule por hora
    */
   async fetchStopSchedule(stopId, routeId, serviceId) {
     try {
       const encodedServiceId = encodeURIComponent(serviceId);
       const url = `${this.proxyUrl}/${stopId}/schedule?route_id=${routeId}&service_id=${encodedServiceId}`;
-
       return await this.fetchWithRetry(url);
     } catch (error) {
       console.error(`❌ Erro ao obter schedule de ${routeId} (${serviceId}) para ${stopId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch de paragens próximas via proxy
+   */
+  async fetchNearbyStops(lat, lng, radius) {
+    try {
+      const url = `${this.proxyUrl}/nearby/${lat}/${lng}/${radius}`;
+      return await this.fetchWithRetry(url);
+    } catch (error) {
+      console.error(`❌ Erro ao obter paragens próximas (${lat}, ${lng}, ${radius}m):`, error);
+      return { stops: [] };
+    }
+  }
+
+  /**
+   * ⭐ NOVO: Pesquisa de paragens por nome/código via proxy
+   * Usa o endpoint /search?q={query} do worker, que chama a STCP API
+   * @param {string} query - Texto de pesquisa (ex: "planetario", "PLNT1")
+   * @param {number} limit - Número máximo de resultados (padrão: 100)
+   * @returns {Promise<Object>} Objeto com array de paragens { stops: [...] }
+   */
+  async fetchSearchStops(query, limit = 100) {
+    try {
+      const url = `${this.proxyUrl}/search?q=${encodeURIComponent(query.trim())}&limit=${limit}`;
+      return await this.fetchWithRetry(url);
+    } catch (error) {
+      console.error(`❌ Erro ao pesquisar paragens "${query}":`, error);
+      return { stops: [] };
+    }
+  }
+
+  /**
+   * Fetch de schedule completo de uma rota via proxy
+   */
+  async fetchRouteSchedule(routeId, serviceId, directionId) {
+    try {
+      const encodedServiceId = encodeURIComponent(serviceId);
+      const url = `${this.proxyUrl}/route/${routeId}/schedule?service_id=${encodedServiceId}&direction_id=${directionId}`;
+      return await this.fetchWithRetry(url);
+    } catch (error) {
+      console.error(`❌ Erro ao obter schedule da rota ${routeId} (${serviceId}, dir ${directionId}):`, error);
       return null;
     }
   }
@@ -116,24 +151,10 @@ class ApiService {
   }
 
   /**
-   * Fetch de trips.json
-   */
-  async fetchTripsData() {
-    return await this.fetchJSON('./resources/trips.json');
-  }
-
-  /**
-   * Fetch de calendar.json
+   * Fetch de calendar.json (ainda necessário para determinar tipo de dia)
    */
   async fetchCalendarData() {
     return await this.fetchJSON('./resources/calendar.json');
-  }
-
-  /**
-   * Fetch de stops.json
-   */
-  async fetchStopsData() {
-    return await this.fetchJSON('./resources/stops.json');
   }
 }
 

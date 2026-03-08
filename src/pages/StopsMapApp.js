@@ -1,6 +1,5 @@
 /**
  * StopsMapApp - Aplicação de mapa de paragens
- * Usa: MapManager, StopMarkerManager, BusMarkerManager, NextArrivals, vehicleService
  */
 
 import { geolocationService } from '../core/geolocationService.js';
@@ -8,12 +7,14 @@ import { apiService } from '../core/apiService.js';
 import { stopService } from '../services/stopService.js';
 import { vehicleService } from '../services/vehicleService.js';
 import { plannedArrivalsService } from '../services/plannedArrivalsService.js';
+import { scheduleService } from '../services/scheduleService.js';
 import { MapManager } from '../map/MapManager.js';
 import { StopMarkerManager } from '../map/markers/StopMarkerManager.js';
 import { BusMarkerManager } from '../map/markers/BusMarkerManager.js';
 import { createCenterControl } from '../map/controls/CenterControl.js';
 import { createBusMapControl } from '../map/controls/BusMapControl.js';
 import { NextArrivals } from '../ui/components/NextArrivals.js';
+import { LoadingSpinner } from '../ui/components/LoadingSpinner.js';
 import { iconCache } from '../ui/design/iconCache.js';
 
 export class StopsMapApp {
@@ -25,361 +26,391 @@ export class StopsMapApp {
     this.centerControl = null;
     this.busMapControl = null;
     this.nextArrivals = null;
+    this.loadingOverlay = null;
     
-    // Estado
+    // Estado da paragem atual
     this.currentStopId = null;
     this.currentStopPosition = null;
     this.refreshInterval = null;
+
+    // Flag: evita re-centrar no auto-refresh
+    this.busMapCentered = false;
+
+    // Posições dos autocarros atuais (para re-centrar ao fechar popup)
+    this.currentBusPositions = [];
+
+    // Estado da pesquisa
+    this.isSearchActive = false;
+    this.suppressMapChangeUntil = 0;
+    this._searchGeneration = 0;
+    
+    // Raio dinâmico e controlo de carregamento
+    this.currentRadius = 1000;
+    this.isLoadingStops = false;
+    this.loadStopsDebounce = null;
   }
 
   async initialize() {
     try {
       console.log('🚀 Inicializando StopsMapApp...');
+      this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de paragens...');
 
-      // 1. Carregar dados de paragens
-      await stopService.loadStopsData();
+      await scheduleService.loadScheduleData();
 
-      // 2. Inicializar mapa
       this.mapManager = new MapManager(this.mapElementId);
       this.mapManager.initialize();
       await this.mapManager.waitForReady();
 
-      // 3. Adicionar controlo de centrar
-      this.centerControl = createCenterControl(
-        this.mapManager.map,
-        () => this.mapManager.getUserPosition()
-      );
+      this.centerControl = createCenterControl(this.mapManager.map, () => this.mapManager.getUserPosition());
       this.centerControl.addTo(this.mapManager.map);
-
-      // 4. Adicionar controlo de voltar ao busmap
       this.busMapControl = createBusMapControl(this.mapManager.map);
       this.busMapControl.addTo(this.mapManager.map);
 
-      // 5. Inicializar stop marker manager
       this.stopMarkerManager = new StopMarkerManager(this.mapManager.map);
-      
-      // 6. Inicializar bus marker manager
       this.busMarkerManager = new BusMarkerManager(this.mapManager.map);
 
-      // 7. Inicializar NextArrivals panel
       this.nextArrivals = new NextArrivals();
       this.nextArrivals.create();
-      
-      // Callbacks
       this.nextArrivals.onArrivalClick((data) => this.handleArrivalClick(data));
       this.nextArrivals.onClose(() => this.handleCloseArrivals());
       this.nextArrivals.onRefresh(() => this.handleRefreshArrivals());
 
-      // 8. Configurar geolocalização
-      this.setupGeolocation();
-
-      // 9. Configurar event listeners
+      await this.setupGeolocation();
       this.setupEventListeners();
+      this.setupMapListeners();
+      await this.loadNearbyStops();
 
-      // 10. Mostrar paragens
-      this.displayAllStops();
-
+      this.loadingOverlay.remove();
+      this.loadingOverlay = null;
     } catch (error) {
       console.error('❌ Erro na inicialização:', error);
+      if (this.loadingOverlay) this.loadingOverlay.remove();
       this.showError('Erro ao inicializar aplicação');
     }
   }
 
-  setupGeolocation() {
-    geolocationService.getCurrentPosition()
-      .then(position => {
-        this.mapManager.updateUserMarker(position);
-        this.displayNearbyStops();
-      })
-      .catch(error => {
-        console.warn('⚠ Não foi possível obter localização:', error.message);
-        this.displayAllStops();
-      });
+  async setupGeolocation() {
+    try {
+      const position = await geolocationService.getCurrentPosition();
+      this.mapManager.updateUserMarker(position);
+      this.mapManager.centerOn(position, 15);
+    } catch (error) {
+      console.warn('⚠️ Não foi possível obter localização:', error.message);
+      this.mapManager.centerOn([41.1579, -8.6291], 13);
+    }
   }
 
   setupEventListeners() {
-    // Pesquisa ao escrever (debounced)
     const searchInput = document.getElementById('stop-search');
-    if (searchInput) {
-      let searchTimeout;
-      searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-          this.handleSearch();
-        }, 300);
-      });
+    const clearBtn = document.getElementById('search-clear');
+    if (!searchInput) return;
 
-      searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          clearTimeout(searchTimeout);
-          this.handleSearch();
-        }
-      });
+    let searchTimeout;
+
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      if (clearBtn) {
+        clearBtn.style.display = searchInput.value.length > 0 ? 'flex' : 'none';
+      }
+      searchTimeout = setTimeout(() => this.handleSearch(), 300);
+    });
+
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        clearTimeout(searchTimeout);
+        this.handleSearch();
+      }
+    });
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => this.handleClearSearch());
     }
   }
 
-  displayAllStops() {
-    const stops = stopService.getAllStops();
-    this.stopMarkerManager.updateStopMarkers(stops, false, (stop) => {
-      this.handleStopClick(stop);
+  setupMapListeners() {
+    if (!this.mapManager?.map) return;
+
+    this.mapManager.map.on('zoomend', () => this.handleMapChange());
+    this.mapManager.map.on('moveend', () => this.handleMapChange());
+
+    // Ao fechar popup de autocarro, re-centrar em todos os autocarros
+    this.mapManager.map.on('popupclose', () => {
+      if (this.nextArrivals?.isVisible && this.currentBusPositions.length > 0) {
+        setTimeout(() => this.recenterOnBuses(), 200);
+      }
     });
   }
 
-  displayNearbyStops() {
-    const userPos = this.mapManager.getUserPosition();
-    if (!userPos) {
-      this.displayAllStops();
-      return;
-    }
+  handleMapChange() {
+    if (this.nextArrivals?.isVisible) return;
+    if (this.isSearchActive) return;
+    if (Date.now() < this.suppressMapChangeUntil) return;
+    clearTimeout(this.loadStopsDebounce);
+    this.loadStopsDebounce = setTimeout(() => this.loadNearbyStops(), 500);
+  }
 
-    const nearbyStops = stopService.getNearbyStops(userPos[0], userPos[1], 2000);
-    
-    if (nearbyStops.length > 0) {
-      this.stopMarkerManager.updateStopMarkers(nearbyStops, true, (stop) => {
-        this.handleStopClick(stop);
-      });
-      this.mapManager.centerOn(userPos, 15);
-    } else {
-      this.displayAllStops();
+  calculateRadiusFromZoom(zoom) {
+    if (zoom >= 18) return 500;
+    if (zoom >= 16) return 1000;
+    if (zoom >= 14) return 2000;
+    if (zoom >= 12) return 4000;
+    return 6000;
+  }
+
+  async loadNearbyStops() {
+    if (this.isLoadingStops) return;
+    this.isLoadingStops = true;
+    try {
+      const center = this.mapManager.map.getCenter();
+      const zoom = this.mapManager.map.getZoom();
+      this.currentRadius = this.calculateRadiusFromZoom(zoom);
+
+      const stops = await stopService.getNearbyStops(center.lat, center.lng, this.currentRadius);
+
+      // ⭐ Verificar DEPOIS do fetch: se entretanto o utilizador abriu uma paragem,
+      // descartar esta resposta para não sobrepor os marcadores ao showOnlyMarker.
+      if (this.nextArrivals?.isVisible) return;
+
+      if (stops.length === 0) { this.stopMarkerManager.clearAllMarkers(); return; }
+      this.stopMarkerManager.updateStopMarkers(stops, false, (stop) => this.handleStopClick(stop));
+    } catch (error) {
+      console.error('❌ Erro ao carregar paragens:', error);
+    } finally {
+      this.isLoadingStops = false;
     }
   }
 
-  handleSearch() {
+  // -------------------------------------------------------------------------
+  // Pesquisa
+  // -------------------------------------------------------------------------
+
+  async handleSearch() {
     const searchInput = document.getElementById('stop-search');
     const query = searchInput.value.trim();
+    this.isSearchActive = Boolean(query);
 
     if (!query) {
-      this.displayNearbyStops();
+      this.loadNearbyStops();
       return;
     }
 
-    const results = stopService.searchStops(query);
-    
+    const generation = ++this._searchGeneration;
+    const results = await stopService.searchStops(query);
+    if (generation !== this._searchGeneration) return;
+
     if (results.length === 0) {
       this.stopMarkerManager.clearAllMarkers();
+      this.showError('Nenhuma paragem encontrada');
       return;
     }
 
-    this.stopMarkerManager.updateStopMarkers(results, false, (stop) => {
-      this.handleStopClick(stop);
-    });
+    this.stopMarkerManager.updateStopMarkers(results, false, (stop) => this.handleStopClick(stop));
+    this.suppressMapChangeUntil = Date.now() + 1500;
 
     if (results.length === 1) {
       this.mapManager.centerOn([results[0].latitude, results[0].longitude], 16);
     } else {
-      const positions = results.map(s => [s.latitude, s.longitude]);
-      this.mapManager.fitBounds(positions);
+      this.mapManager.fitBounds(results.map(s => [s.latitude, s.longitude]));
     }
   }
+
+  _clearSearch(focusInput = false, reloadDelay = 0) {
+    const searchInput = document.getElementById('stop-search');
+    const clearBtn = document.getElementById('search-clear');
+    if (searchInput) searchInput.value = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+    this.isSearchActive = false;
+    this._searchGeneration++;
+    if (focusInput && searchInput) searchInput.focus();
+    if (reloadDelay > 0) {
+      setTimeout(() => this.loadNearbyStops(), reloadDelay);
+    } else {
+      this.loadNearbyStops();
+    }
+  }
+
+  handleClearSearch() {
+    this._clearSearch(true, 0);
+  }
+
+  // -------------------------------------------------------------------------
+  // Paragem / Chegadas
+  // -------------------------------------------------------------------------
 
   async handleStopClick(stop) {
     this.currentStopId = stop.stop_id;
     this.currentStopPosition = [stop.latitude, stop.longitude];
-    
-    // Abrir painel (passar stopId para mostrar código)
+    this.busMapCentered = false;
+    this.currentBusPositions = [];
+
+    // ⭐ Cancelar imediatamente qualquer debounce de loadNearbyStops pendente
+    // para evitar que uma resposta em-vôo sobrescreva o showOnlyMarker.
+    clearTimeout(this.loadStopsDebounce);
+    this.loadStopsDebounce = null;
+
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
-    
-    // Mostrar apenas o marcador desta paragem (esconder os outros)
     this.stopMarkerManager.showOnlyMarker(stop.stop_id);
-    
-    // Fechar popup da paragem
     this.mapManager.map.closePopup();
 
-    // Carregar e mostrar chegadas
-    await this.loadStopArrivals(stop.stop_id);
-    
-    // Iniciar auto-refresh
+    await this.loadStopArrivals(stop.stop_id, true);
     this.startAutoRefresh();
   }
 
-  async loadStopArrivals(stopId) {
+  async loadStopArrivals(stopId, centerMap = false) {
     try {
-      // Usar o serviço de chegadas planeadas para obter chegadas combinadas (realtime + programadas)
       const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60);
-      
       if (arrivals.length === 0) {
         this.nextArrivals.setArrivals([], []);
         this.busMarkerManager.clearAllMarkers();
         this.nextArrivals.updateLastUpdate();
         return;
       }
-      
-      // Buscar dados de veículos (para mostrar localização dos autocarros)
       const vehicles = await apiService.fetchBusData();
-
-      // Atualizar painel com TODAS as chegadas
       this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
-      
-      // Filtrar e mostrar apenas autocarros que vão à paragem
-      this.updateBusMap(arrivals, vehicles);
-      
+      await this.updateBusMap(arrivals, vehicles, centerMap);
     } catch (error) {
       console.error('❌ Erro ao carregar chegadas:', error);
+      this.nextArrivals.hideLoading();
       this.showError('Erro ao carregar informações da paragem');
     }
   }
 
-  updateBusMap(arrivals, vehicles) {
+  async updateBusMap(arrivals, vehicles, centerMap = false) {
     if (!arrivals || arrivals.length === 0) {
       this.busMarkerManager.clearAllMarkers();
+      this.currentBusPositions = [];
       return;
     }
 
-    // Filtrar e processar veículos que correspondem às chegadas
     const busesToShow = [];
     const busPositions = [];
 
-    arrivals.forEach(arrival => {
-      // Apenas tentar fazer match para chegadas em tempo real
-      if (!arrival.is_realtime) return;
-      
+    for (const arrival of arrivals) {
+      if (!arrival.is_realtime) continue;
       const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
-      
       if (vehicle) {
-        // Processar veículo usando vehicleService.processBusData()
-        const processedBus = vehicleService.processBusData(vehicle, arrival.trip_headsign);
-        
+        const processedBus = await vehicleService.processBusData(vehicle);
         if (processedBus) {
           busesToShow.push(processedBus);
           busPositions.push([processedBus.latitude, processedBus.longitude]);
         }
       }
-    });
+    }
 
-    // Atualizar marcadores de autocarros
-    if (busesToShow.length > 0) {
-      this.busMarkerManager.updateBusMarkers(busesToShow);
-
-      // Ajustar zoom do mapa para mostrar todos os autocarros
-      // IMPORTANTE: Como o painel ocupa metade inferior (50vh),
-      // precisamos ajustar o padding para centrar na metade superior
-      setTimeout(() => {
-        if (busPositions.length === 1) {
-          // Se for apenas 1 autocarro, centrar nele com zoom 16
-          this.mapManager.centerOn(busPositions[0], 16);
-        } else if (busPositions.length > 1) {
-          // Se forem vários, ajustar bounds para ver todos
-          // Padding maior em baixo para compensar o painel (50vh = ~metade do ecrã)
-          const mapHeight = this.mapManager.map.getSize().y;
-          const panelHeight = mapHeight * 0.5; // 50% do ecrã
-          
-          this.mapManager.fitBounds(busPositions, { 
-            padding: [60, 60, panelHeight + 60, 60], // top, right, bottom, left
-            maxZoom: 15
-          });
-        }
-      }, 100);
-    } else {
-      // Nenhum autocarro encontrado - limpar mapa
+    if (busesToShow.length === 0) {
       this.busMarkerManager.clearAllMarkers();
+      this.currentBusPositions = [];
+      return;
+    }
+
+    this.busMarkerManager.updateBusMarkers(busesToShow);
+    this.currentBusPositions = busPositions;
+
+    if (centerMap && !this.busMapCentered) {
+      this.busMapCentered = true;
+      setTimeout(() => this.recenterOnBuses(), 150);
+    }
+  }
+
+  recenterOnBuses() {
+    if (!this.mapManager || this.currentBusPositions.length === 0) return;
+    const mapHeight = this.mapManager.map.getSize().y;
+    const panelHeight = mapHeight * 0.5;
+    if (this.currentBusPositions.length === 1) {
+      const offsetY = Math.round(panelHeight * 0.5);
+      this.mapManager.centerOnWithOffset(this.currentBusPositions[0], 16, offsetY);
+    } else {
+      this.mapManager.fitBounds(this.currentBusPositions, {
+        paddingTopLeft: [60, 60],
+        paddingBottomRight: [60, panelHeight + 60],
+        maxZoom: 16,
+        minZoom: 13
+      });
     }
   }
 
   handleArrivalClick(data) {
     const { vehicleId, location } = data;
-
     if (!location || !this.mapManager) return;
-    
-    // Fazer zoom no autocarro (na metade superior do ecrã)
     const coords = [location.latitude, location.longitude];
-    this.mapManager.centerOn(coords, 17);
-    
-    // Abrir popup do marcador
+    const mapHeight = this.mapManager.map.getSize().y;
+    const offsetY = Math.round(mapHeight * 0.25);
+    this.mapManager.centerOnWithOffset(coords, 17, offsetY);
     const marker = this.busMarkerManager.markers[vehicleId];
-    if (marker) {
-      marker.openPopup();
-    }
+    if (marker) marker.openPopup();
   }
 
   handleRefreshArrivals() {
-    if (this.currentStopId) {
-      this.loadStopArrivals(this.currentStopId);
-    }
+    if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false);
   }
 
   handleCloseArrivals() {
-    // Parar auto-refresh
     this.stopAutoRefresh();
-    
-    // Limpar autocarros do mapa
     this.busMarkerManager.clearAllMarkers();
-    
-    // Mostrar todas as paragens novamente
-    this.stopMarkerManager.showAllMarkers();
-    
-    // Voltar à paragem que foi consultada
-    if (this.currentStopPosition) {
-      this.mapManager.centerOn(this.currentStopPosition, 16);
-    }
-    
-    // Limpar estado
+    this.busMapCentered = false;
+    this.currentBusPositions = [];
+
+    const wasSearchActive = this.isSearchActive;
+    const returnPosition = this.currentStopPosition;
+
     this.currentStopId = null;
     this.currentStopPosition = null;
+
+    if (returnPosition) {
+      this.suppressMapChangeUntil = Date.now() + 1800;
+      this.mapManager.centerOn(returnPosition, 16);
+    }
+
+    if (wasSearchActive) {
+      this._clearSearch(false, 700);
+    } else {
+      this.stopMarkerManager.showAllMarkers();
+    }
   }
+
+  // -------------------------------------------------------------------------
+  // Auto-refresh
+  // -------------------------------------------------------------------------
 
   startAutoRefresh() {
     this.stopAutoRefresh();
-    
     this.refreshInterval = setInterval(() => {
-      if (this.currentStopId) {
-        this.loadStopArrivals(this.currentStopId);
-      }
-    }, 5000); // 5 segundos
+      if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false);
+    }, 5000);
   }
 
   stopAutoRefresh() {
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-      this.refreshInterval = null;
-    }
+    if (this.refreshInterval) { clearInterval(this.refreshInterval); this.refreshInterval = null; }
   }
 
   showError(message) {
     console.error('❌', message);
-    const errorElement = document.getElementById('error-message');
-    if (errorElement) {
-      errorElement.textContent = message;
-      errorElement.classList.add('show');
-      setTimeout(() => {
-        errorElement.classList.remove('show');
-      }, 5000);
+    const el = document.getElementById('error-message');
+    if (el) {
+      el.textContent = message;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 5000);
     }
   }
 
   cleanup() {
     this.stopAutoRefresh();
     geolocationService.stopWatching();
-    
-    if (this.stopMarkerManager) {
-      this.stopMarkerManager.clearAllMarkers();
-    }
-    
-    if (this.busMarkerManager) {
-      this.busMarkerManager.clearAllMarkers();
-    }
-    
-    if (this.nextArrivals) {
-      this.nextArrivals.destroy();
-    }
-    
-    if (this.mapManager) {
-      this.mapManager.cleanup();
-    }
+    if (this.stopMarkerManager) this.stopMarkerManager.clearAllMarkers();
+    if (this.busMarkerManager) this.busMarkerManager.clearAllMarkers();
+    if (this.nextArrivals) this.nextArrivals.destroy();
+    if (this.mapManager) this.mapManager.cleanup();
   }
 }
 
-// Auto-inicializar quando DOM estiver pronto
 if (typeof window !== 'undefined') {
   const app = new StopsMapApp();
-
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => app.initialize());
   } else {
     app.initialize();
   }
-
-  // Cleanup ao sair da página
   window.addEventListener('beforeunload', () => app.cleanup());
 }

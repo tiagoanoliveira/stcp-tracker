@@ -1,14 +1,14 @@
 /**
  * Vehicle Service - Lógica centralizada de processamento de dados de autocarros
+ * Usa: scheduleService
  * Responsável por: extração de anotações, processamento de dados, matching
  */
+
+import { scheduleService } from './scheduleService.js';
 
 class VehicleService {
   /**
    * Extrair anotação de um autocarro por prefixo
-   * @param {object} bus - Objeto do autocarro
-   * @param {string} prefix - Prefixo da anotação (ex: "stcp:route:")
-   * @returns {string|null} Valor da anotação ou null
    */
   extractAnnotation(bus, prefix) {
     if (!bus.annotations || !bus.annotations.value) return null;
@@ -24,30 +24,20 @@ class VehicleService {
 
   /**
    * Extrair número da linha do autocarro
-   * @param {object} bus - Objeto do autocarro
-   * @returns {string|null}
    */
   extractLineNumber(bus) {
-    const line = this.extractAnnotation(bus, "stcp:route:");
-    if (!line) console.warn(`⚠ Linha não encontrada para autocarro ${bus.id}`);
-    return line;
+    return this.extractAnnotation(bus, "stcp:route:");
   }
 
   /**
    * Extrair sentido/direção do autocarro
-   * @param {object} bus - Objeto do autocarro
-   * @returns {string|null}
    */
   extractDirection(bus) {
-    const direction = this.extractAnnotation(bus, "stcp:sentido:");
-    if (direction === null) console.warn(`⚠ Sentido não encontrado para autocarro ${bus.id}`);
-    return direction;
+    return this.extractAnnotation(bus, "stcp:sentido:");
   }
 
   /**
    * Extrair ID da viagem (trip_id) do autocarro
-   * @param {object} bus - Objeto do autocarro
-   * @returns {string|null}
    */
   extractTripId(bus) {
     return this.extractAnnotation(bus, "stcp:nr_viagem:");
@@ -55,9 +45,6 @@ class VehicleService {
 
   /**
    * Match de um veículo com uma viagem específica
-   * @param {array} vehicles - Array de veículos
-   * @param {string} tripId - ID da viagem a procurar
-   * @returns {object|null} Veículo encontrado ou null
    */
   matchVehicleToTrip(vehicles, tripId) {
     if (!Array.isArray(vehicles) || !tripId) return null;
@@ -74,8 +61,6 @@ class VehicleService {
 
   /**
    * Extrair localização de um veículo
-   * @param {object} vehicle - Objeto do veículo
-   * @returns {object|null} Objeto com latitude, longitude, bearing, speed
    */
   extractVehicleLocation(vehicle) {
     if (!vehicle || !vehicle.location || !vehicle.location.value) {
@@ -94,21 +79,36 @@ class VehicleService {
   }
 
   /**
-   * Processar dados completos de um autocarro
+   * ⭐ ASYNC: Processar dados completos de um autocarro
+   * Agora usa API para obter destino em vez de trips.json
    * @param {object} bus - Objeto do autocarro da API
-   * @param {string} destination - Destino/headsign
-   * @returns {object|null} Objeto processado ou null se inválido
+   * @returns {Promise<object|null>} Objeto processado ou null se inválido
    */
-  processBusData(bus, destination = 'Destino Desconhecido') {
+  async processBusData(bus) {
     const line = this.extractLineNumber(bus);
     const direction = this.extractDirection(bus);
     const tripId = this.extractTripId(bus);
     const lat = bus.location?.value?.coordinates?.[1];
     const lon = bus.location?.value?.coordinates?.[0];
 
+    // Validar coordenadas
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      console.warn(`⚠ Coordenadas inválidas para autocarro ${bus.id}`);
       return null;
+    }
+
+    // Validar dados mínimos
+    if (!line || direction == null) {
+      return null;
+    }
+
+    // ✨ Obter destino via API (assíncrono)
+    let destination = 'Destino Desconhecido';
+    if (tripId && line && direction != null) {
+      try {
+        destination = await scheduleService.getHeadsignForTrip(tripId, line, direction);
+      } catch (error) {
+        console.warn(`⚠️ Erro ao obter destino para ${line}/${tripId}:`, error.message);
+      }
     }
 
     const speed = bus.speed ? bus.speed.value : 'N/A';
@@ -128,10 +128,23 @@ class VehicleService {
   }
 
   /**
-   * Verificar se um autocarro deve ser incluindo (filtro)
-   * @param {object} bus - Objeto do autocarro processado
-   * @param {string} filterValue - Valor de filtro (número da linha)
-   * @returns {boolean}
+   * ⭐ NOVO: Processar múltiplos autocarros em paralelo
+   * @param {Array} buses - Array de autocarros da API
+   * @returns {Promise<Array>} Array de autocarros processados
+   */
+  async processBusDataBatch(buses) {
+    if (!Array.isArray(buses)) return [];
+    
+    // Processar todos em paralelo
+    const promises = buses.map(bus => this.processBusData(bus));
+    const results = await Promise.all(promises);
+    
+    // Filtrar nulos
+    return results.filter(bus => bus !== null);
+  }
+
+  /**
+   * Verificar se um autocarro deve ser incluído (filtro)
    */
   shouldIncludeBus(bus, filterValue) {
     return filterValue === '' || (bus.line && bus.line.startsWith(filterValue));

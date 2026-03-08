@@ -1,6 +1,6 @@
 /**
  * BusMapApp - Aplicação principal do mapa de autocarros em tempo real
- * Usa toda a nova arquitetura: core services, map managers, ui components
+ * Usa: core services, map managers, ui components, LoadingSpinner
  */
 
 import { apiService } from '../core/apiService.js';
@@ -11,6 +11,7 @@ import { scheduleService } from '../services/scheduleService.js';
 import { MapManager } from '../map/MapManager.js';
 import { BusMarkerManager } from '../map/markers/BusMarkerManager.js';
 import { LastUpdateDisplay } from '../ui/components/LastUpdateDisplay.js';
+import { LoadingSpinner } from '../ui/components/LoadingSpinner.js';
 import { createCenterControl } from '../map/controls/CenterControl.js';
 import { createStopsControl } from '../map/controls/StopsControl.js';
 
@@ -23,11 +24,15 @@ export class BusMapApp {
     this.lastUpdateDisplay = new LastUpdateDisplay();
     this.centerControl = null;
     this.stopsControl = null;
+    this.loadingOverlay = null;
   }
 
   async initialize() {
     try {
       console.log('🚀 Inicializando BusMapApp...');
+
+      // ✨ Mostrar loading inicial
+      this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de autocarros...');
 
       // 1. Inicializar mapa
       this.mapManager = new MapManager(this.mapElementId);
@@ -51,7 +56,8 @@ export class BusMapApp {
       // 4. Inicializar bus marker manager
       this.busMarkerManager = new BusMarkerManager(this.mapManager.map);
 
-      // 5. Carregar dados de schedule (trips + calendar)
+      // 5. Carregar dados de schedule (calendar para service_id)
+      this.loadingOverlay.update('A carregar calendário...');
       await scheduleService.loadScheduleData();
       console.log('✓ Dados de horários carregados');
 
@@ -65,7 +71,12 @@ export class BusMapApp {
       this.lastUpdateDisplay.initialize();
 
       // 9. Primeira busca de dados
+      this.loadingOverlay.update('A carregar autocarros...');
       await this.fetchAndUpdateBuses();
+
+      // ✨ Remover loading
+      this.loadingOverlay.remove();
+      this.loadingOverlay = null;
 
       // 10. Iniciar auto-refresh
       this.startAutoRefresh();
@@ -73,6 +84,9 @@ export class BusMapApp {
       console.log('✅ BusMapApp inicializado com sucesso');
     } catch (error) {
       console.error('❌ Erro na inicialização:', error);
+      if (this.loadingOverlay) {
+        this.loadingOverlay.remove();
+      }
       this.showError('Erro ao inicializar aplicação');
     }
   }
@@ -84,7 +98,7 @@ export class BusMapApp {
         this.mapManager.updateUserMarker(position);
       })
       .catch(error => {
-        console.warn('⚠ Não foi possível obter localização:', error.message);
+        console.warn('⚠️ Não foi possível obter localização:', error.message);
       });
   }
 
@@ -114,47 +128,32 @@ export class BusMapApp {
       // 1. Fetch dados da API FIWARE
       const rawBusData = await apiService.fetchBusData();
       if (!Array.isArray(rawBusData) || rawBusData.length === 0) {
-        console.warn('⚠ Nenhum autocarro encontrado');
+        console.warn('⚠️ Nenhum autocarro encontrado');
         this.busMarkerManager.clearAllMarkers();
         this.lastUpdateDisplay.update();
         return;
       }
 
-      // 2. Processar dados de cada autocarro
-      const processedBuses = rawBusData
-        .map(bus => this.processBus(bus))
-        .filter(bus => bus && vehicleService.shouldIncludeBus(bus, filterValue));
+      // 2. ✨ Processar dados de todos os autocarros de forma assíncrona (batch)
+      const processedBuses = await vehicleService.processBusDataBatch(rawBusData);
+      
+      // 3. Aplicar filtro se existir
+      const filteredBuses = processedBuses.filter(bus => 
+        vehicleService.shouldIncludeBus(bus, filterValue)
+      );
 
-      console.log(`✓ ${processedBuses.length} autocarros processados`);
+      console.log(`✓ ${filteredBuses.length} autocarros processados`);
 
-      // 3. Atualizar marcadores no mapa
-      this.busMarkerManager.updateBusMarkers(processedBuses);
+      // 4. Atualizar marcadores no mapa
+      this.busMarkerManager.updateBusMarkers(filteredBuses);
 
-      // 4. Atualizar timestamp
+      // 5. Atualizar timestamp
       this.lastUpdateDisplay.update();
 
       console.log('✅ Mapa atualizado com sucesso');
     } catch (error) {
       console.error('❌ Erro ao atualizar autocarros:', error);
       this.showError('Erro ao obter dados dos autocarros');
-    }
-  }
-
-  processBus(bus) {
-    try {
-      // Extrair informações básicas
-      const line = vehicleService.extractLineNumber(bus);
-      const direction = vehicleService.extractDirection(bus);
-      const tripId = vehicleService.extractTripId(bus);
-
-      // Obter destino usando scheduleService
-      const destination = scheduleService.getDestination(line, direction);
-
-      // Processar dados completos
-      return vehicleService.processBusData(bus, destination);
-    } catch (error) {
-      console.warn(`⚠ Erro ao processar autocarro ${bus.id}:`, error);
-      return null;
     }
   }
 
@@ -179,7 +178,7 @@ export class BusMapApp {
     if (this.mapManager) {
       this.mapManager.cleanup();
     }
-    console.log('🗑 BusMapApp cleanup concluído');
+    console.log('🗑️ BusMapApp cleanup concluído');
   }
 }
 

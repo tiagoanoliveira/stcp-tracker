@@ -4,6 +4,7 @@
  */
 
 import { vehicleService } from '../../services/vehicleService.js';
+import { LoadingSpinner } from './LoadingSpinner.js';
 
 export class NextArrivals {
   constructor() {
@@ -13,6 +14,7 @@ export class NextArrivals {
     this.onCloseCallback = null;
     this.onRefreshCallback = null;
     this.currentStopId = null;
+    this.loadingSpinner = null;
   }
 
   create() {
@@ -38,8 +40,8 @@ export class NextArrivals {
         </button>
       </div>
       <div class="next-arrivals-content">
-        <div id="arrivals-list-panel" class="arrivals-list-panel">
-          <p class="loading-message">A carregar...</p>
+        <div id="arrivals-list-panel" class="arrivals-list-panel panel-loading">
+          <!-- Loading spinner appears here -->
         </div>
       </div>
       <div class="next-arrivals-footer">
@@ -65,6 +67,7 @@ export class NextArrivals {
     refreshBtn.addEventListener('click', () => {
       if (this.onRefreshCallback) {
         refreshBtn.classList.add('refreshing');
+        this.showLoading('A atualizar...');
         this.onRefreshCallback();
         setTimeout(() => refreshBtn.classList.remove('refreshing'), 1000);
       }
@@ -78,6 +81,42 @@ export class NextArrivals {
     });
 
     return sheet;
+  }
+
+  /**
+   * ⭐ NOVO: Mostrar loading spinner
+   */
+  showLoading(message = 'A carregar próximas chegadas...') {
+    if (!this.element) return;
+    
+    const listContainer = this.element.querySelector('#arrivals-list-panel');
+    listContainer.classList.add('panel-loading');
+    
+    // Criar spinner se não existir
+    if (!this.loadingSpinner) {
+      this.loadingSpinner = new LoadingSpinner({
+        size: 'medium',
+        message
+      });
+    } else {
+      this.loadingSpinner.setMessage(message);
+    }
+    
+    this.loadingSpinner.show(listContainer);
+  }
+
+  /**
+   * ⭐ NOVO: Esconder loading spinner
+   */
+  hideLoading() {
+    if (!this.element) return;
+    
+    const listContainer = this.element.querySelector('#arrivals-list-panel');
+    listContainer.classList.remove('panel-loading');
+    
+    if (this.loadingSpinner) {
+      this.loadingSpinner.remove();
+    }
   }
 
   show(stopName, stopId = null) {
@@ -98,6 +137,9 @@ export class NextArrivals {
       codeElement.textContent = `Código: ${stopId}`;
     }
 
+    // ✨ Mostrar loading ao abrir
+    this.showLoading();
+
     this.element.classList.add('visible');
     this.isVisible = true;
   }
@@ -108,6 +150,9 @@ export class NextArrivals {
       this.isVisible = false;
       this.currentStopId = null;
 
+      // Limpar loading ao fechar
+      this.hideLoading();
+
       if (this.onCloseCallback) {
         this.onCloseCallback();
       }
@@ -116,6 +161,9 @@ export class NextArrivals {
 
   setArrivals(arrivals, vehicles) {
     if (!this.element) return;
+
+    // ✨ Esconder loading
+    this.hideLoading();
 
     const listContainer = this.element.querySelector('#arrivals-list-panel');
     
@@ -362,6 +410,10 @@ export class NextArrivals {
     if (this.element) {
       this.element.remove();
       this.element = null;
+    }
+    if (this.loadingSpinner) {
+      this.loadingSpinner.remove();
+      this.loadingSpinner = null;
     }
   }
 }
