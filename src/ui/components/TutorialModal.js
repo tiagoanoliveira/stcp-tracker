@@ -18,7 +18,7 @@ const STEPS = {
     {
       icon: IMG('favicon.svg', 'STCP Live'),
       title: 'Bem-vindo ao STCP Live!',
-      body: 'Este mapa mostra a localização em <strong>tempo real</strong> de todos os autocarros STCP no Porto. Os marcadores actualizam-se automaticamente a cada 5 segundos.'
+      body: 'Este mapa mostra a localização em <strong>tempo real</strong> de todos os autocarros STCP no Porto. Os autocarros actualizam-se automaticamente a cada 5 segundos - ou assim que as novas localizações forem fornecidas.'
     },
     {
       icon: IMG('busmap.png', 'Mapa de autocarros'),
@@ -49,6 +49,11 @@ const STEPS = {
       icon: '\uD83C\uDF19',
       title: 'Linhas nocturnas',
       body: 'As linhas nocturnas (identificadas com <strong>M</strong>) só aparecem nos filtros entre as <strong>00:30 e as 06:30</strong>. As linhas diurnas são ocultadas entre as 01:30 e as 05:30.'
+    },
+    {
+      icon: '\uD83E\uDEF6',
+      title: 'Agradecimento',
+      body: 'O desenvolvedor desta aplicação espera que a mesma facilite a tua rotina. Podes <a href="https://tiagoanoliveira.pt/support/a260e7bee11b401b9fd09290e8a8d6d9"><strong>agradecer, sugerir melhorias ou reportar problemas</strong> em 30s <strong>aqui</strong></a>. Obrigado! 🤍'
     }
   ],
   stopsmap: [
@@ -86,6 +91,11 @@ const STEPS = {
       icon: '\uD83D\uDD17',
       title: 'Links directos',
       body: 'O URL actualiza-se automaticamente quando abres uma paragem. Copia o link e partilha-o — quem o abrir verá directamente as chegadas dessa paragem. No telemóvel usa <em>"Adicionar ao ecrã inicial"</em>.'
+    },
+    {
+      icon: '\uD83E\uDEF6',
+      title: 'Agradecimento',
+      body: 'O desenvolvedor desta aplicação espera que a mesma facilite a tua rotina. Podes <a href="https://tiagoanoliveira.pt/support/a260e7bee11b401b9fd09290e8a8d6d9"><strong>agradecer, sugerir melhorias ou reportar problemas</strong> em 30s <strong>aqui</strong></a>. Obrigado! 🤍'
     }
   ]
 };
