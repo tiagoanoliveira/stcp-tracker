@@ -1,33 +1,24 @@
 /* =========================================================
    RouteFilterBar — barra de chips de linha
    Integra-se de forma transparente em qualquer container:
-   - index.html      : dentro de .header-overlay (pill frosted-glass)
-   - stopsmap.html   : dentro de .search-overlay  (abaixo do input)
+   - index.html    : dentro de .header-overlay (pill horizontal frosted-glass)
+   - stopsmap.html : dentro de .search-overlay (coluna, abaixo do input)
    ========================================================= */
 
-/* O wrapper #route-filter-bar não deve ter fundo, borda nem sombra próprios.
-   Toda a aparência vem do container pai. */
+/* Wrapper base: sem fundo, borda nem sombra próprios */
 #route-filter-bar {
-  /* sem background, sem border, sem box-shadow */
   display: flex;
   align-items: center;
 }
 
-/* Dentro do .header-overlay (index.html):
-   adiciona separador visual à esquerda e alinha na linha do header */
+/* Dentro do .header-overlay (index.html)
+   Aparece na mesma linha que o timestamp e o botão de refresh,
+   separado por uma linha fina à esquerda. */
 .header-overlay #route-filter-bar {
   border-left: 1px solid rgba(255, 255, 255, 0.35);
   padding-left: 10px;
-  height: 44px;        /* mesma altura dos outros elementos do header */
+  height: 44px;
   align-self: center;
-}
-
-/* Dentro do .search-overlay (stopsmap.html):
-   ocupa toda a largura e tem um separador visual no topo */
-.search-overlay #route-filter-bar {
-  width: 100%;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 4px 0 2px;
 }
 
 /* ---- Inner layout ---- */
@@ -50,7 +41,7 @@
   flex-shrink: 0;
 }
 
-/* Dentro do header o label fica branco/translucido */
+/* Label branco dentro do header pill */
 .header-overlay .rfb-label {
   color: rgba(255, 255, 255, 0.7);
 }
@@ -100,9 +91,7 @@
   white-space: nowrap;
   line-height: 1.4;
 }
-.rfb-chip.active .rfb-chip-main {
-  padding-right: 6px;
-}
+.rfb-chip.active .rfb-chip-main { padding-right: 6px; }
 
 /* ---- Botão de direcção (→ / ←) ---- */
 .rfb-chip-dir {
@@ -115,9 +104,7 @@
   line-height: 1.4;
   transition: filter .15s;
 }
-.rfb-chip-dir:hover {
-  filter: brightness(1.15);
-}
+.rfb-chip-dir:hover { filter: brightness(1.15); }
 
 /* ---- Loading / vazio ---- */
 .rfb-loading,
@@ -132,7 +119,7 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
-/* ---- Disabled (painel de chegadas aberto) ---- */
+/* ---- Disabled ---- */
 #route-filter-bar[data-disabled="true"] {
   opacity: 0.4;
   pointer-events: none;

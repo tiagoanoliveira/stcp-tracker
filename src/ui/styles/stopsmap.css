@@ -2,18 +2,20 @@
  * StopsMap CSS - Barra de pesquisa e estilos específicos do mapa de paragens
  */
 
-/* Logo como link - sem sublinhado, cursor pointer */
+/* Logo como link */
 a.logo-overlay {
   text-decoration: none;
   cursor: pointer;
   transition: opacity 0.15s ease;
 }
+a.logo-overlay:hover { opacity: 0.85; }
 
-a.logo-overlay:hover {
-  opacity: 0.85;
-}
-
-/* Barra de pesquisa - abaixo do logo e menu, centrada */
+/* -----------------------------------------------------------------------
+   Barra de pesquisa
+   Layout: coluna flexível
+     linha 1 → .search-input-wrapper  (input com ícone e botão ×)
+     linha 2 → #route-filter-bar      (chips de linha, só quando há chips)
+   ----------------------------------------------------------------------- */
 .search-overlay {
   position: absolute;
   top: 20px;
@@ -21,8 +23,12 @@ a.logo-overlay:hover {
   margin-left: 20px;
   transform: translateX(-50%);
   z-index: 1000;
+
   display: flex;
-  align-items: center;
+  flex-direction: column;       /* ← coluna: input em cima, chips em baixo */
+  align-items: stretch;
+  gap: 0;
+
   padding: 6px 12px;
   background-color: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(10px);
@@ -32,19 +38,20 @@ a.logo-overlay:hover {
   border: 1px solid rgba(255, 255, 255, 0.2);
   min-width: 400px;
   max-width: 600px;
-  height: 56px;
+  /* height: auto – deixar crescer conforme o conteúdo */
 }
 
+/* Linha 1: wrapper do input */
 .search-input-wrapper {
-  flex: 1;
-  position: relative;
   display: flex;
   align-items: center;
+  height: 44px;               /* altura fixa da linha do input */
+  position: relative;
 }
 
 .search-input {
   width: 100%;
-  padding: 10px 44px 10px 40px; /* direita: espaço para botão × */
+  padding: 10px 44px 10px 40px;
   background-color: rgba(255, 255, 255, 0.95);
   border: none;
   border-radius: 22px;
@@ -56,15 +63,11 @@ a.logo-overlay:hover {
   height: 44px;
   box-sizing: border-box;
 }
-
 .search-input:focus {
   background-color: #fff;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
-
-.search-input::placeholder {
-  color: #999;
-}
+.search-input::placeholder { color: #999; }
 
 .search-icon {
   position: absolute;
@@ -79,7 +82,7 @@ a.logo-overlay:hover {
   z-index: 1;
 }
 
-/* Botão de limpar pesquisa (×) */
+/* Botão × */
 .search-clear-btn {
   position: absolute;
   right: 8px;
@@ -91,47 +94,37 @@ a.logo-overlay:hover {
   background: rgba(0, 0, 0, 0.12);
   border-radius: 50%;
   cursor: pointer;
-  display: none; /* escondido por defeito; JS muda para flex */
+  display: none;
   align-items: center;
   justify-content: center;
   padding: 0;
   flex-shrink: 0;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s, color 0.15s;
   color: #555;
   z-index: 2;
 }
+.search-clear-btn:hover { background: rgba(0, 0, 0, 0.22); color: #111; }
+.search-clear-btn svg { width: 12px; height: 12px; pointer-events: none; }
 
-.search-clear-btn:hover {
-  background: rgba(0, 0, 0, 0.22);
-  color: #111;
-}
-
-.search-clear-btn svg {
-  width: 12px;
-  height: 12px;
-  pointer-events: none;
+/* Linha 2: chips de linha (só visível quando o JS injeta conteúdo) */
+.search-overlay #route-filter-bar {
+  /* ocupa toda a largura do pill */
+  width: 100%;
+  /* separador subtil entre o input e os chips */
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  margin-top: 4px;
+  padding-top: 4px;
+  padding-bottom: 2px;
+  /* escondido enquanto vazio; JS/RouteFilterBar deve adicionar conteúdo */
+  display: flex;
+  align-items: center;
 }
 
 /* Popup das paragens */
-.stop-popup {
-  font-family: inherit;
-  padding: 4px 0;
-}
-
-.stop-popup strong {
-  color: #0072c6;
-  font-size: 15px;
-}
-
-.stop-popup a {
-  color: #0072c6;
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.stop-popup a:hover {
-  text-decoration: underline;
-}
+.stop-popup { font-family: inherit; padding: 4px 0; }
+.stop-popup strong { color: #0072c6; font-size: 15px; }
+.stop-popup a { color: #0072c6; text-decoration: none; font-weight: 500; }
+.stop-popup a:hover { text-decoration: underline; }
 
 /* Responsive - Tablet */
 @media (max-width: 768px) {
@@ -139,10 +132,9 @@ a.logo-overlay:hover {
     top: 12px;
     min-width: 300px;
     max-width: 500px;
-    height: 48px;
     padding: 4px 8px;
   }
-
+  .search-input-wrapper { height: 40px; }
   .search-input {
     font-size: 13px;
     padding: 8px 40px 8px 38px;
@@ -156,26 +148,15 @@ a.logo-overlay:hover {
     top: 12px;
     min-width: calc(90% - 44px);
     max-width: calc(90% - 44px);
-    height: 44px;
     padding: 4px;
     margin-left: 25px;
   }
-
+  .search-input-wrapper { height: 36px; }
   .search-input {
     font-size: 12px;
     padding: 8px 40px 8px 36px;
     height: 36px;
   }
-
-  .search-icon {
-    width: 16px;
-    height: 16px;
-    left: 12px;
-  }
-
-  .search-clear-btn {
-    width: 22px;
-    height: 22px;
-    right: 6px;
-  }
+  .search-icon { width: 16px; height: 16px; left: 12px; }
+  .search-clear-btn { width: 22px; height: 22px; right: 6px; }
 }
