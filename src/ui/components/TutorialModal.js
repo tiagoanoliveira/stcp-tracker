@@ -6,22 +6,27 @@
  *   t.mount();
  *   t.showIfFirstVisit();  // mostra automaticamente na 1.ª visita
  *   t.open();              // abre manualmente (botão ?)
+ *
+ * O campo `icon` de cada step aceita HTML (ex: <img>) ou texto/emoji.
  */
+
+const IMG = (src, alt = '') =>
+  `<img src="./resources/${src}" alt="${alt}" class="tut-icon-img">`;
 
 const STEPS = {
   busmap: [
     {
-      icon: '\uD83D\uDE8C',
+      icon: IMG('favicon.svg', 'STCP Live'),
       title: 'Bem-vindo ao STCP Live!',
       body: 'Este mapa mostra a localização em <strong>tempo real</strong> de todos os autocarros STCP no Porto. Os marcadores actualizam-se automaticamente a cada 5 segundos.'
     },
     {
-      icon: '\uD83D\uDDF3\uFE0F',
+      icon: IMG('busmap.png', 'Mapa de autocarros'),
       title: 'Filtrar por linha',
       body: 'Usa a barra de linhas no topo para ver apenas os autocarros de uma linha específica. Clica na seta \u2192/\u2190 no chip para alternar entre o sentido de ida e de volta.'
     },
     {
-      icon: '\uD83D\uDEBE',
+      icon: IMG('paragem.png', 'Paragem'),
       title: 'Mapa de paragens',
       body: 'No canto inferior esquerdo encontras o botão <strong>"Paragens"</strong>. Clica nele para aceder ao mapa de todas as paragens STCP — o mapa centra-se automaticamente na tua localização.'
     },
@@ -48,7 +53,7 @@ const STEPS = {
   ],
   stopsmap: [
     {
-      icon: '\uD83D\uDEBF',
+      icon: IMG('favicon.svg', 'STCP Live'),
       title: 'Bem-vindo ao mapa de paragens!',
       body: 'Aqui podes explorar todas as paragens STCP do Porto. O mapa centra-se automaticamente na tua localização e mostra as paragens mais próximas da área visível.'
     },
@@ -63,12 +68,12 @@ const STEPS = {
       body: 'A barra de linhas no topo mostra as paragens e o percurso de uma linha específica no mapa. Usa a seta \u2192/\u2190 para ver a ida ou a volta.'
     },
     {
-      icon: '\uD83D\uDE8C',
+      icon: IMG('busmap.png', 'Mapa de autocarros'),
       title: 'Mapa de autocarros em tempo real',
       body: 'No canto inferior esquerdo encontras o botão <strong>"Autocarros"</strong>. Clica nele para aceder ao mapa de localização em tempo real de todos os autocarros STCP — o mapa centra-se automaticamente na tua localização.'
     },
     {
-      icon: '\uD83D\uDCCD',
+      icon: IMG('paragem.png', 'Paragem'),
       title: 'Próximas chegadas',
       body: 'Clica em qualquer paragem — ou em <em>"Próximos autocarros"</em> no popup — para ver as próximas chegadas em tempo real com o estado de cada autocarro.'
     },
@@ -183,7 +188,14 @@ export class TutorialModal {
     const last  = this.current === this.steps.length - 1;
     const first = this.current === 0;
 
-    this.element.querySelector('#tut-icon').textContent  = step.icon;
+    // icon suporta HTML (imagens) ou texto/emoji
+    const iconEl = this.element.querySelector('#tut-icon');
+    if (step.icon.trimStart().startsWith('<')) {
+      iconEl.innerHTML = step.icon;
+    } else {
+      iconEl.textContent = step.icon;
+    }
+
     this.element.querySelector('#tut-title').textContent = step.title;
     this.element.querySelector('#tut-body').innerHTML    = step.body;
 
