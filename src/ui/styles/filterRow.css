@@ -55,9 +55,8 @@
   #filter-row {
     height: 44px;
     padding: 4px 10px;
+    top: 70px;
   }
-  .busmap-filter-row   { top: 72px;  } /* 12 + 48 + 12 */
-  .stopsmap-filter-row { top: 80px;  }
 }
 
 /* Mobile */
@@ -65,7 +64,6 @@
   #filter-row {
     height: 40px;
     padding: 3px 10px;
+    top: 65px;
   }
-  .busmap-filter-row   { top: 68px;  } /* 12 + 44 + 12 */
-  .stopsmap-filter-row { top: 76px;  }
 }
