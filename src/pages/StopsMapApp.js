@@ -15,10 +15,12 @@ import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
 import { LineOverlayManager }     from '../map/LineOverlayManager.js';
 import { createCenterControl }    from '../map/controls/CenterControl.js';
 import { createBusMapControl }    from '../map/controls/BusMapControl.js';
+import { createTutorialControl }  from '../map/controls/TutorialControl.js';
 import { NextArrivals }           from '../ui/components/NextArrivals.js';
 import { LoadingSpinner }         from '../ui/components/LoadingSpinner.js';
 import { RouteFilterBar }         from '../ui/components/RouteFilterBar.js';
 import { FavouritesPanel }        from '../ui/components/FavouritesPanel.js';
+import { TutorialModal }          from '../ui/components/TutorialModal.js';
 import { favouritesManager }      from '../services/FavouritesManager.js';
 import { iconCache }              from '../ui/design/iconCache.js';
 
@@ -31,8 +33,10 @@ export class StopsMapApp {
     this.lineOverlayManager  = null;
     this.routeFilterBar      = null;
     this.favouritesPanel     = null;
+    this.tutorialModal       = null;
     this.centerControl       = null;
     this.busMapControl       = null;
+    this.tutorialControl     = null;
     this.nextArrivals        = null;
     this.loadingOverlay      = null;
 
@@ -68,12 +72,20 @@ export class StopsMapApp {
 
       this.centerControl = createCenterControl(this.mapManager.map, () => this.mapManager.getUserPosition());
       this.centerControl.addTo(this.mapManager.map);
+
       this.busMapControl = createBusMapControl(this.mapManager.map);
       this.busMapControl.addTo(this.mapManager.map);
+
+      this.tutorialControl = createTutorialControl(this.mapManager.map, () => this.tutorialModal?.open());
+      this.tutorialControl.addTo(this.mapManager.map);
 
       this.stopMarkerManager  = new StopMarkerManager(this.mapManager.map);
       this.busMarkerManager   = new BusMarkerManager(this.mapManager.map);
       this.lineOverlayManager = new LineOverlayManager(this.mapManager.map);
+
+      // Tutorial
+      this.tutorialModal = new TutorialModal({ page: 'stopsmap' });
+      this.tutorialModal.mount();
 
       this.nextArrivals = new NextArrivals();
       this.nextArrivals.create();
@@ -108,6 +120,10 @@ export class StopsMapApp {
 
       this.loadingOverlay.remove();
       this.loadingOverlay = null;
+
+      // Mostrar tutorial na primeira visita
+      this.tutorialModal.showIfFirstVisit();
+
     } catch (error) {
       console.error('\u274C Erro na inicializa\u00e7\u00e3o:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();
@@ -187,10 +203,6 @@ export class StopsMapApp {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Deep-link
-  // ---------------------------------------------------------------------------
-
   async _handleDeepLink() {
     const params  = new URLSearchParams(window.location.search);
     const stopId  = params.get('stop');
@@ -238,10 +250,6 @@ export class StopsMapApp {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Filtro GLOBAL de linhas (Modo A)
-  // ---------------------------------------------------------------------------
-
   async _handleGlobalRouteFilterChange(selected, routeObjs) {
     if (this.nextArrivals?.isVisible && !this._deepLinkInProgress) return;
 
@@ -284,10 +292,6 @@ export class StopsMapApp {
     el.title            = disabled ? 'Feche o painel de chegadas para usar o filtro de linhas' : '';
   }
 
-  // ---------------------------------------------------------------------------
-  // Pesquisa
-  // ---------------------------------------------------------------------------
-
   async handleSearch() {
     const searchInput = document.getElementById('stop-search');
     const query = searchInput.value.trim();
@@ -316,10 +320,6 @@ export class StopsMapApp {
   }
 
   handleClearSearch() { this._clearSearch(true, 0); }
-
-  // ---------------------------------------------------------------------------
-  // Paragem / Chegadas
-  // ---------------------------------------------------------------------------
 
   async handleStopClick(stop) {
     this.stopAutoRefresh();
@@ -411,10 +411,6 @@ export class StopsMapApp {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Filtro de linhas no painel de chegadas (Modo B)
-  // ---------------------------------------------------------------------------
-
   async handleArrivalFilterChange(selectedRoutes) {
     const visiblePositions = this.busMarkerManager.filterByRoutes(selectedRoutes);
     if (selectedRoutes.size === 0) {
@@ -477,10 +473,6 @@ export class StopsMapApp {
     } else { this.stopMarkerManager.showAllMarkers(); }
   }
 
-  // ---------------------------------------------------------------------------
-  // Favoritos
-  // ---------------------------------------------------------------------------
-
   _toggleFavourite(stopId) {
     if (!stopId) return;
     const name    = this.currentStopName || `Paragem ${stopId}`;
@@ -497,10 +489,6 @@ export class StopsMapApp {
     this.favouritesPanel.refresh();
     if (added) { this.favouritesPanel.open(); setTimeout(() => this.favouritesPanel.close(), 1800); }
   }
-
-  // ---------------------------------------------------------------------------
-  // Auto-refresh
-  // ---------------------------------------------------------------------------
 
   startAutoRefresh() {
     this.stopAutoRefresh();
@@ -528,6 +516,7 @@ export class StopsMapApp {
     if (this.routeFilterBar)     this.routeFilterBar.destroy();
     if (this.nextArrivals)       this.nextArrivals.destroy();
     if (this.favouritesPanel)    this.favouritesPanel.destroy();
+    if (this.tutorialModal)      this.tutorialModal.destroy();
     if (this.mapManager)         this.mapManager.cleanup();
   }
 }

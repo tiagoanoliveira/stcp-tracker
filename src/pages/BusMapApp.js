@@ -1,7 +1,5 @@
 /**
  * BusMapApp - Mapa de autocarros em tempo real
- *
- * Deep-link: ?stop=<stop_id>[&line=<route_number>[&dir=<0|1>]]
  */
 
 import { apiService }             from '../core/apiService.js';
@@ -20,8 +18,10 @@ import { RouteFilterBar }         from '../ui/components/RouteFilterBar.js';
 import { NextArrivals }           from '../ui/components/NextArrivals.js';
 import { FavouritesPanel }        from '../ui/components/FavouritesPanel.js';
 import { favouritesManager }      from '../services/FavouritesManager.js';
+import { TutorialModal }          from '../ui/components/TutorialModal.js';
 import { createCenterControl }    from '../map/controls/CenterControl.js';
 import { createStopsControl }     from '../map/controls/StopsControl.js';
+import { createTutorialControl }  from '../map/controls/TutorialControl.js';
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -34,9 +34,11 @@ export class BusMapApp {
     this.routeFilterBar     = null;
     this.nextArrivals       = null;
     this.favouritesPanel    = null;
+    this.tutorialModal      = null;
     this.lastUpdateDisplay  = new LastUpdateDisplay();
     this.centerControl      = null;
     this.stopsControl       = null;
+    this.tutorialControl    = null;
     this.loadingOverlay     = null;
 
     this._selectedRoutes    = new Set();
@@ -61,13 +63,22 @@ export class BusMapApp {
       this.mapManager.initialize();
       await this.mapManager.waitForReady();
 
+      // Controlos do mapa (ordem = ordem visual de baixo para cima, bottomleft)
       this.centerControl = createCenterControl(this.mapManager.map, () => this.mapManager.getUserPosition());
       this.centerControl.addTo(this.mapManager.map);
+
       this.stopsControl = createStopsControl(this.mapManager.map);
       this.stopsControl.addTo(this.mapManager.map);
 
+      this.tutorialControl = createTutorialControl(this.mapManager.map, () => this.tutorialModal?.open());
+      this.tutorialControl.addTo(this.mapManager.map);
+
       this.busMarkerManager   = new BusMarkerManager(this.mapManager.map);
       this.lineOverlayManager = new LineOverlayManager(this.mapManager.map);
+
+      // Tutorial
+      this.tutorialModal = new TutorialModal({ page: 'busmap' });
+      this.tutorialModal.mount();
 
       this.nextArrivals = new NextArrivals();
       this.nextArrivals.create();
@@ -105,6 +116,9 @@ export class BusMapApp {
       this.startAutoRefresh();
       await this._handleDeepLink();
 
+      // Mostrar tutorial na primeira visita (após tudo carregado)
+      this.tutorialModal.showIfFirstVisit();
+
     } catch (error) {
       console.error('\u274C Erro na inicializa\u00e7\u00e3o:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();
@@ -126,10 +140,6 @@ export class BusMapApp {
   startAutoRefresh() {
     autoRefreshManager.start('bus-map', () => this.fetchAndUpdateBuses(), this.refreshInterval);
   }
-
-  // ---------------------------------------------------------------------------
-  // Deep-link
-  // ---------------------------------------------------------------------------
 
   async _handleDeepLink() {
     const params  = new URLSearchParams(window.location.search);
@@ -178,10 +188,6 @@ export class BusMapApp {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Fetch + update de autocarros
-  // ---------------------------------------------------------------------------
-
   async fetchAndUpdateBuses() {
     try {
       const rawBusData = await apiService.fetchBusData();
@@ -204,10 +210,6 @@ export class BusMapApp {
       this.showError('Erro ao obter dados dos autocarros');
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Filtro de linhas
-  // ---------------------------------------------------------------------------
 
   async _handleRouteFilterChange(selected, routeObjs) {
     this._selectedRoutes = selected;
@@ -238,10 +240,6 @@ export class BusMapApp {
       this.lineOverlayManager.fitBounds();
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Painel de próximas chegadas
-  // ---------------------------------------------------------------------------
 
   async _handleStopClick(stop) {
     this._stopArrivalsRefresh();
@@ -336,10 +334,6 @@ export class BusMapApp {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Favoritos
-  // ---------------------------------------------------------------------------
-
   _toggleFavourite(stopId) {
     if (!stopId) return;
     const name    = this._currentStopName || `Paragem ${stopId}`;
@@ -352,13 +346,8 @@ export class BusMapApp {
     });
     this.nextArrivals.refreshFavouriteBtn();
     this.favouritesPanel.refresh();
-    // Abrir o drawer brevemente para confirmar
     if (added) { this.favouritesPanel.open(); setTimeout(() => this.favouritesPanel.close(), 1800); }
   }
-
-  // ---------------------------------------------------------------------------
-  // Auto-refresh das chegadas
-  // ---------------------------------------------------------------------------
 
   _startArrivalsRefresh() {
     this._stopArrivalsRefresh();
@@ -370,10 +359,6 @@ export class BusMapApp {
   _stopArrivalsRefresh() {
     if (this._arrivalsRefreshInterval) { clearInterval(this._arrivalsRefreshInterval); this._arrivalsRefreshInterval = null; }
   }
-
-  // ---------------------------------------------------------------------------
-  // URL sync
-  // ---------------------------------------------------------------------------
 
   _pushStopToURL(stopId) {
     const params = new URLSearchParams(window.location.search);
@@ -387,10 +372,6 @@ export class BusMapApp {
     const qs = params.toString();
     window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
   }
-
-  // ---------------------------------------------------------------------------
-  // Utils de mapa
-  // ---------------------------------------------------------------------------
 
   _fitToPositions(positions) {
     if (!this.mapManager || positions.length === 0) return;
@@ -420,6 +401,7 @@ export class BusMapApp {
     if (this.routeFilterBar)     this.routeFilterBar.destroy();
     if (this.nextArrivals)       this.nextArrivals.destroy();
     if (this.favouritesPanel)    this.favouritesPanel.destroy();
+    if (this.tutorialModal)      this.tutorialModal.destroy();
     if (this.mapManager)         this.mapManager.cleanup();
   }
 }
