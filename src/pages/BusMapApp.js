@@ -1,26 +1,27 @@
 /**
  * BusMapApp - Mapa de autocarros em tempo real
  *
- * Fase 5: painel de próximas chegadas acessível a partir dos markers
- *         de paragem desenhados pelas overlays de linha.
+ * Deep-link: ?stop=<stop_id>[&line=<route_number>[&dir=<0|1>]]
+ * Abre automaticamente o painel de chegadas da paragem indicada,
+ * com o filtro de linha pré-seleccionado se especificado.
  */
 
-import { apiService }            from '../core/apiService.js';
-import { geolocationService }    from '../core/geolocationService.js';
-import { autoRefreshManager }    from '../core/autoRefreshManager.js';
-import { vehicleService }        from '../services/vehicleService.js';
-import { routeService }          from '../services/routeService.js';
-import { scheduleService }       from '../services/scheduleService.js';
+import { apiService }             from '../core/apiService.js';
+import { geolocationService }     from '../core/geolocationService.js';
+import { autoRefreshManager }     from '../core/autoRefreshManager.js';
+import { vehicleService }         from '../services/vehicleService.js';
+import { routeService }           from '../services/routeService.js';
+import { scheduleService }        from '../services/scheduleService.js';
 import { plannedArrivalsService } from '../services/plannedArrivalsService.js';
-import { MapManager }            from '../map/MapManager.js';
-import { BusMarkerManager }      from '../map/markers/BusMarkerManager.js';
-import { LineOverlayManager }    from '../map/LineOverlayManager.js';
-import { LastUpdateDisplay }     from '../ui/components/LastUpdateDisplay.js';
-import { LoadingSpinner }        from '../ui/components/LoadingSpinner.js';
-import { RouteFilterBar }        from '../ui/components/RouteFilterBar.js';
-import { NextArrivals }          from '../ui/components/NextArrivals.js';
-import { createCenterControl }   from '../map/controls/CenterControl.js';
-import { createStopsControl }    from '../map/controls/StopsControl.js';
+import { MapManager }             from '../map/MapManager.js';
+import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
+import { LineOverlayManager }     from '../map/LineOverlayManager.js';
+import { LastUpdateDisplay }      from '../ui/components/LastUpdateDisplay.js';
+import { LoadingSpinner }         from '../ui/components/LoadingSpinner.js';
+import { RouteFilterBar }         from '../ui/components/RouteFilterBar.js';
+import { NextArrivals }           from '../ui/components/NextArrivals.js';
+import { createCenterControl }    from '../map/controls/CenterControl.js';
+import { createStopsControl }     from '../map/controls/StopsControl.js';
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -41,7 +42,6 @@ export class BusMapApp {
     this._routeDirMap       = new Map();
     this._allProcessedBuses = [];
 
-    // Estado do painel de chegadas
     this._arrivalsRefreshInterval = null;
     this._currentStopId           = null;
     this._currentStopPosition     = null;
@@ -58,7 +58,6 @@ export class BusMapApp {
       console.log('\uD83D\uDE80 Inicializando BusMapApp...');
       this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de autocarros...');
 
-      // Carregar dados de horários (necessário para próximas chegadas)
       await scheduleService.loadScheduleData();
 
       this.mapManager = new MapManager(this.mapElementId);
@@ -73,17 +72,14 @@ export class BusMapApp {
       this.busMarkerManager   = new BusMarkerManager(this.mapManager.map);
       this.lineOverlayManager = new LineOverlayManager(this.mapManager.map);
 
-      // Painel de próximas chegadas
       this.nextArrivals = new NextArrivals();
       this.nextArrivals.create();
-      this.nextArrivals.onArrivalClick(data  => this._handleArrivalClick(data));
-      this.nextArrivals.onClose(()           => this._handleCloseArrivals());
-      this.nextArrivals.onRefresh(()         => this._handleRefreshArrivals());
+      this.nextArrivals.onArrivalClick(data => this._handleArrivalClick(data));
+      this.nextArrivals.onClose(()          => this._handleCloseArrivals());
+      this.nextArrivals.onRefresh(()        => this._handleRefreshArrivals());
 
-      // Callback do LineOverlayManager: botão "Próximos autocarros" nos stop markers
       this.lineOverlayManager.onStopClick(stop => this._handleStopClick(stop));
 
-      // Barra de filtro de linhas
       this.routeFilterBar = new RouteFilterBar('route-filter-bar');
       this.routeFilterBar.mount();
       this.routeFilterBar.setLoading(true);
@@ -105,6 +101,10 @@ export class BusMapApp {
       this.loadingOverlay = null;
 
       this.startAutoRefresh();
+
+      // Deep-link: abrir paragem/filtro especificado na URL
+      await this._handleDeepLink();
+
       console.log('\u2705 BusMapApp inicializado');
     } catch (error) {
       console.error('\u274C Erro na inicializa\u00e7\u00e3o:', error);
@@ -116,7 +116,7 @@ export class BusMapApp {
   setupGeolocation() {
     geolocationService.getCurrentPosition()
       .then(position => this.mapManager.updateUserMarker(position))
-      .catch(err => console.warn('\u26A0\uFE0F Localiza\u00e7\u00e3o indispon\u00edvel:', err.message));
+      .catch(err => console.warn('\u26A0\uFE0F Localização indisponível:', err.message));
   }
 
   setupEventListeners() {
@@ -126,6 +126,71 @@ export class BusMapApp {
 
   startAutoRefresh() {
     autoRefreshManager.start('bus-map', () => this.fetchAndUpdateBuses(), this.refreshInterval);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Deep-link
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Lê parâmetros da URL e activa filtro/paragem automaticamente.
+   *
+   * Formatos suportados:
+   *   index.html?stop=<stop_id>
+   *   index.html?stop=<stop_id>&line=<route_number>&dir=<0|1>
+   *   index.html?line=<route_number>&dir=<0|1>
+   */
+  async _handleDeepLink() {
+    const params  = new URLSearchParams(window.location.search);
+    const stopId  = params.get('stop');
+    const lineNum = params.get('line');
+    const dir     = parseInt(params.get('dir') ?? '0', 10);
+
+    if (!stopId && !lineNum) return;
+
+    // Pré-seleccionar linha no filtro
+    if (lineNum) {
+      await this._waitForRoutes();
+      const route = (this.routeFilterBar.routes || []).find(r => String(r.number) === String(lineNum));
+      if (route) {
+        const direction = isNaN(dir) ? 0 : dir;
+        this.routeFilterBar.selected.set(route.number, { route, direction });
+        this.routeFilterBar._render();
+        await this._handleRouteFilterChange(
+          new Set([route.number]),
+          [{ ...route, direction }]
+        );
+      }
+    }
+
+    // Abrir painel de chegadas
+    if (stopId) {
+      try {
+        const stopInfo = await apiService.fetchStopInfo(stopId);
+        const stop = {
+          stop_id:   stopId,
+          stop_name: stopInfo?.stop_name || `Paragem ${stopId}`,
+          latitude:  stopInfo?.latitude  || 41.1579,
+          longitude: stopInfo?.longitude || -8.6291,
+          routes:    stopInfo?.routes    || []
+        };
+        this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
+        await this._handleStopClick(stop);
+      } catch (e) {
+        console.warn('Deep-link: paragem não encontrada', stopId, e);
+      }
+    }
+  }
+
+  /** Aguarda até o RouteFilterBar ter linhas carregadas (máx 5s) */
+  _waitForRoutes() {
+    return new Promise(resolve => {
+      if (this.routeFilterBar?.routes?.length > 0) { resolve(); return; }
+      const check = setInterval(() => {
+        if (this.routeFilterBar?.routes?.length > 0) { clearInterval(check); resolve(); }
+      }, 100);
+      setTimeout(() => { clearInterval(check); resolve(); }, 5000);
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -205,15 +270,19 @@ export class BusMapApp {
   // ---------------------------------------------------------------------------
 
   async _handleStopClick(stop) {
+    // Cancelar refresh anterior antes de abrir nova paragem
+    this._stopArrivalsRefresh();
+    this.busMarkerManager.clearAllMarkers();
+
     this._currentStopId       = stop.stop_id;
     this._currentStopPosition = [stop.latitude, stop.longitude];
     this._busMapCentered      = false;
     this._currentBusPositions = [];
 
+    // show() actualiza nome/código mesmo que o painel já esteja visível
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.mapManager.map.closePopup();
 
-    // Carregar rotas da paragem
     const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
     const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes
       ? stopInfo.value.routes
@@ -222,6 +291,9 @@ export class BusMapApp {
 
     await this._loadStopArrivals(stop.stop_id, true);
     this._startArrivalsRefresh();
+
+    // Manter a URL sincronizada
+    this._pushStopToURL(stop.stop_id);
   }
 
   async _loadStopArrivals(stopId, centerMap = false) {
@@ -277,9 +349,7 @@ export class BusMapApp {
     const { vehicleId, location } = data;
     if (!location || !this.mapManager) return;
     const offsetY = Math.round(this.mapManager.map.getSize().y * 0.25);
-    this.mapManager.centerOnWithOffset(
-      [location.latitude, location.longitude], 17, offsetY
-    );
+    this.mapManager.centerOnWithOffset([location.latitude, location.longitude], 17, offsetY);
     const marker = this.busMarkerManager.markers[vehicleId];
     if (marker) marker.openPopup();
   }
@@ -294,7 +364,10 @@ export class BusMapApp {
     this._currentStopPosition = null;
     this._busMapCentered      = false;
     this._currentBusPositions = [];
-    // Não limpa os bus markers globais — retoma os autocarros da linha filtrada
+
+    // Limpar ?stop da URL
+    this._clearStopFromURL();
+
     if (this._selectedRoutes.size > 0) {
       this.busMarkerManager.filterByRoutes(this._selectedRoutes, this._routeDirMap);
     } else {
@@ -314,6 +387,23 @@ export class BusMapApp {
       clearInterval(this._arrivalsRefreshInterval);
       this._arrivalsRefreshInterval = null;
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // URL sync
+  // ---------------------------------------------------------------------------
+
+  _pushStopToURL(stopId) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('stop', stopId);
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+  }
+
+  _clearStopFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    params.delete('stop');
+    const qs = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
   }
 
   // ---------------------------------------------------------------------------
