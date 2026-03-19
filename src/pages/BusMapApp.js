@@ -2,8 +2,6 @@
  * BusMapApp - Mapa de autocarros em tempo real
  *
  * Deep-link: ?stop=<stop_id>[&line=<route_number>[&dir=<0|1>]]
- * Abre automaticamente o painel de chegadas da paragem indicada,
- * com o filtro de linha pré-seleccionado se especificado.
  */
 
 import { apiService }             from '../core/apiService.js';
@@ -20,6 +18,8 @@ import { LastUpdateDisplay }      from '../ui/components/LastUpdateDisplay.js';
 import { LoadingSpinner }         from '../ui/components/LoadingSpinner.js';
 import { RouteFilterBar }         from '../ui/components/RouteFilterBar.js';
 import { NextArrivals }           from '../ui/components/NextArrivals.js';
+import { FavouritesPanel }        from '../ui/components/FavouritesPanel.js';
+import { favouritesManager }      from '../services/FavouritesManager.js';
 import { createCenterControl }    from '../map/controls/CenterControl.js';
 import { createStopsControl }     from '../map/controls/StopsControl.js';
 
@@ -33,6 +33,7 @@ export class BusMapApp {
     this.lineOverlayManager = null;
     this.routeFilterBar     = null;
     this.nextArrivals       = null;
+    this.favouritesPanel    = null;
     this.lastUpdateDisplay  = new LastUpdateDisplay();
     this.centerControl      = null;
     this.stopsControl       = null;
@@ -44,18 +45,14 @@ export class BusMapApp {
 
     this._arrivalsRefreshInterval = null;
     this._currentStopId           = null;
+    this._currentStopName         = null;
     this._currentStopPosition     = null;
     this._currentBusPositions     = [];
     this._busMapCentered          = false;
   }
 
-  // ---------------------------------------------------------------------------
-  // Init
-  // ---------------------------------------------------------------------------
-
   async initialize() {
     try {
-      console.log('\uD83D\uDE80 Inicializando BusMapApp...');
       this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de autocarros...');
 
       await scheduleService.loadScheduleData();
@@ -77,8 +74,13 @@ export class BusMapApp {
       this.nextArrivals.onArrivalClick(data => this._handleArrivalClick(data));
       this.nextArrivals.onClose(()          => this._handleCloseArrivals());
       this.nextArrivals.onRefresh(()        => this._handleRefreshArrivals());
+      this.nextArrivals.onFavouriteClick(stopId => this._toggleFavourite(stopId));
+      this.nextArrivals.onIsFavourite(stopId => favouritesManager.isFavourite(stopId));
 
       this.lineOverlayManager.onStopClick(stop => this._handleStopClick(stop));
+
+      this.favouritesPanel = new FavouritesPanel();
+      this.favouritesPanel.mount();
 
       this.routeFilterBar = new RouteFilterBar('route-filter-bar');
       this.routeFilterBar.mount();
@@ -101,11 +103,8 @@ export class BusMapApp {
       this.loadingOverlay = null;
 
       this.startAutoRefresh();
-
-      // Deep-link: abrir paragem/filtro especificado na URL
       await this._handleDeepLink();
 
-      console.log('\u2705 BusMapApp inicializado');
     } catch (error) {
       console.error('\u274C Erro na inicializa\u00e7\u00e3o:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();
@@ -116,7 +115,7 @@ export class BusMapApp {
   setupGeolocation() {
     geolocationService.getCurrentPosition()
       .then(position => this.mapManager.updateUserMarker(position))
-      .catch(err => console.warn('\u26A0\uFE0F Localização indisponível:', err.message));
+      .catch(err => console.warn('\u26A0\uFE0F Localiza\u00e7\u00e3o indispon\u00edvel:', err.message));
   }
 
   setupEventListeners() {
@@ -132,14 +131,6 @@ export class BusMapApp {
   // Deep-link
   // ---------------------------------------------------------------------------
 
-  /**
-   * Lê parâmetros da URL e activa filtro/paragem automaticamente.
-   *
-   * Formatos suportados:
-   *   index.html?stop=<stop_id>
-   *   index.html?stop=<stop_id>&line=<route_number>&dir=<0|1>
-   *   index.html?line=<route_number>&dir=<0|1>
-   */
   async _handleDeepLink() {
     const params  = new URLSearchParams(window.location.search);
     const stopId  = params.get('stop');
@@ -148,7 +139,6 @@ export class BusMapApp {
 
     if (!stopId && !lineNum) return;
 
-    // Pré-seleccionar linha no filtro
     if (lineNum) {
       await this._waitForRoutes();
       const route = (this.routeFilterBar.routes || []).find(r => String(r.number) === String(lineNum));
@@ -156,14 +146,10 @@ export class BusMapApp {
         const direction = isNaN(dir) ? 0 : dir;
         this.routeFilterBar.selected.set(route.number, { route, direction });
         this.routeFilterBar._render();
-        await this._handleRouteFilterChange(
-          new Set([route.number]),
-          [{ ...route, direction }]
-        );
+        await this._handleRouteFilterChange(new Set([route.number]), [{ ...route, direction }]);
       }
     }
 
-    // Abrir painel de chegadas
     if (stopId) {
       try {
         const stopInfo = await apiService.fetchStopInfo(stopId);
@@ -177,12 +163,11 @@ export class BusMapApp {
         this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
         await this._handleStopClick(stop);
       } catch (e) {
-        console.warn('Deep-link: paragem não encontrada', stopId, e);
+        console.warn('Deep-link: paragem n\u00e3o encontrada', stopId, e);
       }
     }
   }
 
-  /** Aguarda até o RouteFilterBar ter linhas carregadas (máx 5s) */
   _waitForRoutes() {
     return new Promise(resolve => {
       if (this.routeFilterBar?.routes?.length > 0) { resolve(); return; }
@@ -205,24 +190,14 @@ export class BusMapApp {
         this.lastUpdateDisplay.update();
         return;
       }
-
       const processed = await vehicleService.processBusDataBatch(rawBusData);
       this._allProcessedBuses = processed;
-
-      processed.forEach(bus => {
-        this.busMarkerManager.setRouteForMarker(bus.id, bus.line || '', bus.direction);
-      });
-
+      processed.forEach(bus => this.busMarkerManager.setRouteForMarker(bus.id, bus.line || '', bus.direction));
       const toShow = this._selectedRoutes.size > 0
         ? processed.filter(b => this._selectedRoutes.has(String(b.line || '')))
         : processed;
-
       this.busMarkerManager.updateBusMarkers(toShow);
-
-      if (this._selectedRoutes.size > 0) {
-        this.busMarkerManager.filterByRoutes(this._selectedRoutes, this._routeDirMap);
-      }
-
+      if (this._selectedRoutes.size > 0) this.busMarkerManager.filterByRoutes(this._selectedRoutes, this._routeDirMap);
       this.lastUpdateDisplay.update();
     } catch (error) {
       console.error('\u274C Erro ao atualizar autocarros:', error);
@@ -253,7 +228,6 @@ export class BusMapApp {
       color:      r.color      || '#187EC2',
       text_color: r.text_color || '#FFFFFF'
     }));
-
     const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
     this.lineOverlayManager.setRoutes(overlayData);
 
@@ -270,29 +244,25 @@ export class BusMapApp {
   // ---------------------------------------------------------------------------
 
   async _handleStopClick(stop) {
-    // Cancelar refresh anterior antes de abrir nova paragem
     this._stopArrivalsRefresh();
     this.busMarkerManager.clearAllMarkers();
 
     this._currentStopId       = stop.stop_id;
+    this._currentStopName     = stop.stop_name;
     this._currentStopPosition = [stop.latitude, stop.longitude];
     this._busMapCentered      = false;
     this._currentBusPositions = [];
 
-    // show() actualiza nome/código mesmo que o painel já esteja visível
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.mapManager.map.closePopup();
 
     const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
     const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes
-      ? stopInfo.value.routes
-      : (stop.routes || []);
+      ? stopInfo.value.routes : (stop.routes || []);
     this.nextArrivals.setRoutes(routes);
 
     await this._loadStopArrivals(stop.stop_id, true);
     this._startArrivalsRefresh();
-
-    // Manter a URL sincronizada
     this._pushStopToURL(stop.stop_id);
   }
 
@@ -311,14 +281,13 @@ export class BusMapApp {
     } catch (error) {
       console.error('\u274C Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
-      this.showError('Erro ao carregar informações da paragem');
+      this.showError('Erro ao carregar informa\u00e7\u00f5es da paragem');
     }
   }
 
   async _updateArrivalsOnMap(arrivals, vehicles, centerMap = false) {
     const busesToShow  = [];
     const busPositions = [];
-
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
       const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
@@ -327,18 +296,12 @@ export class BusMapApp {
       if (!processedBus) continue;
       busesToShow.push(processedBus);
       busPositions.push([processedBus.latitude, processedBus.longitude]);
-      const routeNum = String(
-        arrival.route_short_name || arrival.route_number ||
-        arrival.route_id         || processedBus.line    || ''
-      );
+      const routeNum = String(arrival.route_short_name || arrival.route_number || arrival.route_id || processedBus.line || '');
       this.busMarkerManager.setRouteForMarker(processedBus.id, routeNum);
     }
-
     if (busesToShow.length === 0) return;
-
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this._currentBusPositions = busPositions;
-
     if (centerMap && !this._busMapCentered && busPositions.length > 0) {
       this._busMapCentered = true;
       setTimeout(() => this._recenterOnPositions(busPositions), 150);
@@ -361,19 +324,41 @@ export class BusMapApp {
   _handleCloseArrivals() {
     this._stopArrivalsRefresh();
     this._currentStopId       = null;
+    this._currentStopName     = null;
     this._currentStopPosition = null;
     this._busMapCentered      = false;
     this._currentBusPositions = [];
-
-    // Limpar ?stop da URL
     this._clearStopFromURL();
-
     if (this._selectedRoutes.size > 0) {
       this.busMarkerManager.filterByRoutes(this._selectedRoutes, this._routeDirMap);
     } else {
       this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Favoritos
+  // ---------------------------------------------------------------------------
+
+  _toggleFavourite(stopId) {
+    if (!stopId) return;
+    const name    = this._currentStopName || `Paragem ${stopId}`;
+    const lineNum = this._selectedRoutes.size === 1 ? [...this._selectedRoutes][0] : null;
+    const dir     = lineNum ? (this._routeDirMap.get(lineNum) ?? 0) : null;
+    const added   = favouritesManager.toggle(stopId, name, {
+      line:    lineNum,
+      dir:     dir,
+      baseUrl: window.location.pathname
+    });
+    this.nextArrivals.refreshFavouriteBtn();
+    this.favouritesPanel.refresh();
+    // Abrir o drawer brevemente para confirmar
+    if (added) { this.favouritesPanel.open(); setTimeout(() => this.favouritesPanel.close(), 1800); }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auto-refresh das chegadas
+  // ---------------------------------------------------------------------------
 
   _startArrivalsRefresh() {
     this._stopArrivalsRefresh();
@@ -383,10 +368,7 @@ export class BusMapApp {
   }
 
   _stopArrivalsRefresh() {
-    if (this._arrivalsRefreshInterval) {
-      clearInterval(this._arrivalsRefreshInterval);
-      this._arrivalsRefreshInterval = null;
-    }
+    if (this._arrivalsRefreshInterval) { clearInterval(this._arrivalsRefreshInterval); this._arrivalsRefreshInterval = null; }
   }
 
   // ---------------------------------------------------------------------------
@@ -412,29 +394,15 @@ export class BusMapApp {
 
   _fitToPositions(positions) {
     if (!this.mapManager || positions.length === 0) return;
-    if (positions.length === 1) {
-      this.mapManager.centerOn(positions[0], 16);
-    } else {
-      this.mapManager.fitBounds(positions, {
-        paddingTopLeft: [60, 100], paddingBottomRight: [60, 60],
-        maxZoom: 16, minZoom: 11
-      });
-    }
+    if (positions.length === 1) { this.mapManager.centerOn(positions[0], 16); return; }
+    this.mapManager.fitBounds(positions, { paddingTopLeft: [60, 100], paddingBottomRight: [60, 60], maxZoom: 16, minZoom: 11 });
   }
 
   _recenterOnPositions(positions) {
     if (!this.mapManager || positions.length === 0) return;
-    const mapHeight   = this.mapManager.map.getSize().y;
-    const panelHeight = mapHeight * 0.5;
-    if (positions.length === 1) {
-      this.mapManager.centerOnWithOffset(positions[0], 16, Math.round(panelHeight * 0.5));
-    } else {
-      this.mapManager.fitBounds(positions, {
-        paddingTopLeft:     [60, 60],
-        paddingBottomRight: [60, panelHeight + 60],
-        maxZoom: 16, minZoom: 13
-      });
-    }
+    const panelHeight = this.mapManager.map.getSize().y * 0.5;
+    if (positions.length === 1) { this.mapManager.centerOnWithOffset(positions[0], 16, Math.round(panelHeight * 0.5)); return; }
+    this.mapManager.fitBounds(positions, { paddingTopLeft: [60, 60], paddingBottomRight: [60, panelHeight + 60], maxZoom: 16, minZoom: 13 });
   }
 
   showError(message) {
@@ -451,6 +419,7 @@ export class BusMapApp {
     if (this.lineOverlayManager) this.lineOverlayManager.clearAll();
     if (this.routeFilterBar)     this.routeFilterBar.destroy();
     if (this.nextArrivals)       this.nextArrivals.destroy();
+    if (this.favouritesPanel)    this.favouritesPanel.destroy();
     if (this.mapManager)         this.mapManager.cleanup();
   }
 }

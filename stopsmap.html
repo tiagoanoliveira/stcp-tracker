@@ -7,21 +7,18 @@
   <meta name="theme-color" content="#0072c6">
   <title>STCP Tracker - Mapa de Paragens</title>
   
-  <!-- Leaflet CSS -->
+  <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
-  <!-- CSS da aplicação -->
   <link rel="stylesheet" href="./src/ui/styles/busmap.css">
   <link rel="stylesheet" href="./src/ui/styles/stopsmap.css">
   <link rel="stylesheet" href="./src/ui/styles/stopDetail.css">
   <link rel="stylesheet" href="./src/ui/styles/loading.css">
   <link rel="stylesheet" href="./src/ui/styles/routeFilterBar.css">
   <link rel="stylesheet" href="./src/ui/styles/filterRow.css">
+  <link rel="stylesheet" href="./src/ui/styles/favourites.css">
   
-  <!-- Favicon -->
   <link rel="shortcut icon" href="./resources/favicon.svg">
 
-  <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYVRR1K1R2"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -38,7 +35,6 @@
     <span class="logo-text">Paragens STCP</span>
   </a>
 
-  <!-- Barra de pesquisa (só o input, sem chips internos) -->
   <div class="search-overlay">
     <div class="search-input-wrapper">
       <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -61,7 +57,6 @@
     </div>
   </div>
 
-  <!-- Pill de filtro de linhas — independente, abaixo da search-overlay -->
   <div id="filter-row" class="stopsmap-filter-row">
     <div id="route-filter-bar"></div>
   </div>
