@@ -1,5 +1,5 @@
 /**
- * StopsMapApp - Aplicação de mapa de paragens
+ * StopsMapApp - Aplica\u00e7\u00e3o de mapa de paragens
  */
 
 import { geolocationService } from '../core/geolocationService.js';
@@ -27,24 +27,17 @@ export class StopsMapApp {
     this.busMapControl = null;
     this.nextArrivals = null;
     this.loadingOverlay = null;
-    
-    // Estado da paragem atual
+
     this.currentStopId = null;
     this.currentStopPosition = null;
     this.refreshInterval = null;
-
-    // Flag: evita re-centrar no auto-refresh
     this.busMapCentered = false;
-
-    // Posições dos autocarros atuais (para re-centrar ao fechar popup)
     this.currentBusPositions = [];
 
-    // Estado da pesquisa
     this.isSearchActive = false;
     this.suppressMapChangeUntil = 0;
     this._searchGeneration = 0;
-    
-    // Raio dinâmico e controlo de carregamento
+
     this.currentRadius = 1000;
     this.isLoadingStops = false;
     this.loadStopsDebounce = null;
@@ -52,7 +45,7 @@ export class StopsMapApp {
 
   async initialize() {
     try {
-      console.log('🚀 Inicializando StopsMapApp...');
+      console.log('\ud83d\ude80 Inicializando StopsMapApp...');
       this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de paragens...');
 
       await scheduleService.loadScheduleData();
@@ -83,9 +76,9 @@ export class StopsMapApp {
       this.loadingOverlay.remove();
       this.loadingOverlay = null;
     } catch (error) {
-      console.error('❌ Erro na inicialização:', error);
+      console.error('\u274c Erro na inicializa\u00e7\u00e3o:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();
-      this.showError('Erro ao inicializar aplicação');
+      this.showError('Erro ao inicializar aplica\u00e7\u00e3o');
     }
   }
 
@@ -95,7 +88,7 @@ export class StopsMapApp {
       this.mapManager.updateUserMarker(position);
       this.mapManager.centerOn(position, 15);
     } catch (error) {
-      console.warn('⚠️ Não foi possível obter localização:', error.message);
+      console.warn('\u26a0\ufe0f N\u00e3o foi poss\u00edvel obter localiza\u00e7\u00e3o:', error.message);
       this.mapManager.centerOn([41.1579, -8.6291], 13);
     }
   }
@@ -106,39 +99,24 @@ export class StopsMapApp {
     if (!searchInput) return;
 
     let searchTimeout;
-
     searchInput.addEventListener('input', () => {
       clearTimeout(searchTimeout);
-      if (clearBtn) {
-        clearBtn.style.display = searchInput.value.length > 0 ? 'flex' : 'none';
-      }
+      if (clearBtn) clearBtn.style.display = searchInput.value.length > 0 ? 'flex' : 'none';
       searchTimeout = setTimeout(() => this.handleSearch(), 300);
     });
-
     searchInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        clearTimeout(searchTimeout);
-        this.handleSearch();
-      }
+      if (e.key === 'Enter') { e.preventDefault(); clearTimeout(searchTimeout); this.handleSearch(); }
     });
-
-    if (clearBtn) {
-      clearBtn.addEventListener('click', () => this.handleClearSearch());
-    }
+    if (clearBtn) clearBtn.addEventListener('click', () => this.handleClearSearch());
   }
 
   setupMapListeners() {
     if (!this.mapManager?.map) return;
-
     this.mapManager.map.on('zoomend', () => this.handleMapChange());
     this.mapManager.map.on('moveend', () => this.handleMapChange());
-
-    // Ao fechar popup de autocarro, re-centrar em todos os autocarros
     this.mapManager.map.on('popupclose', () => {
-      if (this.nextArrivals?.isVisible && this.currentBusPositions.length > 0) {
+      if (this.nextArrivals?.isVisible && this.currentBusPositions.length > 0)
         setTimeout(() => this.recenterOnBuses(), 200);
-      }
     });
   }
 
@@ -165,49 +143,35 @@ export class StopsMapApp {
       const center = this.mapManager.map.getCenter();
       const zoom = this.mapManager.map.getZoom();
       this.currentRadius = this.calculateRadiusFromZoom(zoom);
-
       const stops = await stopService.getNearbyStops(center.lat, center.lng, this.currentRadius);
-
-      // ⭐ Verificar DEPOIS do fetch: se entretanto o utilizador abriu uma paragem,
-      // descartar esta resposta para não sobrepor os marcadores ao showOnlyMarker.
       if (this.nextArrivals?.isVisible) return;
-
       if (stops.length === 0) { this.stopMarkerManager.clearAllMarkers(); return; }
       this.stopMarkerManager.updateStopMarkers(stops, false, (stop) => this.handleStopClick(stop));
     } catch (error) {
-      console.error('❌ Erro ao carregar paragens:', error);
+      console.error('\u274c Erro ao carregar paragens:', error);
     } finally {
       this.isLoadingStops = false;
     }
   }
 
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Pesquisa
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   async handleSearch() {
     const searchInput = document.getElementById('stop-search');
     const query = searchInput.value.trim();
     this.isSearchActive = Boolean(query);
-
-    if (!query) {
-      this.loadNearbyStops();
-      return;
-    }
+    if (!query) { this.loadNearbyStops(); return; }
 
     const generation = ++this._searchGeneration;
     const results = await stopService.searchStops(query);
     if (generation !== this._searchGeneration) return;
 
-    if (results.length === 0) {
-      this.stopMarkerManager.clearAllMarkers();
-      this.showError('Nenhuma paragem encontrada');
-      return;
-    }
+    if (results.length === 0) { this.stopMarkerManager.clearAllMarkers(); this.showError('Nenhuma paragem encontrada'); return; }
 
     this.stopMarkerManager.updateStopMarkers(results, false, (stop) => this.handleStopClick(stop));
     this.suppressMapChangeUntil = Date.now() + 1500;
-
     if (results.length === 1) {
       this.mapManager.centerOn([results[0].latitude, results[0].longitude], 16);
     } else {
@@ -223,20 +187,15 @@ export class StopsMapApp {
     this.isSearchActive = false;
     this._searchGeneration++;
     if (focusInput && searchInput) searchInput.focus();
-    if (reloadDelay > 0) {
-      setTimeout(() => this.loadNearbyStops(), reloadDelay);
-    } else {
-      this.loadNearbyStops();
-    }
+    if (reloadDelay > 0) setTimeout(() => this.loadNearbyStops(), reloadDelay);
+    else this.loadNearbyStops();
   }
 
-  handleClearSearch() {
-    this._clearSearch(true, 0);
-  }
+  handleClearSearch() { this._clearSearch(true, 0); }
 
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Paragem / Chegadas
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   async handleStopClick(stop) {
     this.currentStopId = stop.stop_id;
@@ -244,14 +203,23 @@ export class StopsMapApp {
     this.busMapCentered = false;
     this.currentBusPositions = [];
 
-    // ⭐ Cancelar imediatamente qualquer debounce de loadNearbyStops pendente
-    // para evitar que uma resposta em-vôo sobrescreva o showOnlyMarker.
     clearTimeout(this.loadStopsDebounce);
     this.loadStopsDebounce = null;
 
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     this.mapManager.map.closePopup();
+
+    // ⭐ Buscar info da paragem (linhas com cores) em paralelo com as chegadas
+    const [stopInfo] = await Promise.allSettled([
+      apiService.fetchStopInfo(stop.stop_id)
+    ]);
+
+    const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes
+      ? stopInfo.value.routes
+      : (stop.routes || []); // fallback para rotas j\u00e1 no objeto da paragem (se houver)
+
+    this.nextArrivals.setRoutes(routes);
 
     await this.loadStopArrivals(stop.stop_id, true);
     this.startAutoRefresh();
@@ -271,9 +239,9 @@ export class StopsMapApp {
       this.nextArrivals.updateLastUpdate();
       await this.updateBusMap(arrivals, vehicles, centerMap);
     } catch (error) {
-      console.error('❌ Erro ao carregar chegadas:', error);
+      console.error('\u274c Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
-      this.showError('Erro ao carregar informações da paragem');
+      this.showError('Erro ao carregar informa\u00e7\u00f5es da paragem');
     }
   }
 
@@ -283,10 +251,7 @@ export class StopsMapApp {
       this.currentBusPositions = [];
       return;
     }
-
-    const busesToShow = [];
-    const busPositions = [];
-
+    const busesToShow = [], busPositions = [];
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
       const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
@@ -298,20 +263,10 @@ export class StopsMapApp {
         }
       }
     }
-
-    if (busesToShow.length === 0) {
-      this.busMarkerManager.clearAllMarkers();
-      this.currentBusPositions = [];
-      return;
-    }
-
+    if (busesToShow.length === 0) { this.busMarkerManager.clearAllMarkers(); this.currentBusPositions = []; return; }
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this.currentBusPositions = busPositions;
-
-    if (centerMap && !this.busMapCentered) {
-      this.busMapCentered = true;
-      setTimeout(() => this.recenterOnBuses(), 150);
-    }
+    if (centerMap && !this.busMapCentered) { this.busMapCentered = true; setTimeout(() => this.recenterOnBuses(), 150); }
   }
 
   recenterOnBuses() {
@@ -319,14 +274,12 @@ export class StopsMapApp {
     const mapHeight = this.mapManager.map.getSize().y;
     const panelHeight = mapHeight * 0.5;
     if (this.currentBusPositions.length === 1) {
-      const offsetY = Math.round(panelHeight * 0.5);
-      this.mapManager.centerOnWithOffset(this.currentBusPositions[0], 16, offsetY);
+      this.mapManager.centerOnWithOffset(this.currentBusPositions[0], 16, Math.round(panelHeight * 0.5));
     } else {
       this.mapManager.fitBounds(this.currentBusPositions, {
         paddingTopLeft: [60, 60],
         paddingBottomRight: [60, panelHeight + 60],
-        maxZoom: 16,
-        minZoom: 13
+        maxZoom: 16, minZoom: 13
       });
     }
   }
@@ -334,10 +287,8 @@ export class StopsMapApp {
   handleArrivalClick(data) {
     const { vehicleId, location } = data;
     if (!location || !this.mapManager) return;
-    const coords = [location.latitude, location.longitude];
-    const mapHeight = this.mapManager.map.getSize().y;
-    const offsetY = Math.round(mapHeight * 0.25);
-    this.mapManager.centerOnWithOffset(coords, 17, offsetY);
+    const offsetY = Math.round(this.mapManager.map.getSize().y * 0.25);
+    this.mapManager.centerOnWithOffset([location.latitude, location.longitude], 17, offsetY);
     const marker = this.busMarkerManager.markers[vehicleId];
     if (marker) marker.openPopup();
   }
@@ -351,28 +302,14 @@ export class StopsMapApp {
     this.busMarkerManager.clearAllMarkers();
     this.busMapCentered = false;
     this.currentBusPositions = [];
-
     const wasSearchActive = this.isSearchActive;
     const returnPosition = this.currentStopPosition;
-
     this.currentStopId = null;
     this.currentStopPosition = null;
-
-    if (returnPosition) {
-      this.suppressMapChangeUntil = Date.now() + 1800;
-      this.mapManager.centerOn(returnPosition, 16);
-    }
-
-    if (wasSearchActive) {
-      this._clearSearch(false, 700);
-    } else {
-      this.stopMarkerManager.showAllMarkers();
-    }
+    if (returnPosition) { this.suppressMapChangeUntil = Date.now() + 1800; this.mapManager.centerOn(returnPosition, 16); }
+    if (wasSearchActive) this._clearSearch(false, 700);
+    else this.stopMarkerManager.showAllMarkers();
   }
-
-  // -------------------------------------------------------------------------
-  // Auto-refresh
-  // -------------------------------------------------------------------------
 
   startAutoRefresh() {
     this.stopAutoRefresh();
@@ -386,13 +323,9 @@ export class StopsMapApp {
   }
 
   showError(message) {
-    console.error('❌', message);
+    console.error('\u274c', message);
     const el = document.getElementById('error-message');
-    if (el) {
-      el.textContent = message;
-      el.classList.add('show');
-      setTimeout(() => el.classList.remove('show'), 5000);
-    }
+    if (el) { el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 5000); }
   }
 
   cleanup() {
@@ -407,10 +340,7 @@ export class StopsMapApp {
 
 if (typeof window !== 'undefined') {
   const app = new StopsMapApp();
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => app.initialize());
-  } else {
-    app.initialize();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => app.initialize());
+  else app.initialize();
   window.addEventListener('beforeunload', () => app.cleanup());
 }
