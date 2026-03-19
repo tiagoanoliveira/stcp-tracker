@@ -1,19 +1,5 @@
 /**
  * StopsMapApp - Aplicação de mapa de paragens
- * Fase 3+4: RouteFilterBar global + LineOverlayManager + direction toggle
- *
- * Dois modos de uso da barra de filtro:
- *
- * A) MODO GLOBAL (nenhuma paragem aberta)
- *    - Seleccionar linha(s) substitui os markers de paragem pelas paragens
- *      dessa(s) linha(s) e desenha as polylines no mapa.
- *    - Limpar filtro volta ao comportamento normal (loadNearbyStops).
- *    - Botão →/← no chip muda a direcção (ida/volta) e redesenha.
- *
- * B) MODO DETALHE (painel de chegadas aberto)
- *    - A barra de filtro global fica desactivada.
- *    - Os chips no painel de chegadas controlam markers de autocarros
- *      E desenham a polyline da linha seleccionada.
  */
 
 import { geolocationService }    from '../core/geolocationService.js';
@@ -61,7 +47,6 @@ export class StopsMapApp {
     this.isLoadingStops    = false;
     this.loadStopsDebounce = null;
 
-    // Filtro global de linhas (modo A)
     this._globalSelectedRoutes    = new Set();
     this._globalSelectedRouteObjs = [];
     this._lineFilterMode          = false;
@@ -97,7 +82,9 @@ export class StopsMapApp {
       this.nextArrivals.onRefresh(() => this.handleRefreshArrivals());
       this.nextArrivals.onFilterChange(selected => this.handleArrivalFilterChange(selected));
 
-      // Barra de filtro global de linhas
+      // Callback do LineOverlayManager para paragens das overlays de linha
+      this.lineOverlayManager.onStopClick(stop => this.handleStopClick(stop));
+
       this.routeFilterBar = new RouteFilterBar('route-filter-bar');
       this.routeFilterBar.mount();
       this.routeFilterBar.setLoading(true);
@@ -111,7 +98,10 @@ export class StopsMapApp {
       await this.setupGeolocation();
       this.setupEventListeners();
       this.setupMapListeners();
-      await this.loadNearbyStops();
+
+      // Deep-link: abrir paragem e/ou filtro de linha a partir da URL
+      const deepLinkHandled = await this._handleDeepLink();
+      if (!deepLinkHandled) await this.loadNearbyStops();
 
       this.loadingOverlay.remove();
       this.loadingOverlay = null;
@@ -196,11 +186,83 @@ export class StopsMapApp {
   }
 
   // ---------------------------------------------------------------------------
+  // Deep-link
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Lê parâmetros da URL e abre paragem/filtro directamente.
+   * Formatos suportados:
+   *   ?stop=<stop_id>
+   *   ?stop=<stop_id>&line=<route_number>&dir=<0|1>
+   *   ?line=<route_number>&dir=<0|1>   (só filtro de linha, sem paragem)
+   * Devolve true se tratou algum parâmetro (para não carregar paragens próximas).
+   */
+  async _handleDeepLink() {
+    const params  = new URLSearchParams(window.location.search);
+    const stopId  = params.get('stop');
+    const lineNum = params.get('line');
+    const dir     = parseInt(params.get('dir') ?? '0', 10);
+
+    if (!stopId && !lineNum) return false;
+
+    // Aplicar filtro de linha se presente
+    if (lineNum && this.routeFilterBar) {
+      // Esperar que as linhas estejam carregadas (fetchRoutesList pode ainda estar em curso)
+      await this._waitForRoutes();
+      const routes = this.routeFilterBar.routes || [];
+      const route  = routes.find(r => String(r.number) === String(lineNum));
+      if (route) {
+        this.routeFilterBar.selected.set(route.number, { route, direction: isNaN(dir) ? 0 : dir });
+        this.routeFilterBar._render();
+        await this._handleGlobalRouteFilterChange(
+          new Set([route.number]),
+          [{ ...route, direction: isNaN(dir) ? 0 : dir }]
+        );
+      }
+    }
+
+    // Abrir paragem se presente
+    if (stopId) {
+      try {
+        // Tentar obter a paragem pelo ID directamente
+        const stopInfo = await apiService.fetchStopInfo(stopId);
+        const stop = {
+          stop_id:   stopId,
+          stop_name: stopInfo?.stop_name || `Paragem ${stopId}`,
+          latitude:  stopInfo?.latitude  || 41.1579,
+          longitude: stopInfo?.longitude || -8.6291,
+          routes:    stopInfo?.routes    || []
+        };
+        // Centrar mapa na paragem
+        this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
+        await this.handleStopClick(stop);
+      } catch (e) {
+        console.warn('Deep-link: paragem não encontrada', stopId);
+      }
+    }
+
+    return true;
+  }
+
+  /** Aguarda até o RouteFilterBar ter linhas carregadas (máx 5s) */
+  _waitForRoutes() {
+    return new Promise(resolve => {
+      if (this.routeFilterBar?.routes?.length > 0) { resolve(); return; }
+      const check = setInterval(() => {
+        if (this.routeFilterBar?.routes?.length > 0) { clearInterval(check); resolve(); }
+      }, 100);
+      setTimeout(() => { clearInterval(check); resolve(); }, 5000);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Filtro GLOBAL de linhas (Modo A)
   // ---------------------------------------------------------------------------
 
   async _handleGlobalRouteFilterChange(selected, routeObjs) {
-    if (this.nextArrivals?.isVisible) return;
+    // Não bloquear quando o painel de chegadas está aberto — pode vir de deep-link
+    // ou de mudança de paragem dentro da mesma overlay
+    if (this.nextArrivals?.isVisible && !this._deepLinkInProgress) return;
 
     this._globalSelectedRoutes    = selected;
     this._globalSelectedRouteObjs = routeObjs;
@@ -216,7 +278,6 @@ export class StopsMapApp {
 
     this._lineFilterMode = true;
 
-    // direction vem do RouteFilterBar (0 = ida, 1 = volta)
     const routesToFetch = routeObjs.map(r => ({
       routeId:    String(r.id || r.number),
       direction:  r.direction ?? 0,
@@ -227,7 +288,6 @@ export class StopsMapApp {
     const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
     this.lineOverlayManager.setRoutes(overlayData);
 
-    // Paragens da(s) linha(s)
     const allStops = [];
     overlayData.forEach(r => (r.stops?.stops || []).forEach(s => allStops.push(s)));
     const uniqueStops = Array.from(new Map(allStops.map(s => [s.stop_id, s])).values());
@@ -237,14 +297,14 @@ export class StopsMapApp {
       this.stopMarkerManager.updateStopMarkers(uniqueStops, false, stop => this.handleStopClick(stop));
     }
 
-    this.lineOverlayManager.fitBounds();
+    if (!this.nextArrivals?.isVisible) this.lineOverlayManager.fitBounds();
   }
 
   _setGlobalFilterBarDisabled(disabled) {
     const el = document.getElementById('route-filter-bar');
     if (!el) return;
-    el.dataset.disabled   = disabled ? 'true' : 'false';
-    el.title              = disabled ? 'Feche o painel de chegadas para usar o filtro de linhas' : '';
+    el.dataset.disabled = disabled ? 'true' : 'false';
+    el.title            = disabled ? 'Feche o painel de chegadas para usar o filtro de linhas' : '';
   }
 
   // ---------------------------------------------------------------------------
@@ -291,6 +351,10 @@ export class StopsMapApp {
   // ---------------------------------------------------------------------------
 
   async handleStopClick(stop) {
+    // Cancelar refresh anterior antes de abrir nova paragem
+    this.stopAutoRefresh();
+    this.busMarkerManager.clearAllMarkers();
+
     this.currentStopId       = stop.stop_id;
     this.currentStopPosition = [stop.latitude, stop.longitude];
     this.busMapCentered      = false;
@@ -299,10 +363,17 @@ export class StopsMapApp {
     clearTimeout(this.loadStopsDebounce);
     this.loadStopsDebounce = null;
 
+    // show() actualiza o nome/código mesmo que o painel já esteja visível
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
-    this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     this.mapManager.map.closePopup();
     this._setGlobalFilterBarDisabled(true);
+
+    // Só chamar showOnlyMarker quando as paragens são do StopMarkerManager
+    // (modo normal sem filtro de linha). No modo linha, as paragens vêm
+    // dos circle markers do LineOverlayManager e não estão no StopMarkerManager.
+    if (!this._lineFilterMode) {
+      this.stopMarkerManager.showOnlyMarker(stop.stop_id);
+    }
 
     const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
     const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes
@@ -312,6 +383,17 @@ export class StopsMapApp {
 
     await this.loadStopArrivals(stop.stop_id, true);
     this.startAutoRefresh();
+
+    // Actualizar URL para permitir partilhar/guardar o link desta paragem
+    this._pushStopToURL(stop.stop_id);
+  }
+
+  /** Actualiza a URL sem recarregar a página */
+  _pushStopToURL(stopId) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('stop', stopId);
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, '', newUrl);
   }
 
   async loadStopArrivals(stopId, centerMap = false) {
@@ -341,21 +423,17 @@ export class StopsMapApp {
       return;
     }
 
-    const busesToShow = [];
+    const busesToShow  = [];
     const busPositions = [];
 
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
       const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
       if (!vehicle) continue;
-
-      // processBusData é agora síncrono (sem await) - headsign lazy no popup
       const processedBus = vehicleService.processBusData(vehicle);
       if (!processedBus) continue;
-
       busesToShow.push(processedBus);
       busPositions.push([processedBus.latitude, processedBus.longitude]);
-
       const routeNum = String(
         arrival.route_short_name || arrival.route_number ||
         arrival.route_id         || processedBus.line    || ''
@@ -395,7 +473,6 @@ export class StopsMapApp {
     if (selectedRoutes.size === 0) {
       this.lineOverlayManager.clearAll();
     } else {
-      // No painel de chegadas não temos direction toggle, usa sempre ida (0)
       const routeObjs = (this.nextArrivals?.availableRoutes || [])
         .filter(r => selectedRoutes.has(r.number))
         .map(r => ({
@@ -404,7 +481,6 @@ export class StopsMapApp {
           color:      r.color      || '#187EC2',
           text_color: r.text_color || '#FFFFFF'
         }));
-
       const overlayData = await routeService.fetchMultipleRoutesOverlay(routeObjs);
       this.lineOverlayManager.setRoutes(overlayData);
     }
@@ -459,6 +535,12 @@ export class StopsMapApp {
     this.currentStopPosition = null;
 
     this._setGlobalFilterBarDisabled(false);
+
+    // Limpar parâmetro ?stop da URL ao fechar o painel
+    const params = new URLSearchParams(window.location.search);
+    params.delete('stop');
+    const qs = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
 
     if (returnPosition) {
       this.suppressMapChangeUntil = Date.now() + 1800;
