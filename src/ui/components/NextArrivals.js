@@ -1,6 +1,6 @@
 /**
- * NextArrivals - Componente de UI para mostrar pr\u00f3ximas chegadas numa paragem
- * Inclui chips de filtro por linha de autocarro.
+ * NextArrivals - Componente de UI para mostrar pr\u00f3ximas chegadas numa paragem.
+ * Inclui chips de filtro por linha; ao alterar o filtro dispara onFilterChange.
  */
 
 import { vehicleService } from '../../services/vehicleService.js';
@@ -13,14 +13,14 @@ export class NextArrivals {
     this.onArrivalClickCallback = null;
     this.onCloseCallback = null;
     this.onRefreshCallback = null;
+    this.onFilterChangeCallback = null; // ⭐ novo
     this.currentStopId = null;
     this.loadingSpinner = null;
 
-    // Estado dos filtros
-    this.availableRoutes = [];   // [{id, number, name, color, text_color}]
-    this.selectedRoutes = new Set(); // n\u00fameros das linhas seleccionadas
-    this.allArrivals = [];        // todas as chegadas (sem filtro)
-    this.allVehicles = [];        // todos os ve\u00edculos
+    this.availableRoutes = [];
+    this.selectedRoutes = new Set();
+    this.allArrivals = [];
+    this.allVehicles = [];
   }
 
   create() {
@@ -46,16 +46,13 @@ export class NextArrivals {
         </button>
       </div>
 
-      <!-- ⭐ Linha de filtros por rota -->
       <div id="arrivals-filter-bar" class="arrivals-filter-bar" style="display:none;">
         <span class="filter-label">Filtrar por:</span>
         <div id="arrivals-filter-chips" class="arrivals-filter-chips"></div>
       </div>
 
       <div class="next-arrivals-content">
-        <div id="arrivals-list-panel" class="arrivals-list-panel panel-loading">
-          <!-- Loading spinner aparece aqui -->
-        </div>
+        <div id="arrivals-list-panel" class="arrivals-list-panel panel-loading"></div>
       </div>
 
       <div class="next-arrivals-footer">
@@ -91,29 +88,25 @@ export class NextArrivals {
   // Filtros
   // ---------------------------------------------------------------------------
 
-  /**
-   * Define as rotas dispon\u00edveis e renderiza os chips de filtro.
-   * Chamado antes de setArrivals (em paralelo com o fetch de chegadas).
-   * @param {Array} routes - [{id, number, name, color, text_color}]
-   */
   setRoutes(routes = []) {
     this.availableRoutes = routes;
-    this.selectedRoutes = new Set(); // limpar sele\u00e7\u00e3o ao mudar de paragem
+    this.selectedRoutes = new Set();
     this._renderFilterBar();
   }
 
-  /**
-   * Toggle de uma linha no filtro.
-   * Sem sele\u00e7\u00e3o = mostrar tudo.
-   */
   _toggleRoute(routeNumber) {
     if (this.selectedRoutes.has(routeNumber)) {
       this.selectedRoutes.delete(routeNumber);
     } else {
       this.selectedRoutes.add(routeNumber);
     }
-    this._renderFilterBar(); // re-renderiza chips para atualizar estado ativo/inativo
-    this._renderArrivals();  // re-filtra a lista
+    this._renderFilterBar();
+    this._renderArrivals();
+
+    // ⭐ Notificar o StopsMapApp para atualizar o mapa
+    if (this.onFilterChangeCallback) {
+      this.onFilterChangeCallback(new Set(this.selectedRoutes));
+    }
   }
 
   _renderFilterBar() {
@@ -122,10 +115,7 @@ export class NextArrivals {
     const chipsContainer = this.element.querySelector('#arrivals-filter-chips');
     if (!bar || !chipsContainer) return;
 
-    if (this.availableRoutes.length === 0) {
-      bar.style.display = 'none';
-      return;
-    }
+    if (this.availableRoutes.length === 0) { bar.style.display = 'none'; return; }
 
     bar.style.display = 'flex';
     chipsContainer.innerHTML = '';
@@ -143,19 +133,10 @@ export class NextArrivals {
     });
   }
 
-  /**
-   * Devolve as chegadas filtradas pelas linhas seleccionadas.
-   * Se nenhuma linha seleccionada, devolve todas.
-   */
   _getFilteredArrivals() {
     if (this.selectedRoutes.size === 0) return this.allArrivals;
     return this.allArrivals.filter(arrival => {
-      const num = String(
-        arrival.route_short_name ||
-        arrival.route_number ||
-        arrival.route_id ||
-        ''
-      );
+      const num = String(arrival.route_short_name || arrival.route_number || arrival.route_id || '');
       return this.selectedRoutes.has(num);
     });
   }
@@ -189,12 +170,10 @@ export class NextArrivals {
   show(stopName, stopId = null) {
     if (!this.element) this.create();
     this.currentStopId = stopId;
-
     const titleEl = this.element.querySelector('#arrivals-stop-name');
     const codeEl = this.element.querySelector('#arrivals-stop-code');
     if (titleEl && stopName) titleEl.textContent = stopName;
     if (codeEl && stopId) codeEl.textContent = `C\u00f3digo: ${stopId}`;
-
     this.showLoading();
     this.element.classList.add('visible');
     this.isVisible = true;
@@ -206,7 +185,6 @@ export class NextArrivals {
       this.isVisible = false;
       this.currentStopId = null;
       this.hideLoading();
-      // Limpar estado de filtros ao fechar
       this.availableRoutes = [];
       this.selectedRoutes = new Set();
       this.allArrivals = [];
@@ -234,18 +212,9 @@ export class NextArrivals {
     const filtered = this._getFilteredArrivals();
 
     if (!filtered || filtered.length === 0) {
-      if (this.allArrivals.length === 0) {
-        // De facto n\u00e3o h\u00e1 chegadas
-        listContainer.innerHTML = `
-          <p class="no-arrivals">
-            \u26a0\ufe0f N\u00e3o h\u00e1, de momento, localiza\u00e7\u00f5es dos autocarros previstos para esta paragem - pode ter que aguardar que estes iniciem viagem.<br><br>
-            Consulte <a href="index.html">aqui a localiza\u00e7\u00e3o em tempo real de todos os autocarros</a> ou verifique o hor\u00e1rio planeado na paragem.
-          </p>`;
-      } else {
-        // H\u00e1 chegadas mas o filtro n\u00e3o retorna nada
-        listContainer.innerHTML = `
-          <p class="no-arrivals">\u26a0\ufe0f Nenhuma chegada encontrada para as linhas seleccionadas.</p>`;
-      }
+      listContainer.innerHTML = this.allArrivals.length === 0
+        ? `<p class="no-arrivals">\u26a0\ufe0f N\u00e3o h\u00e1, de momento, localiza\u00e7\u00f5es dos autocarros previstos para esta paragem - pode ter que aguardar que estes iniciem viagem.<br><br>Consulte <a href="index.html">aqui a localiza\u00e7\u00e3o em tempo real de todos os autocarros</a> ou verifique o hor\u00e1rio planeado na paragem.</p>`
+        : `<p class="no-arrivals">\u26a0\ufe0f Nenhuma chegada encontrada para as linhas seleccionadas.</p>`;
       return;
     }
 
@@ -310,7 +279,7 @@ export class NextArrivals {
   }
 
   // ---------------------------------------------------------------------------
-  // Ic\u00f3nes, helpers
+  // \u00cdcones + helpers
   // ---------------------------------------------------------------------------
 
   getActiveLocationIcon() {
@@ -370,6 +339,8 @@ export class NextArrivals {
   onArrivalClick(callback) { this.onArrivalClickCallback = callback; }
   onClose(callback) { this.onCloseCallback = callback; }
   onRefresh(callback) { this.onRefreshCallback = callback; }
+  /** Chamado sempre que o filtro de linhas muda. Recebe Set<string> com as linhas activas (vazio = todas). */
+  onFilterChange(callback) { this.onFilterChangeCallback = callback; }
 
   destroy() {
     if (this.element) { this.element.remove(); this.element = null; }

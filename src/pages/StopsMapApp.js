@@ -32,7 +32,7 @@ export class StopsMapApp {
     this.currentStopPosition = null;
     this.refreshInterval = null;
     this.busMapCentered = false;
-    this.currentBusPositions = [];
+    this.currentBusPositions = []; // posi\u00e7\u00f5es de TODOS os autocarros (sem filtro)
 
     this.isSearchActive = false;
     this.suppressMapChangeUntil = 0;
@@ -67,6 +67,8 @@ export class StopsMapApp {
       this.nextArrivals.onArrivalClick((data) => this.handleArrivalClick(data));
       this.nextArrivals.onClose(() => this.handleCloseArrivals());
       this.nextArrivals.onRefresh(() => this.handleRefreshArrivals());
+      // ⭐ Quando o filtro muda, actualizar mapa
+      this.nextArrivals.onFilterChange((selectedRoutes) => this.handleFilterChange(selectedRoutes));
 
       await this.setupGeolocation();
       this.setupEventListeners();
@@ -210,15 +212,10 @@ export class StopsMapApp {
     this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     this.mapManager.map.closePopup();
 
-    // ⭐ Buscar info da paragem (linhas com cores) em paralelo com as chegadas
-    const [stopInfo] = await Promise.allSettled([
-      apiService.fetchStopInfo(stop.stop_id)
-    ]);
-
+    const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
     const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes
       ? stopInfo.value.routes
-      : (stop.routes || []); // fallback para rotas j\u00e1 no objeto da paragem (se houver)
-
+      : (stop.routes || []);
     this.nextArrivals.setRoutes(routes);
 
     await this.loadStopArrivals(stop.stop_id, true);
@@ -251,7 +248,10 @@ export class StopsMapApp {
       this.currentBusPositions = [];
       return;
     }
-    const busesToShow = [], busPositions = [];
+
+    const busesToShow = [];
+    const busPositions = [];
+
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
       const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
@@ -260,28 +260,77 @@ export class StopsMapApp {
         if (processedBus) {
           busesToShow.push(processedBus);
           busPositions.push([processedBus.latitude, processedBus.longitude]);
+
+          // ⭐ Guardar a associa\u00e7\u00e3o busId -> n\u00famero de linha
+          const routeNum = String(
+            arrival.route_short_name ||
+            arrival.route_number ||
+            arrival.route_id ||
+            processedBus.line ||
+            ''
+          );
+          this.busMarkerManager.setRouteForMarker(processedBus.id, routeNum);
         }
       }
     }
-    if (busesToShow.length === 0) { this.busMarkerManager.clearAllMarkers(); this.currentBusPositions = []; return; }
+
+    if (busesToShow.length === 0) {
+      this.busMarkerManager.clearAllMarkers();
+      this.currentBusPositions = [];
+      return;
+    }
+
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this.currentBusPositions = busPositions;
-    if (centerMap && !this.busMapCentered) { this.busMapCentered = true; setTimeout(() => this.recenterOnBuses(), 150); }
+
+    // Aplicar filtro activo (se existir) ap\u00f3s atualizar os markers
+    const activeFilter = this.nextArrivals?.selectedRoutes;
+    if (activeFilter && activeFilter.size > 0) {
+      const visiblePositions = this.busMarkerManager.filterByRoutes(activeFilter);
+      if (centerMap && !this.busMapCentered && visiblePositions.length > 0) {
+        this.busMapCentered = true;
+        setTimeout(() => this._recenterOnPositions(visiblePositions), 150);
+      }
+    } else {
+      if (centerMap && !this.busMapCentered) {
+        this.busMapCentered = true;
+        setTimeout(() => this.recenterOnBuses(), 150);
+      }
+    }
   }
 
-  recenterOnBuses() {
-    if (!this.mapManager || this.currentBusPositions.length === 0) return;
+  /**
+   * ⭐ Chamado pelo NextArrivals sempre que o utilizador toca num chip de filtro.
+   * Filtra os marcadores do mapa e recentra.
+   */
+  handleFilterChange(selectedRoutes) {
+    const visiblePositions = this.busMarkerManager.filterByRoutes(selectedRoutes);
+    if (visiblePositions.length > 0) {
+      this._recenterOnPositions(visiblePositions);
+    }
+    // Se n\u00e3o h\u00e1 autocarros vis\u00edveis para o filtro, n\u00e3o mover o mapa
+  }
+
+  /**
+   * Recentra o mapa numa lista de posi\u00e7\u00f5es [lat, lng], respeitando o offset do painel.
+   */
+  _recenterOnPositions(positions) {
+    if (!this.mapManager || positions.length === 0) return;
     const mapHeight = this.mapManager.map.getSize().y;
     const panelHeight = mapHeight * 0.5;
-    if (this.currentBusPositions.length === 1) {
-      this.mapManager.centerOnWithOffset(this.currentBusPositions[0], 16, Math.round(panelHeight * 0.5));
+    if (positions.length === 1) {
+      this.mapManager.centerOnWithOffset(positions[0], 16, Math.round(panelHeight * 0.5));
     } else {
-      this.mapManager.fitBounds(this.currentBusPositions, {
+      this.mapManager.fitBounds(positions, {
         paddingTopLeft: [60, 60],
         paddingBottomRight: [60, panelHeight + 60],
         maxZoom: 16, minZoom: 13
       });
     }
+  }
+
+  recenterOnBuses() {
+    this._recenterOnPositions(this.currentBusPositions);
   }
 
   handleArrivalClick(data) {
