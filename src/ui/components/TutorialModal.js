@@ -21,6 +21,11 @@ const STEPS = {
       body: 'Usa a barra de linhas no topo para ver apenas os autocarros de uma linha específica. Clica na seta \u2192/\u2190 no chip para alternar entre o sentido de ida e de volta.'
     },
     {
+      icon: '\uD83D\uDEBE',
+      title: 'Mapa de paragens',
+      body: 'No canto inferior esquerdo encontras o botão <strong>"Paragens"</strong>. Clica nele para aceder ao mapa de todas as paragens STCP — o mapa centra-se automaticamente na tua localização.'
+    },
+    {
       icon: '\uD83D\uDCCD',
       title: 'Próximas chegadas',
       body: 'Clica em cima de qualquer paragem para ver as próximas chegadas em tempo real. Podes filtrar por linha dentro do próprio painel.'
@@ -33,7 +38,7 @@ const STEPS = {
     {
       icon: '\uD83D\uDD17',
       title: 'Links directos',
-      body: 'Podes guardar um link directo para a tua paragem. Abre o painel de chegadas e copia o URL — inclui a paragem e a linha. No telemoóvel usa <em>"Adicionar ao ecrã inicial"</em> para criar um atalho.'
+      body: 'Podes guardar um link directo para a tua paragem. Abre o painel de chegadas e copia o URL — inclui a paragem e a linha. No telemóvel usa <em>"Adicionar ao ecrã inicial"</em> para criar um atalho.'
     },
     {
       icon: '\uD83C\uDF19',
@@ -45,7 +50,7 @@ const STEPS = {
     {
       icon: '\uD83D\uDEBF',
       title: 'Bem-vindo ao mapa de paragens!',
-      body: 'Aqui podes explorar todas as paragens STCP do Porto. O mapa mostra as paragens mais próximas da área visível e actualiza-se ao mover o mapa.'
+      body: 'Aqui podes explorar todas as paragens STCP do Porto. O mapa centra-se automaticamente na tua localização e mostra as paragens mais próximas da área visível.'
     },
     {
       icon: '\uD83D\uDD0D',
@@ -56,6 +61,11 @@ const STEPS = {
       icon: '\uD83D\uDDF3\uFE0F',
       title: 'Filtrar por linha',
       body: 'A barra de linhas no topo mostra as paragens e o percurso de uma linha específica no mapa. Usa a seta \u2192/\u2190 para ver a ida ou a volta.'
+    },
+    {
+      icon: '\uD83D\uDE8C',
+      title: 'Mapa de autocarros em tempo real',
+      body: 'No canto inferior esquerdo encontras o botão <strong>"Autocarros"</strong>. Clica nele para aceder ao mapa de localização em tempo real de todos os autocarros STCP — o mapa centra-se automaticamente na tua localização.'
     },
     {
       icon: '\uD83D\uDCCD',
@@ -70,7 +80,7 @@ const STEPS = {
     {
       icon: '\uD83D\uDD17',
       title: 'Links directos',
-      body: 'O URL actualiza-se automaticamente quando abres uma paragem. Copia o link e partilha-o — quem o abrir verá directamente as chegadas dessa paragem. No telemoóvel usa <em>"Adicionar ao ecrã inicial"</em>.'
+      body: 'O URL actualiza-se automaticamente quando abres uma paragem. Copia o link e partilha-o — quem o abrir verá directamente as chegadas dessa paragem. No telemóvel usa <em>"Adicionar ao ecrã inicial"</em>.'
     }
   ]
 };
@@ -158,7 +168,6 @@ export class TutorialModal {
     this.element.setAttribute('aria-hidden', 'true');
     this.element.classList.remove('visible');
     document.body.style.overflow = '';
-    // Marcar como visto
     const key = STORAGE_KEY[this.page];
     if (key) localStorage.setItem(key, '1');
   }
@@ -178,7 +187,6 @@ export class TutorialModal {
     this.element.querySelector('#tut-title').textContent = step.title;
     this.element.querySelector('#tut-body').innerHTML    = step.body;
 
-    // Dots
     const dotsEl = this.element.querySelector('#tut-dots');
     dotsEl.innerHTML = '';
     this.steps.forEach((_, i) => {
@@ -191,7 +199,7 @@ export class TutorialModal {
     const prevBtn = this.element.querySelector('#tut-prev');
     const nextBtn = this.element.querySelector('#tut-next');
     prevBtn.style.visibility = first ? 'hidden' : 'visible';
-    nextBtn.textContent = last ? 'Concluír \u2713' : 'Próximo \u2192';
+    nextBtn.textContent = last ? 'Concluir \u2713' : 'Próximo \u2192';
     nextBtn.classList.toggle('tutorial-btn-finish', last);
   }
 
