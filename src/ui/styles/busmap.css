@@ -52,7 +52,7 @@ html, body {
   color: #0072c6;
 }
 
-/* Header menu - centrado com base no timestamp */
+/* Header pill — topo centro (timestamp + refresh) */
 .header-overlay {
   position: absolute;
   top: 20px;
@@ -61,6 +61,7 @@ html, body {
   transform: translateX(-50%);
   z-index: 1000;
   display: flex;
+  flex-direction: row;
   gap: 12px;
   align-items: center;
   padding: 6px 12px;
@@ -71,6 +72,27 @@ html, body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   height: 56px;
+}
+
+/* Pill de filtro de linhas — imediatamente abaixo do header pill */
+#filter-row {
+  position: absolute;
+  top: 88px;            /* 20px (top header) + 56px (altura header) + 12px (gap) */
+  left: 50%;
+  margin-left: 20px;
+  transform: translateX(-50%);
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  padding: 6px 14px;
+  background-color: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 28px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  height: 48px;
 }
 
 /* Botões do menu */
@@ -133,7 +155,7 @@ html, body {
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  width: 92%; /* 80-95% da largura */
+  width: 92%;
   max-width: 1200px;
   padding: 12px 24px;
   background-color: rgba(255, 255, 255, 0.15);
@@ -158,13 +180,13 @@ html, body {
   text-decoration: underline;
 }
 
-/* Controlos empilhados no canto inferior direito - ACIMA do footer */
+/* Controlos empilhados no canto inferior direito */
 .leaflet-bottom.leaflet-right {
-  bottom: 80px; /* Espaço para o footer */
+  bottom: 80px;
   right: 20px;
 }
 
-/* Controlo de zoom do Leaflet - REMOVER moldura completamente */
+/* Controlo de zoom */
 .leaflet-control-zoom {
   border: none !important;
   box-shadow: none !important;
@@ -194,7 +216,7 @@ html, body {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2) !important;
 }
 
-/* Controlo de centrar - mesmo estilo */
+/* Controlo de centrar */
 .leaflet-control-center.leaflet-control {
   margin-bottom: 8px !important;
   margin-right: 0 !important;
@@ -225,13 +247,12 @@ html, body {
   height: 24px;
 }
 
-/* Controlos no canto inferior ESQUERDO */
+/* Controlos no canto inferior esquerdo */
 .leaflet-bottom.leaflet-left {
-  bottom: 80px; /* Espaço para o footer */
+  bottom: 80px;
   left: 20px;
 }
 
-/* Controlo de ver paragens - mesmo estilo dos outros controlos */
 .leaflet-control-stops.leaflet-control {
   margin-left: 0 !important;
   border: none !important;
@@ -292,14 +313,8 @@ html, body {
 }
 
 @keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
+  from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 /* Popup dos autocarros */
@@ -308,15 +323,8 @@ html, body {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
-.bus-popup {
-  font-family: inherit;
-  padding: 4px 0;
-}
-
-.bus-popup strong {
-  color: #0072c6;
-  font-size: 15px;
-}
+.bus-popup { font-family: inherit; padding: 4px 0; }
+.bus-popup strong { color: #0072c6; font-size: 15px; }
 
 /* Responsive - Tablet */
 @media (max-width: 768px) {
@@ -331,13 +339,8 @@ html, body {
     padding: 8px 12px;
   }
 
-  .logo-overlay img {
-    height: 28px;
-  }
-
-  .logo-overlay .logo-text {
-    font-size: 13px;
-  }
+  .logo-overlay img { height: 28px; }
+  .logo-overlay .logo-text { font-size: 13px; }
 
   .header-overlay {
     top: 12px;
@@ -345,15 +348,14 @@ html, body {
     gap: 8px;
   }
 
-  .header-btn {
-    width: 40px;
-    height: 40px;
+  #filter-row {
+    top: 72px;    /* 12px + 48px + 12px */
+    padding: 4px 10px;
+    height: 44px;
   }
 
-  .header-btn img {
-    width: 20px;
-    height: 20px;
-  }
+  .header-btn { width: 40px; height: 40px; }
+  .header-btn img { width: 20px; height: 20px; }
 
   .header-timestamp {
     padding: 8px 14px;
@@ -368,17 +370,9 @@ html, body {
   }
 
   .leaflet-bottom.leaflet-right,
-  .leaflet-bottom.leaflet-left {
-    bottom: 60px;
-  }
-
-  .leaflet-bottom.leaflet-right {
-    right: 12px;
-  }
-
-  .leaflet-bottom.leaflet-left {
-    left: 12px;
-  }
+  .leaflet-bottom.leaflet-left { bottom: 60px; }
+  .leaflet-bottom.leaflet-right { right: 12px; }
+  .leaflet-bottom.leaflet-left  { left: 12px; }
 
   .leaflet-control-zoom a,
   .leaflet-control-center button,
@@ -386,11 +380,7 @@ html, body {
     width: 40px !important;
     height: 40px !important;
   }
-
-  .leaflet-control-zoom a {
-    line-height: 40px !important;
-    font-size: 18px !important;
-  }
+  .leaflet-control-zoom a { line-height: 40px !important; font-size: 18px !important; }
 }
 
 /* Responsive - Mobile */
@@ -399,49 +389,26 @@ html, body {
     height: 44px;
     padding: 8px;
   }
+  .logo-overlay img { height: 28px; }
+  .logo-overlay .logo-text { display: none; }
 
-  .logo-overlay img {
-    height: 28px;
+  .header-overlay { height: 44px; font-size: 12px; }
+
+  #filter-row {
+    top: 68px;    /* 12px + 44px + 12px */
+    padding: 3px 10px;
+    height: 40px;
   }
 
-  /* ESCONDER texto do logo em mobile */
-  .logo-overlay .logo-text {
-    display: none;
-  }
+  .header-btn { width: 36px; height: 36px; }
+  .header-btn img { width: 18px; height: 18px; }
 
-  .header-overlay {
-    height: 44px;
-    font-size: 12px;
-  }
-
-  .header-btn {
-    width: 36px;
-    height: 36px;
-  }
-
-  .header-btn img {
-    width: 18px;
-    height: 18px;
-  }
-
-  .header-timestamp {
-    font-size: 12px;
-    height: 36px;
-    padding: 6px 12px;
-  }
+  .header-timestamp { font-size: 12px; height: 36px; padding: 6px 12px; }
 
   .leaflet-bottom.leaflet-right,
-  .leaflet-bottom.leaflet-left {
-    bottom: 60px;
-  }
-
-  .leaflet-bottom.leaflet-right {
-    right: 10px;
-  }
-
-  .leaflet-bottom.leaflet-left {
-    left: 10px;
-  }
+  .leaflet-bottom.leaflet-left { bottom: 60px; }
+  .leaflet-bottom.leaflet-right { right: 10px; }
+  .leaflet-bottom.leaflet-left  { left: 10px; }
 
   .leaflet-control-zoom a,
   .leaflet-control-center button,
@@ -450,9 +417,5 @@ html, body {
     height: 40px !important;
     margin-bottom: 6px !important;
   }
-
-  .leaflet-control-zoom a {
-    line-height: 40px !important;
-    font-size: 18px !important;
-  }
+  .leaflet-control-zoom a { line-height: 40px !important; font-size: 18px !important; }
 }

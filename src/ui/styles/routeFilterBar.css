@@ -1,24 +1,15 @@
 /* =========================================================
    RouteFilterBar — barra de chips de linha
-   Integra-se de forma transparente em qualquer container:
-   - index.html    : dentro de .header-overlay (pill horizontal frosted-glass)
-   - stopsmap.html : dentro de .search-overlay (coluna, abaixo do input)
+   Contextos suportados:
+   - #filter-row (index.html)       : pill independente abaixo do header
+   - .search-overlay (stopsmap.html): segunda linha dentro do pill de pesquisa
    ========================================================= */
 
 /* Wrapper base: sem fundo, borda nem sombra próprios */
 #route-filter-bar {
   display: flex;
   align-items: center;
-}
-
-/* Dentro do .header-overlay (index.html)
-   Aparece na mesma linha que o timestamp e o botão de refresh,
-   separado por uma linha fina à esquerda. */
-.header-overlay #route-filter-bar {
-  border-left: 1px solid rgba(255, 255, 255, 0.35);
-  padding-left: 10px;
-  height: 44px;
-  align-self: center;
+  width: 100%;
 }
 
 /* ---- Inner layout ---- */
@@ -31,19 +22,13 @@
   width: 100%;
 }
 
+/* Label "Filtrar por:" */
 .rfb-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.55);
   white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: .4px;
   flex-shrink: 0;
-}
-
-/* Label branco dentro do header pill */
-.header-overlay .rfb-label {
-  color: rgba(255, 255, 255, 0.7);
 }
 
 /* ---- Chips container (scrollável horizontalmente) ---- */
@@ -114,10 +99,6 @@
   white-space: nowrap;
   padding: 4px 0;
 }
-.header-overlay .rfb-loading,
-.header-overlay .rfb-empty {
-  color: rgba(255, 255, 255, 0.6);
-}
 
 /* ---- Disabled ---- */
 #route-filter-bar[data-disabled="true"] {
@@ -130,5 +111,5 @@
   .rfb-inner     { min-height: 32px; }
   .rfb-chip-main { font-size: 11px; padding: 3px 8px; }
   .rfb-chip-dir  { font-size: 12px; padding: 3px 6px; }
-  .rfb-label     { display: none; }
+  .rfb-label     { font-size: 11px; }
 }

@@ -23,7 +23,6 @@
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-
     gtag('config', 'G-BYVRR1K1R2');
   </script>
 </head>
@@ -38,8 +37,7 @@
     <span class="logo-text">STCP Live</span>
   </a>
 
-  <!-- Header menu no topo centro -->
-  <!-- Os chips de linha vivem DENTRO deste pill para herdar o frosted-glass -->
+  <!-- Header menu no topo centro (timestamp + refresh) -->
   <div class="header-overlay">
     <div id="last-update-time" class="header-timestamp">
       Última atualização: <strong>--:--:--</strong>
@@ -47,7 +45,10 @@
     <button id="refresh-now" class="header-btn" title="Atualizar dados">
       <img src="./resources/atualizar.png" alt="Atualizar">
     </button>
-    <!-- Chips de filtro de linha: separados por uma linha fina à esquerda -->
+  </div>
+
+  <!-- Barra de filtro de linhas: pill separado, imediatamente abaixo do header -->
+  <div id="filter-row">
     <div id="route-filter-bar"></div>
   </div>
 
