@@ -20,9 +20,6 @@
 </head>
 <body>
 
-  <!-- Barra de filtro de linhas (por cima do mapa) -->
-  <div id="route-filter-bar"></div>
-
   <!-- Mapa full-screen -->
   <div id="map"></div>
 
@@ -33,6 +30,7 @@
   </a>
 
   <!-- Header menu no topo centro -->
+  <!-- Os chips de linha vivem DENTRO deste pill para herdar o frosted-glass -->
   <div class="header-overlay">
     <div id="last-update-time" class="header-timestamp">
       Última atualização: <strong>--:--:--</strong>
@@ -40,6 +38,8 @@
     <button id="refresh-now" class="header-btn" title="Atualizar dados">
       <img src="./resources/atualizar.png" alt="Atualizar">
     </button>
+    <!-- Chips de filtro de linha: separados por uma linha fina à esquerda -->
+    <div id="route-filter-bar"></div>
   </div>
 
   <!-- Rodapé no fundo centro -->
@@ -54,7 +54,7 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
-  <!-- Nossa aplicação refatorizada -->
+  <!-- Nossa aplicação -->
   <script type="module" src="./src/pages/BusMapApp.js"></script>
 </body>
 </html>

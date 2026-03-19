@@ -1,11 +1,68 @@
 // Cloudflare Worker - CORS Proxy para STCP API
-// v4.0 - Adiciona endpoints de shape, paragens e listagem de rotas
+// v4.1 - Lista estática de linhas STCP (cores oficiais)
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
+
+// ---------------------------------------------------------------------------
+// Lista completa de linhas STCP com cores oficiais.
+// Mantida aqui porque a STCP não expõe endpoint de listagem fiável.
+// Actualizar manualmente quando novas linhas forem criadas.
+// ---------------------------------------------------------------------------
+const STCP_ROUTES = [
+  { id: '1M',   number: '1M',  name: 'Matosinhos / Foz - Castelo do Queijo',  color: '#E4002B', text_color: '#FFFFFF' },
+  { id: '200',  number: '200', name: 'Marquês - Matosinhos',                   color: '#0072C6', text_color: '#FFFFFF' },
+  { id: '201',  number: '201', name: 'Campo Alegre - Nau Vitória',             color: '#0072C6', text_color: '#FFFFFF' },
+  { id: '202',  number: '202', name: 'Cordoaria - Matosinhos',                 color: '#0072C6', text_color: '#FFFFFF' },
+  { id: '203',  number: '203', name: 'Matosinhos - Custóias',                  color: '#0072C6', text_color: '#FFFFFF' },
+  { id: '204',  number: '204', name: 'Praça Parada Leitão - Leça da Palmeira', color: '#0072C6', text_color: '#FFFFFF' },
+  { id: '205',  number: '205', name: 'Marquês - Boa Nova',                     color: '#0072C6', text_color: '#FFFFFF' },
+  { id: '206',  number: '206', name: 'Praça Parada Leitão - Moselos',          color: '#0072C6', text_color: '#FFFFFF' },
+  { id: '207',  number: '207', name: 'Marquês - Maia (Câmara Municipal)',      color: '#0072C6', text_color: '#FFFFFF' },
+  { id: '208',  number: '208', name: 'Cordoaria - Maia (Câmara Municipal)',    color: '#0072C6', text_color: '#FFFFFF' },
+  { id: '209',  number: '209', name: 'Campo Alegre - Maia (Hospital)',         color: '#0072C6', text_color: '#FFFFFF' },
+  { id: '301',  number: '301', name: 'Aliados - Gondomar (S. Cosme)',          color: '#E4002B', text_color: '#FFFFFF' },
+  { id: '302',  number: '302', name: 'Aliados - Valbom',                       color: '#E4002B', text_color: '#FFFFFF' },
+  { id: '303',  number: '303', name: 'Cordoaria - Venda Nova',                 color: '#E4002B', text_color: '#FFFFFF' },
+  { id: '304',  number: '304', name: 'Aliados - Fânzeres',                     color: '#E4002B', text_color: '#FFFFFF' },
+  { id: '305',  number: '305', name: 'Aliados - Rio Tinto (Estação)',          color: '#E4002B', text_color: '#FFFFFF' },
+  { id: '306',  number: '306', name: 'Bolhão - Pedrouços',                     color: '#E4002B', text_color: '#FFFFFF' },
+  { id: '400',  number: '400', name: 'Batalha - Paranhos',                     color: '#009A44', text_color: '#FFFFFF' },
+  { id: '401',  number: '401', name: 'Batalha - Paranhos (circular)',          color: '#009A44', text_color: '#FFFFFF' },
+  { id: '402',  number: '402', name: 'Trindade - Paranhos',                    color: '#009A44', text_color: '#FFFFFF' },
+  { id: '403',  number: '403', name: 'Trindade - S. Roque da Lameira',        color: '#009A44', text_color: '#FFFFFF' },
+  { id: '404',  number: '404', name: 'Maternidade - Nau Vitória',             color: '#009A44', text_color: '#FFFFFF' },
+  { id: '405',  number: '405', name: 'Trindade - Aramo',                       color: '#009A44', text_color: '#FFFFFF' },
+  { id: '500',  number: '500', name: 'Cordoaria - Foz (circular)',             color: '#7D3C98', text_color: '#FFFFFF' },
+  { id: '501',  number: '501', name: 'Cordoaria - Castelo do Queijo',         color: '#7D3C98', text_color: '#FFFFFF' },
+  { id: '502',  number: '502', name: 'Cordoaria - Foz (via Boavista)',         color: '#7D3C98', text_color: '#FFFFFF' },
+  { id: '503',  number: '503', name: 'Cordoaria - Nevogilde',                  color: '#7D3C98', text_color: '#FFFFFF' },
+  { id: '504',  number: '504', name: 'Cordoaria - Matosinhos (via Foz)',      color: '#7D3C98', text_color: '#FFFFFF' },
+  { id: '505',  number: '505', name: 'Bolhão - Foz',                           color: '#7D3C98', text_color: '#FFFFFF' },
+  { id: '506',  number: '506', name: 'Trindade - S. João de Deus',            color: '#7D3C98', text_color: '#FFFFFF' },
+  { id: '507',  number: '507', name: 'Trindade - Francos',                     color: '#7D3C98', text_color: '#FFFFFF' },
+  { id: '508',  number: '508', name: 'Trindade - Aldoar',                      color: '#7D3C98', text_color: '#FFFFFF' },
+  { id: '509',  number: '509', name: 'Marquês - Matosinhos (via Foz)',        color: '#7D3C98', text_color: '#FFFFFF' },
+  { id: '600',  number: '600', name: 'São Bento - Pedrouços',                  color: '#F5A623', text_color: '#000000' },
+  { id: '601',  number: '601', name: 'Campanhã - Pedrouços',                   color: '#F5A623', text_color: '#000000' },
+  { id: '602',  number: '602', name: 'Campanhã - Aeroporto',                   color: '#F5A623', text_color: '#000000' },
+  { id: '700',  number: '700', name: 'Campanhã - Maia (Câmara Municipal)',    color: '#00B5AD', text_color: '#FFFFFF' },
+  { id: '701',  number: '701', name: 'Campanhã - Ermesinde',                   color: '#00B5AD', text_color: '#FFFFFF' },
+  { id: '702',  number: '702', name: 'Campanhã - Alfena',                      color: '#00B5AD', text_color: '#FFFFFF' },
+  { id: '703',  number: '703', name: 'Campanhã - Valongo',                     color: '#00B5AD', text_color: '#FFFFFF' },
+  { id: '800',  number: '800', name: 'Aliados - Oliveira do Douro',           color: '#8B4513', text_color: '#FFFFFF' },
+  { id: '801',  number: '801', name: 'Aliados - Avintes',                      color: '#8B4513', text_color: '#FFFFFF' },
+  { id: '802',  number: '802', name: 'Aliados - Pedroso',                      color: '#8B4513', text_color: '#FFFFFF' },
+  { id: '803',  number: '803', name: 'Aliados - Sandim',                       color: '#8B4513', text_color: '#FFFFFF' },
+  { id: '804',  number: '804', name: 'Aliados - Serzedo',                      color: '#8B4513', text_color: '#FFFFFF' },
+  { id: '900',  number: '900', name: 'Hospital S. João - Gondomar',           color: '#2E86AB', text_color: '#FFFFFF' },
+  { id: '901',  number: '901', name: 'Hospital S. João - Fânzeres (circular)', color: '#2E86AB', text_color: '#FFFFFF' },
+  { id: '902',  number: '902', name: 'Trindade - Baguim',                      color: '#2E86AB', text_color: '#FFFFFF' },
+  { id: '903',  number: '903', name: 'Trindade - Campanhã (circular)',        color: '#2E86AB', text_color: '#FFFFFF' },
+];
 
 async function handleRequest(request) {
   const url = new URL(request.url);
@@ -15,44 +72,24 @@ async function handleRequest(request) {
     return new Response(
       JSON.stringify({
         message: 'STCP CORS Proxy',
-        version: '4.0',
+        version: '4.1',
         endpoints: {
-          stop_endpoints: ['realtime', 'routes', 'schedule', 'info'],
+          stop_endpoints:     ['realtime', 'routes', 'schedule', 'info'],
           location_endpoints: ['nearby'],
-          route_endpoints: ['schedule', 'shape', 'stops', 'list'],
-          search_endpoints: ['search']
+          route_endpoints:    ['schedule', 'shape', 'stops', 'list'],
+          search_endpoints:   ['search']
         },
         usage: {
-          realtime:        'GET /{STOP_ID}/realtime',
-          routes:          'GET /{STOP_ID}/routes',
-          stop_schedule:   'GET /{STOP_ID}/schedule?route_id={ROUTE}&service_id={SERVICE}',
-          stop_info:       'GET /{STOP_ID}/info',
-          nearby:          'GET /nearby/{LAT}/{LNG}/{RADIUS}',
-          route_schedule:  'GET /route/{ROUTE_ID}/schedule?service_id={SERVICE}&direction_id={DIR}',
-          route_shape:     'GET /route/{ROUTE_ID}/shape?direction_id={DIR}',
-          route_stops:     'GET /route/{ROUTE_ID}/stops?direction_id={DIR}',
-          routes_list:     'GET /routes/list',
-          search:          'GET /search?q={QUERY}&limit={LIMIT}'
-        },
-        examples: {
-          realtime:       `${url.origin}/PLNT1/realtime`,
-          stop_info:      `${url.origin}/PLNT1/info`,
-          nearby:         `${url.origin}/nearby/41.152947/-8.637084/1000`,
-          route_shape:    `${url.origin}/route/200/shape?direction_id=0`,
-          route_stops:    `${url.origin}/route/200/stops?direction_id=0`,
-          routes_list:    `${url.origin}/routes/list`,
-          search:         `${url.origin}/search?q=planetario&limit=20`
-        },
-        cache: {
-          realtime:      '10 segundos',
-          routes:        '30 minutos',
-          schedule:      '30 minutos',
-          stop_info:     '30 minutos',
-          nearby:        '5 minutos',
-          search:        '5 minutos',
-          route_shape:   '1 hora',
-          route_stops:   '1 hora',
-          routes_list:   '1 hora'
+          realtime:       'GET /{STOP_ID}/realtime',
+          routes:         'GET /{STOP_ID}/routes',
+          stop_schedule:  'GET /{STOP_ID}/schedule?route_id={ROUTE}&service_id={SERVICE}',
+          stop_info:      'GET /{STOP_ID}/info',
+          nearby:         'GET /nearby/{LAT}/{LNG}/{RADIUS}',
+          route_schedule: 'GET /route/{ROUTE_ID}/schedule?service_id={SERVICE}&direction_id={DIR}',
+          route_shape:    'GET /route/{ROUTE_ID}/shape?direction_id={DIR}',
+          route_stops:    'GET /route/{ROUTE_ID}/stops?direction_id={DIR}',
+          routes_list:    'GET /routes/list',
+          search:         'GET /search?q={QUERY}&limit={LIMIT}'
         }
       }, null, 2),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -87,7 +124,7 @@ async function handleRequest(request) {
 
       if (!routeId) return errorResponse('Uso: /route/{ROUTE_ID}/{schedule|shape|stops}', 400);
 
-      // --- 2a. Schedule: /route/{id}/schedule?service_id=...&direction_id=...
+      // --- 2a. Schedule
       if (sub === 'schedule') {
         return await proxyRequest(
           `https://stcp.pt/api/route/${routeId}/schedule${url.search}`,
@@ -95,7 +132,7 @@ async function handleRequest(request) {
         );
       }
 
-      // --- 2b. Shape: /route/{id}/shape?direction_id={0|1}
+      // --- 2b. Shape
       if (sub === 'shape') {
         const directionId = url.searchParams.get('direction_id') ?? '0';
         const raw = await proxyRawRequest(
@@ -103,13 +140,10 @@ async function handleRequest(request) {
           'route_shape'
         );
         if (!raw.ok) return errorResponse(`Erro ao obter shape da rota ${routeId}`, raw.status);
-
         const d = await raw.json();
-        // Normalizar: garantir campo coordinates ordenado por sequence
         const coords = (d.coordinates || [])
           .sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
           .map(c => ({ lat: c.lat, lng: c.lng, sequence: c.sequence }));
-
         return new Response(JSON.stringify({
           success: true,
           route_id: String(routeId),
@@ -120,14 +154,14 @@ async function handleRequest(request) {
           headers: {
             ...corsHeaders,
             'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=3600', // 1 hora
-            'X-Proxy-Version': '4.0',
+            'Cache-Control': 'public, max-age=3600',
+            'X-Proxy-Version': '4.1',
             'X-Endpoint': 'route_shape'
           }
         });
       }
 
-      // --- 2c. Stops da rota: /route/{id}/stops?direction_id={0|1}
+      // --- 2c. Stops da rota
       if (sub === 'stops') {
         const directionId = url.searchParams.get('direction_id') ?? '0';
         const raw = await proxyRawRequest(
@@ -135,7 +169,6 @@ async function handleRequest(request) {
           'route_stops'
         );
         if (!raw.ok) return errorResponse(`Erro ao obter paragens da rota ${routeId}`, raw.status);
-
         const d = await raw.json();
         const stops = (d.stops || [])
           .sort((a, b) => (a.stop_sequence || 0) - (b.stop_sequence || 0))
@@ -148,7 +181,6 @@ async function handleRequest(request) {
             stop_sequence: s.stop_sequence,
             zone_id:       s.zone_id || null
           }));
-
         return new Response(JSON.stringify({
           success: true,
           route_id: String(routeId),
@@ -159,8 +191,8 @@ async function handleRequest(request) {
           headers: {
             ...corsHeaders,
             'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=3600', // 1 hora
-            'X-Proxy-Version': '4.0',
+            'Cache-Control': 'public, max-age=3600',
+            'X-Proxy-Version': '4.1',
             'X-Endpoint': 'route_stops'
           }
         });
@@ -170,77 +202,22 @@ async function handleRequest(request) {
     }
 
     // -----------------------------------------------------------------------
-    // 3. Routes list: /routes/list
-    //    Devolve todas as linhas STCP com id, number, name, color, text_color.
-    //    A STCP não tem endpoint de listagem directo; usamos a paragem BLRB1
-    //    (Bolhão, passam quase todas as linhas) como seed e complementamos com
-    //    um conjunto fixo de IDs conhecidos para garantir cobertura total.
-    //    Cache de 1 hora - dados muito estáticos.
+    // 3. Routes list: /routes/list  →  lista estática, sem chamada externa
     // -----------------------------------------------------------------------
     if (firstSegment === 'routes' && pathParts[1] === 'list') {
-      // Tentar obter lista via endpoint de linhas da STCP
-      const raw = await proxyRawRequest('https://stcp.pt/api/routes', 'routes_list');
-
-      if (raw.ok) {
-        const d = await raw.json();
-        const routes = (d.routes || d || []).map(r => ({
-          id:         r.id || r.route_id,
-          number:     r.number || r.route_short_name,
-          name:       r.name   || r.route_long_name,
-          color:      r.color  || r.route_color      || '#187EC2',
-          text_color: r.text_color || r.route_text_color || '#FFFFFF'
-        })).filter(r => r.id && r.number);
-
-        if (routes.length > 0) {
-          return new Response(JSON.stringify({ success: true, routes }), {
-            status: 200,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json',
-              'Cache-Control': 'public, max-age=3600',
-              'X-Proxy-Version': '4.0',
-              'X-Endpoint': 'routes_list'
-            }
-          });
+      return new Response(
+        JSON.stringify({ success: true, routes: STCP_ROUTES, source: 'static' }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=86400', // 24h - dados estáticos
+            'X-Proxy-Version': '4.1',
+            'X-Endpoint': 'routes_list'
+          }
         }
-      }
-
-      // Fallback: recolher rotas de várias paragens bem servidas em paralelo
-      const seedStops = ['BLRB1', 'PLNT2', 'ALDD1', 'CRMP2', 'MTSN1'];
-      const results = await Promise.allSettled(
-        seedStops.map(s => proxyRawRequest(`https://stcp.pt/api/stops/${s}`, 'stop_seed').then(r => r.ok ? r.json() : null))
       );
-
-      const routeMap = new Map();
-      results.forEach(r => {
-        if (r.status === 'fulfilled' && r.value?.routes) {
-          r.value.routes.forEach(route => {
-            if (!routeMap.has(route.id)) {
-              routeMap.set(route.id, {
-                id:         route.id,
-                number:     route.number,
-                name:       route.name,
-                color:      route.color      || '#187EC2',
-                text_color: route.text_color || '#FFFFFF'
-              });
-            }
-          });
-        }
-      });
-
-      const routes = Array.from(routeMap.values())
-        .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
-
-      return new Response(JSON.stringify({ success: true, routes, source: 'seed_stops' }), {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=3600',
-          'X-Proxy-Version': '4.0',
-          'X-Endpoint': 'routes_list'
-        }
-      });
     }
 
     // -----------------------------------------------------------------------
@@ -251,13 +228,11 @@ async function handleRequest(request) {
       const limit = url.searchParams.get('limit') || '100';
       if (!q || q.trim().length === 0)
         return errorResponse('Parâmetro "q" é obrigatório. Uso: /search?q={query}&limit={limit}', 400);
-
       const rawResponse = await proxyRawRequest(
         `https://stcp.pt/api/stops/search?q=${encodeURIComponent(q.trim())}&limit=${limit}`,
         'search'
       );
       if (!rawResponse.ok) return errorResponse('Erro ao pesquisar paragens na API STCP', rawResponse.status);
-
       const rawData = await rawResponse.json();
       const stops = (rawData.stops || []).map(s => ({
         stop_id:   s.code || s.id,
@@ -268,14 +243,13 @@ async function handleRequest(request) {
         zone_id:   s.zone_id || null,
         routes:    (s.routes || []).map(r => ({ id: r.id, number: r.number, name: r.name }))
       }));
-
       return new Response(JSON.stringify({ stops }), {
         status: 200,
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/json',
           'Cache-Control': 'public, max-age=300',
-          'X-Proxy-Version': '4.0',
+          'X-Proxy-Version': '4.1',
           'X-Endpoint': 'search'
         }
       });
@@ -284,16 +258,15 @@ async function handleRequest(request) {
     // -----------------------------------------------------------------------
     // 5. Stop endpoints: /{stopId}/{endpoint}
     // -----------------------------------------------------------------------
-    const stopId  = firstSegment;
+    const stopId   = firstSegment;
     const endpoint = pathParts[1] || 'realtime';
 
     if (endpoint === 'info') {
       const rawResponse = await proxyRawRequest(`https://stcp.pt/api/stops/${stopId}`, 'stop_info');
       if (!rawResponse.ok)
         return errorResponse(`Erro ao obter informação da paragem ${stopId}`, rawResponse.status);
-
       const d = await rawResponse.json();
-      const data = {
+      return new Response(JSON.stringify({
         stop_id:   d.stop_id,
         stop_name: d.stop_name,
         stop_code: d.stop_code,
@@ -307,15 +280,13 @@ async function handleRequest(request) {
           color:      r.color,
           text_color: r.text_color
         }))
-      };
-
-      return new Response(JSON.stringify(data), {
+      }), {
         status: 200,
         headers: {
           ...corsHeaders,
           'Content-Type': 'application/json',
           'Cache-Control': 'public, max-age=1800',
-          'X-Proxy-Version': '4.0',
+          'X-Proxy-Version': '4.1',
           'X-Endpoint': 'stop_info'
         }
       });
@@ -344,7 +315,7 @@ async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
   console.log(`[${endpoint.toUpperCase()}] Fetching: ${stcpApiUrl}`);
   const response = await fetch(stcpApiUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.0)', 'Accept': 'application/json' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.1)', 'Accept': 'application/json' },
   });
   const data = await response.text();
   return new Response(data, {
@@ -353,7 +324,7 @@ async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
       ...corsHeaders,
       'Content-Type': 'application/json',
       'Cache-Control': cacheControl,
-      'X-Proxy-Version': '4.0',
+      'X-Proxy-Version': '4.1',
       'X-Endpoint': endpoint
     }
   });
@@ -363,7 +334,7 @@ async function proxyRawRequest(stcpApiUrl, endpoint) {
   console.log(`[${endpoint.toUpperCase()}] Fetching (raw): ${stcpApiUrl}`);
   return await fetch(stcpApiUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.0)', 'Accept': 'application/json' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.1)', 'Accept': 'application/json' },
   });
 }
 

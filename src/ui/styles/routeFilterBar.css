@@ -1,32 +1,58 @@
 /* =========================================================
    RouteFilterBar — barra de chips de linha
-   Fase 4: chips com botão de direcção ida/volta
+   Integra-se de forma transparente em qualquer container:
+   - index.html      : dentro de .header-overlay (pill frosted-glass)
+   - stopsmap.html   : dentro de .search-overlay  (abaixo do input)
    ========================================================= */
 
+/* O wrapper #route-filter-bar não deve ter fundo, borda nem sombra próprios.
+   Toda a aparência vem do container pai. */
 #route-filter-bar {
-  position: relative;
-  z-index: 900;
-  background: #fff;
-  border-bottom: 1px solid #e0e0e0;
-  box-shadow: 0 2px 6px rgba(0,0,0,.08);
+  /* sem background, sem border, sem box-shadow */
+  display: flex;
+  align-items: center;
 }
 
+/* Dentro do .header-overlay (index.html):
+   adiciona separador visual à esquerda e alinha na linha do header */
+.header-overlay #route-filter-bar {
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+  padding-left: 10px;
+  height: 44px;        /* mesma altura dos outros elementos do header */
+  align-self: center;
+}
+
+/* Dentro do .search-overlay (stopsmap.html):
+   ocupa toda a largura e tem um separador visual no topo */
+.search-overlay #route-filter-bar {
+  width: 100%;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 4px 0 2px;
+}
+
+/* ---- Inner layout ---- */
 .rfb-inner {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  min-height: 44px;
+  padding: 0 4px;
+  min-height: 36px;
+  width: 100%;
 }
 
 .rfb-label {
   font-size: 11px;
   font-weight: 600;
-  color: #666;
+  color: rgba(0, 0, 0, 0.45);
   white-space: nowrap;
   text-transform: uppercase;
   letter-spacing: .4px;
   flex-shrink: 0;
+}
+
+/* Dentro do header o label fica branco/translucido */
+.header-overlay .rfb-label {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 /* ---- Chips container (scrollável horizontalmente) ---- */
@@ -37,31 +63,31 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding-bottom: 2px;
+  padding-bottom: 1px;
   flex: 1;
 }
 .rfb-chips::-webkit-scrollbar { display: none; }
 
-/* ---- Chip wrapper (agrupa botão principal + botão dir) ---- */
+/* ---- Chip wrapper ---- */
 .rfb-chip {
   display: inline-flex;
   align-items: stretch;
   flex-shrink: 0;
   border-radius: 999px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,.18);
-  opacity: 0.55;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  opacity: 0.6;
   transition: opacity .15s, transform .1s, box-shadow .15s;
 }
 .rfb-chip:hover {
-  opacity: 0.8;
+  opacity: 0.85;
   transform: translateY(-1px);
-  box-shadow: 0 3px 7px rgba(0,0,0,.22);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
 }
 .rfb-chip.active {
   opacity: 1;
   transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(0,0,0,.28);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
 }
 
 /* ---- Botão principal (número da linha) ---- */
@@ -73,16 +99,15 @@
   cursor: pointer;
   white-space: nowrap;
   line-height: 1.4;
-  background: transparent; /* cor vem do inline style */
 }
 .rfb-chip.active .rfb-chip-main {
-  padding-right: 6px; /* aproxima dos dois botões quando activo */
+  padding-right: 6px;
 }
 
-/* ---- Botão de direcção (ida → / volta ←) ---- */
+/* ---- Botão de direcção (→ / ←) ---- */
 .rfb-chip-dir {
   border: none;
-  border-left: 1px solid rgba(255,255,255,.35);
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
   padding: 4px 7px;
   font-size: 13px;
   font-weight: 700;
@@ -94,13 +119,17 @@
   filter: brightness(1.15);
 }
 
-/* ---- Estados loading / vazio ---- */
+/* ---- Loading / vazio ---- */
 .rfb-loading,
 .rfb-empty {
   font-size: 12px;
-  color: #999;
+  color: rgba(0, 0, 0, 0.4);
   white-space: nowrap;
   padding: 4px 0;
+}
+.header-overlay .rfb-loading,
+.header-overlay .rfb-empty {
+  color: rgba(255, 255, 255, 0.6);
 }
 
 /* ---- Disabled (painel de chegadas aberto) ---- */
@@ -111,7 +140,7 @@
 
 /* ---- Responsive ---- */
 @media (max-width: 480px) {
-  .rfb-inner     { padding: 4px 8px; min-height: 38px; }
+  .rfb-inner     { min-height: 32px; }
   .rfb-chip-main { font-size: 11px; padding: 3px 8px; }
   .rfb-chip-dir  { font-size: 12px; padding: 3px 6px; }
   .rfb-label     { display: none; }
