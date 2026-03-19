@@ -13,8 +13,8 @@ const corsHeaders = {
 // Actualizar manualmente quando novas linhas forem criadas.
 // ---------------------------------------------------------------------------
 const STCP_ROUTES = [
-  { id: '1M',   number: '1M',  name: 'Matosinhos / Foz - Castelo do Queijo',  color: '#E4002B', text_color: '#FFFFFF' },
-  { id: '200',  number: '200', name: 'Marquês - Matosinhos',                   color: '#0072C6', text_color: '#FFFFFF' },
+  { id: '1M',   number: '1M',  name: 'Aliados - Matosinhos',  color: '#E4002B', text_color: '#FFFFFF' },
+  { id: '200',  number: '200', name: 'Bolhão - Castelo do Queijo',                   color: '#0072C6', text_color: '#FFFFFF' },
   { id: '201',  number: '201', name: 'Campo Alegre - Nau Vitória',             color: '#0072C6', text_color: '#FFFFFF' },
   { id: '202',  number: '202', name: 'Cordoaria - Matosinhos',                 color: '#0072C6', text_color: '#FFFFFF' },
   { id: '203',  number: '203', name: 'Matosinhos - Custóias',                  color: '#0072C6', text_color: '#FFFFFF' },
@@ -29,13 +29,11 @@ const STCP_ROUTES = [
   { id: '303',  number: '303', name: 'Cordoaria - Venda Nova',                 color: '#E4002B', text_color: '#FFFFFF' },
   { id: '304',  number: '304', name: 'Aliados - Fânzeres',                     color: '#E4002B', text_color: '#FFFFFF' },
   { id: '305',  number: '305', name: 'Aliados - Rio Tinto (Estação)',          color: '#E4002B', text_color: '#FFFFFF' },
-  { id: '306',  number: '306', name: 'Bolhão - Pedrouços',                     color: '#E4002B', text_color: '#FFFFFF' },
   { id: '400',  number: '400', name: 'Batalha - Paranhos',                     color: '#009A44', text_color: '#FFFFFF' },
   { id: '401',  number: '401', name: 'Batalha - Paranhos (circular)',          color: '#009A44', text_color: '#FFFFFF' },
   { id: '402',  number: '402', name: 'Trindade - Paranhos',                    color: '#009A44', text_color: '#FFFFFF' },
   { id: '403',  number: '403', name: 'Trindade - S. Roque da Lameira',        color: '#009A44', text_color: '#FFFFFF' },
   { id: '404',  number: '404', name: 'Maternidade - Nau Vitória',             color: '#009A44', text_color: '#FFFFFF' },
-  { id: '405',  number: '405', name: 'Trindade - Aramo',                       color: '#009A44', text_color: '#FFFFFF' },
   { id: '500',  number: '500', name: 'Cordoaria - Foz (circular)',             color: '#7D3C98', text_color: '#FFFFFF' },
   { id: '501',  number: '501', name: 'Cordoaria - Castelo do Queijo',         color: '#7D3C98', text_color: '#FFFFFF' },
   { id: '502',  number: '502', name: 'Cordoaria - Foz (via Boavista)',         color: '#7D3C98', text_color: '#FFFFFF' },
