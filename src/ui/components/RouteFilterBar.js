@@ -1,29 +1,27 @@
 /**
- * RouteFilterBar - Barra horizontal de chips de linha para filtrar o mapa.
+ * RouteFilterBar - Barra horizontal de chips de linha.
  *
- * Usada em:
- *  - index.html   (BusMapApp)   - filtra autocarros e desenha linhas
- *  - stopsmap.html (StopsMapApp) - filtra paragens e desenha linhas
+ * Fase 4: cada chip tem um botão de direção (0 = ida / 1 = volta)
+ * que aparece APENAS quando o chip está activo.
  *
- * Interface:
- *  - setRoutes(routes)         define a lista completa de linhas
- *  - getSelected()             devolve Set<string> com números seleccionados
- *  - onFilterChange(callback)  callback(Set<string>) chamado em cada toggle
- *  - setLoading(bool)          mostra spinner enquanto carrega a lista
+ * Interface pública:
+ *  mount()                      injeta HTML no container
+ *  setRoutes(routes[])          define lista de linhas
+ *  setLoading(bool)             spinner enquanto carrega
+ *  getSelected()                Set<string> de números seleccionados
+ *  onFilterChange(cb)           cb(Set<string>, routeObjects[])
+ *                               routeObjects inclui campo direction (0|1)
  */
 
 export class RouteFilterBar {
   constructor(containerId) {
     this.containerId = containerId;
-    this.container = null;
-    this.routes = [];
-    this.selected = new Set();
+    this.container   = null;
+    this.routes      = [];
+    // selected: Map<routeNumber, { route, direction: 0|1 }>
+    this.selected    = new Map();
     this._onFilterChange = null;
   }
-
-  // ---------------------------------------------------------------------------
-  // Init
-  // ---------------------------------------------------------------------------
 
   mount() {
     this.container = document.getElementById(this.containerId);
@@ -35,23 +33,17 @@ export class RouteFilterBar {
       <div class="rfb-inner">
         <span class="rfb-label">Linhas:</span>
         <div class="rfb-chips" id="rfb-chips-${this.containerId}"></div>
-      </div>
-    `;
+      </div>`;
   }
 
-  // ---------------------------------------------------------------------------
-  // Dados
-  // ---------------------------------------------------------------------------
-
   setRoutes(routes = []) {
-    this.routes = routes;
-    this.selected = new Set(); // limpar seleção ao carregar nova lista
+    this.routes   = routes;
+    this.selected = new Map();
     this._render();
   }
 
   setLoading(isLoading) {
-    if (!this.container) return;
-    const chipsEl = this.container.querySelector(`#rfb-chips-${this.containerId}`);
+    const chipsEl = this._chipsEl();
     if (!chipsEl) return;
     if (isLoading) {
       chipsEl.innerHTML = '<span class="rfb-loading">A carregar linhas...</span>';
@@ -61,12 +53,8 @@ export class RouteFilterBar {
   }
 
   getSelected() {
-    return new Set(this.selected);
+    return new Set(this.selected.keys());
   }
-
-  // ---------------------------------------------------------------------------
-  // Callback
-  // ---------------------------------------------------------------------------
 
   onFilterChange(callback) {
     this._onFilterChange = callback;
@@ -77,10 +65,8 @@ export class RouteFilterBar {
   // ---------------------------------------------------------------------------
 
   _render() {
-    if (!this.container) return;
-    const chipsEl = this.container.querySelector(`#rfb-chips-${this.containerId}`);
+    const chipsEl = this._chipsEl();
     if (!chipsEl) return;
-
     chipsEl.innerHTML = '';
 
     if (this.routes.length === 0) {
@@ -89,35 +75,93 @@ export class RouteFilterBar {
     }
 
     this.routes.forEach(route => {
-      const isActive = this.selected.has(route.number);
-      const chip = document.createElement('button');
+      const entry     = this.selected.get(route.number);
+      const isActive  = Boolean(entry);
+      const direction = entry?.direction ?? 0;
+
+      const chip = document.createElement('div');
       chip.className = `rfb-chip${isActive ? ' active' : ''}`;
-      chip.style.backgroundColor = route.color      || '#187EC2';
-      chip.style.color            = route.text_color || '#FFFFFF';
-      chip.title   = route.name   || route.number;
-      chip.textContent = route.number;
-      chip.addEventListener('click', () => this._toggle(route));
+
+      // Botão principal (número da linha)
+      const mainBtn = document.createElement('button');
+      mainBtn.className    = 'rfb-chip-main';
+      mainBtn.style.backgroundColor = route.color      || '#187EC2';
+      mainBtn.style.color           = route.text_color || '#FFFFFF';
+      mainBtn.title       = route.name || route.number;
+      mainBtn.textContent = route.number;
+      mainBtn.addEventListener('click', () => this._toggleRoute(route));
+
+      chip.appendChild(mainBtn);
+
+      // Botão de direção (ida/volta) - só visível quando activo
+      if (isActive) {
+        const dirBtn = document.createElement('button');
+        dirBtn.className  = 'rfb-chip-dir';
+        dirBtn.style.backgroundColor = this._darken(route.color || '#187EC2');
+        dirBtn.style.color           = route.text_color || '#FFFFFF';
+        dirBtn.title      = direction === 0 ? 'Mostrar volta (direcção 1)' : 'Mostrar ida (direcção 0)';
+        dirBtn.textContent = direction === 0 ? '\u2192' : '\u2190'; // → / ←
+        dirBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          this._toggleDirection(route);
+        });
+        chip.appendChild(dirBtn);
+      }
+
       chipsEl.appendChild(chip);
     });
   }
 
-  _toggle(route) {
+  // ---------------------------------------------------------------------------
+  // Interacções
+  // ---------------------------------------------------------------------------
+
+  _toggleRoute(route) {
     if (this.selected.has(route.number)) {
       this.selected.delete(route.number);
     } else {
-      this.selected.add(route.number);
+      this.selected.set(route.number, { route, direction: 0 });
     }
     this._render();
-    if (this._onFilterChange) {
-      this._onFilterChange(new Set(this.selected), this._getSelectedRouteObjects());
-    }
+    this._emit();
   }
 
-  /**
-   * Devolve os objectos route completos (com color, etc.) para as linhas seleccionadas.
-   */
-  _getSelectedRouteObjects() {
-    return this.routes.filter(r => this.selected.has(r.number));
+  _toggleDirection(route) {
+    const entry = this.selected.get(route.number);
+    if (!entry) return;
+    entry.direction = entry.direction === 0 ? 1 : 0;
+    this.selected.set(route.number, entry);
+    this._render();
+    this._emit();
+  }
+
+  _emit() {
+    if (!this._onFilterChange) return;
+    const selectedSet = new Set(this.selected.keys());
+    const routeObjs   = Array.from(this.selected.values()).map(e => ({
+      ...e.route,
+      direction: e.direction
+    }));
+    this._onFilterChange(selectedSet, routeObjs);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Utils
+  // ---------------------------------------------------------------------------
+
+  _chipsEl() {
+    return this.container?.querySelector(`#rfb-chips-${this.containerId}`);
+  }
+
+  /** Escurece uma cor hex em ~20% para o botão de direcção */
+  _darken(hex) {
+    try {
+      const n = parseInt(hex.replace('#', ''), 16);
+      const r = Math.max(0, (n >> 16 & 0xff) - 40);
+      const g = Math.max(0, (n >>  8 & 0xff) - 40);
+      const b = Math.max(0, (n       & 0xff) - 40);
+      return `rgb(${r},${g},${b})`;
+    } catch { return hex; }
   }
 
   destroy() {

@@ -1,151 +1,97 @@
 /**
  * Vehicle Service - Lógica centralizada de processamento de dados de autocarros
- * Usa: scheduleService
- * Responsável por: extração de anotações, processamento de dados, matching
+ *
+ * LAZY HEADSIGN: processBusData / processBusDataBatch já NÃO resolvem o
+ * destino (headsign). Esse campo fica como null até ao primeiro clique no
+ * marker, altura em que resolveHeadsign() é chamado e o popup é actualizado.
+ * Isto elimina as chamadas /route/{id}/schedule na inicialização.
  */
 
 import { scheduleService } from './scheduleService.js';
 
 class VehicleService {
-  /**
-   * Extrair anotação de um autocarro por prefixo
-   */
   extractAnnotation(bus, prefix) {
-    if (!bus.annotations || !bus.annotations.value) return null;
-    
+    if (!bus.annotations?.value) return null;
     for (const annotation of bus.annotations.value) {
       const decoded = decodeURIComponent(annotation);
-      if (decoded.startsWith(prefix)) {
-        return decoded.slice(prefix.length);
-      }
+      if (decoded.startsWith(prefix)) return decoded.slice(prefix.length);
     }
     return null;
   }
 
-  /**
-   * Extrair número da linha do autocarro
-   */
-  extractLineNumber(bus) {
-    return this.extractAnnotation(bus, "stcp:route:");
-  }
+  extractLineNumber(bus)  { return this.extractAnnotation(bus, 'stcp:route:'); }
+  extractDirection(bus)   { return this.extractAnnotation(bus, 'stcp:sentido:'); }
+  extractTripId(bus)      { return this.extractAnnotation(bus, 'stcp:nr_viagem:'); }
 
-  /**
-   * Extrair sentido/direção do autocarro
-   */
-  extractDirection(bus) {
-    return this.extractAnnotation(bus, "stcp:sentido:");
-  }
-
-  /**
-   * Extrair ID da viagem (trip_id) do autocarro
-   */
-  extractTripId(bus) {
-    return this.extractAnnotation(bus, "stcp:nr_viagem:");
-  }
-
-  /**
-   * Match de um veículo com uma viagem específica
-   */
   matchVehicleToTrip(vehicles, tripId) {
     if (!Array.isArray(vehicles) || !tripId) return null;
-
-    return vehicles.find(vehicle => {
-      if (!vehicle.annotations || !vehicle.annotations.value) return false;
-      
-      return vehicle.annotations.value.some(annotation => {
-        const decoded = decodeURIComponent(annotation);
-        return decoded === `stcp:nr_viagem:${tripId}`;
-      });
-    });
+    return vehicles.find(vehicle =>
+      vehicle.annotations?.value?.some(a => decodeURIComponent(a) === `stcp:nr_viagem:${tripId}`)
+    );
   }
 
-  /**
-   * Extrair localização de um veículo
-   */
   extractVehicleLocation(vehicle) {
-    if (!vehicle || !vehicle.location || !vehicle.location.value) {
-      return null;
-    }
-
+    if (!vehicle?.location?.value) return null;
     const coords = vehicle.location.value.coordinates;
     if (!coords || coords.length < 2) return null;
-
     return {
-      latitude: coords[1],
+      latitude:  coords[1],
       longitude: coords[0],
-      bearing: vehicle.bearing?.value || vehicle.heading?.value || 0,
-      speed: vehicle.speed?.value || 0
+      bearing:   vehicle.bearing?.value || vehicle.heading?.value || 0,
+      speed:     vehicle.speed?.value || 0
     };
   }
 
   /**
-   * ⭐ ASYNC: Processar dados completos de um autocarro
-   * Agora usa API para obter destino em vez de trips.json
-   * @param {object} bus - Objeto do autocarro da API
-   * @returns {Promise<object|null>} Objeto processado ou null se inválido
+   * Processa um autocarro SEM resolver o headsign (lazy).
+   * O campo destination fica null até ao clique no marker.
    */
-  async processBusData(bus) {
-    const line = this.extractLineNumber(bus);
+  processBusData(bus) {
+    const line      = this.extractLineNumber(bus);
     const direction = this.extractDirection(bus);
-    const tripId = this.extractTripId(bus);
-    const lat = bus.location?.value?.coordinates?.[1];
-    const lon = bus.location?.value?.coordinates?.[0];
+    const tripId    = this.extractTripId(bus);
+    const lat       = bus.location?.value?.coordinates?.[1];
+    const lon       = bus.location?.value?.coordinates?.[0];
 
-    // Validar coordenadas
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      return null;
-    }
-
-    // Validar dados mínimos
-    if (!line || direction == null) {
-      return null;
-    }
-
-    // ✨ Obter destino via API (assíncrono)
-    let destination = 'Destino Desconhecido';
-    if (tripId && line && direction != null) {
-      try {
-        destination = await scheduleService.getHeadsignForTrip(tripId, line, direction);
-      } catch (error) {
-        console.warn(`⚠️ Erro ao obter destino para ${line}/${tripId}:`, error.message);
-      }
-    }
-
-    const speed = bus.speed ? bus.speed.value : 'N/A';
-    const busNumber = bus.fleetVehicleId ? bus.fleetVehicleId.value : 'N/A';
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if (!line || direction == null) return null;
 
     return {
-      id: bus.id,
+      id:          bus.id,
       line,
-      latitude: lat,
-      longitude: lon,
-      speed,
-      busNumber,
-      destination,
+      latitude:    lat,
+      longitude:   lon,
+      speed:       bus.speed?.value ?? 'N/A',
+      busNumber:   bus.fleetVehicleId?.value ?? 'N/A',
+      destination: null,   // resolvido lazy ao clicar
       direction,
       tripId
     };
   }
 
   /**
-   * ⭐ NOVO: Processar múltiplos autocarros em paralelo
-   * @param {Array} buses - Array de autocarros da API
-   * @returns {Promise<Array>} Array de autocarros processados
+   * Processa múltiplos autocarros em paralelo (síncrono, sem headsign).
    */
-  async processBusDataBatch(buses) {
+  processBusDataBatch(buses) {
     if (!Array.isArray(buses)) return [];
-    
-    // Processar todos em paralelo
-    const promises = buses.map(bus => this.processBusData(bus));
-    const results = await Promise.all(promises);
-    
-    // Filtrar nulos
-    return results.filter(bus => bus !== null);
+    return buses.map(b => this.processBusData(b)).filter(b => b !== null);
   }
 
   /**
-   * Verificar se um autocarro deve ser incluído (filtro)
+   * Resolve o headsign de um autocarro já processado.
+   * Chamado apenas quando o utilizador clica no marker.
+   * @param {object} bus - resultado de processBusData
+   * @returns {Promise<string>}
    */
+  async resolveHeadsign(bus) {
+    if (!bus.tripId || !bus.line || bus.direction == null) return 'Destino desconhecido';
+    try {
+      return await scheduleService.getHeadsignForTrip(bus.tripId, bus.line, bus.direction);
+    } catch {
+      return 'Destino desconhecido';
+    }
+  }
+
   shouldIncludeBus(bus, filterValue) {
     return filterValue === '' || (bus.line && bus.line.startsWith(filterValue));
   }

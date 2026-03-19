@@ -1,6 +1,6 @@
 /* =========================================================
-   RouteFilterBar — barra de chips de linha partilhada
-   Usada em index.html e stopsmap.html
+   RouteFilterBar — barra de chips de linha
+   Fase 4: chips com botão de direcção ida/volta
    ========================================================= */
 
 #route-filter-bar {
@@ -36,26 +36,22 @@
   gap: 6px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;          /* Firefox */
-  padding-bottom: 2px;            /* evitar corte da sombra dos chips */
+  scrollbar-width: none;
+  padding-bottom: 2px;
   flex: 1;
 }
-.rfb-chips::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+.rfb-chips::-webkit-scrollbar { display: none; }
 
-/* ---- Chip individual ---- */
+/* ---- Chip wrapper (agrupa botão principal + botão dir) ---- */
 .rfb-chip {
+  display: inline-flex;
+  align-items: stretch;
   flex-shrink: 0;
-  padding: 4px 10px;
-  border: none;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.18);
   opacity: 0.55;
   transition: opacity .15s, transform .1s, box-shadow .15s;
-  white-space: nowrap;
-  line-height: 1.4;
-  box-shadow: 0 1px 3px rgba(0,0,0,.18);
 }
 .rfb-chip:hover {
   opacity: 0.8;
@@ -66,8 +62,36 @@
   opacity: 1;
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(0,0,0,.28);
-  outline: 2px solid rgba(255,255,255,.6);
-  outline-offset: -2px;
+}
+
+/* ---- Botão principal (número da linha) ---- */
+.rfb-chip-main {
+  border: none;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.4;
+  background: transparent; /* cor vem do inline style */
+}
+.rfb-chip.active .rfb-chip-main {
+  padding-right: 6px; /* aproxima dos dois botões quando activo */
+}
+
+/* ---- Botão de direcção (ida → / volta ←) ---- */
+.rfb-chip-dir {
+  border: none;
+  border-left: 1px solid rgba(255,255,255,.35);
+  padding: 4px 7px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: filter .15s;
+}
+.rfb-chip-dir:hover {
+  filter: brightness(1.15);
 }
 
 /* ---- Estados loading / vazio ---- */
@@ -79,17 +103,16 @@
   padding: 4px 0;
 }
 
+/* ---- Disabled (painel de chegadas aberto) ---- */
+#route-filter-bar[data-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 480px) {
-  .rfb-inner {
-    padding: 4px 8px;
-    min-height: 38px;
-  }
-  .rfb-chip {
-    font-size: 11px;
-    padding: 3px 8px;
-  }
-  .rfb-label {
-    display: none; /* poupa espa\u00e7o em mobile */
-  }
+  .rfb-inner     { padding: 4px 8px; min-height: 38px; }
+  .rfb-chip-main { font-size: 11px; padding: 3px 8px; }
+  .rfb-chip-dir  { font-size: 12px; padding: 3px 6px; }
+  .rfb-label     { display: none; }
 }
