@@ -7,19 +7,49 @@
  *  setLoading(bool)         spinner enquanto carrega
  *  getSelected()            Set<string> de números seleccionados
  *  onFilterChange(cb)       cb(Set<string>, routeObjects[]) — routeObjects inclui direction (0|1)
+ *
+ * Visibilidade temporal:
+ *  Linhas diurnas  (sem 'M' no número): visiveis 05:30–01:30
+ *  Linhas nocturnas (com 'M' no número): visiveis 00:30–06:30
  */
 
-// Linhas circulares: só existão na direção 0
 const CIRCULAR_LINES = new Set(['300', '301', '302', '303']);
+
+/** Devolve true se a linha é nocturna (número contém 'M', case-insensitive) */
+function isNightLine(number) {
+  return /M/i.test(String(number));
+}
+
+/**
+ * Dado um Date, devolve:
+ *  'day'   — entre 05:30 e 01:30 do dia seguinte (linhas diurnas visíveis)
+ *  'night' — entre 00:30 e 06:30 (linhas nocturnas visíveis)
+ * As janelas são sobrepostas: 00:30-01:30 e 05:30-06:30 ambas são visíveis.
+ *
+ * Representamos tudo em minutos desde meia-noite.
+ */
+function getLineVisibility(date) {
+  const h = date.getHours();
+  const m = date.getMinutes();
+  const total = h * 60 + m; // minutos desde 00:00
+
+  // Linhas diurnas: visíveis fora do intervalo [01:30, 05:30[
+  const dayHidden = total >= 90 && total < 330; // 90 = 01:30, 330 = 05:30
+
+  // Linhas nocturnas: visíveis dentro de [00:30, 06:30[
+  const nightVisible = total >= 30 && total < 390; // 30 = 00:30, 390 = 06:30
+
+  return { showDay: !dayHidden, showNight: nightVisible };
+}
 
 export class RouteFilterBar {
   constructor(containerId) {
     this.containerId = containerId;
     this.container   = null;
     this.routes      = [];
-    // selected: Map<routeNumber, { route, direction: 0|1 }>
     this.selected    = new Map();
     this._onFilterChange = null;
+    this._timeCheckInterval = null;
   }
 
   mount() {
@@ -43,6 +73,9 @@ export class RouteFilterBar {
 
     const clearBtn = this.container.querySelector(`#rfb-clear-${this.containerId}`);
     if (clearBtn) clearBtn.addEventListener('click', () => this._clearAll());
+
+    // Verificar visibilidade a cada minuto (muda às :30 de certas horas)
+    this._timeCheckInterval = setInterval(() => this._applyTimeVisibility(), 60_000);
   }
 
   setRoutes(routes = []) {
@@ -90,9 +123,12 @@ export class RouteFilterBar {
       const isActive   = Boolean(entry);
       const direction  = entry?.direction ?? 0;
       const isCircular = CIRCULAR_LINES.has(String(route.number));
+      const night      = isNightLine(route.number);
 
       const chip = document.createElement('div');
-      chip.className = `rfb-chip${isActive ? ' active' : ''}`;
+      chip.className    = `rfb-chip${isActive ? ' active' : ''}`;
+      chip.dataset.line = String(route.number);
+      chip.dataset.nightLine = night ? 'true' : 'false';
 
       const mainBtn = document.createElement('button');
       mainBtn.className             = 'rfb-chip-main';
@@ -109,9 +145,8 @@ export class RouteFilterBar {
         dirBtn.style.color           = route.text_color || '#FFFFFF';
 
         if (isCircular) {
-          // Linha circular: botão decorativo, sem ação
           dirBtn.className   = 'rfb-chip-dir rfb-chip-circular';
-          dirBtn.textContent = '\u25CB';   // ○ (círculo vazio)
+          dirBtn.textContent = '\u25CB';
           dirBtn.title       = 'Linha circular — sentido único';
           dirBtn.setAttribute('aria-disabled', 'true');
           dirBtn.tabIndex = -1;
@@ -127,8 +162,37 @@ export class RouteFilterBar {
       chipsEl.appendChild(chip);
     });
 
-    // Mostrar/esconder botão de limpar
     if (clearBtn) clearBtn.style.display = this.selected.size > 0 ? 'flex' : 'none';
+
+    // Aplicar visibilidade temporal após render
+    this._applyTimeVisibility();
+  }
+
+  /**
+   * Oculta/mostra chips com base no horário actual.
+   * Chamado após _render() e a cada minuto.
+   */
+  _applyTimeVisibility() {
+    const chipsEl = this._chipsEl();
+    if (!chipsEl) return;
+    const { showDay, showNight } = getLineVisibility(new Date());
+
+    chipsEl.querySelectorAll('.rfb-chip').forEach(chip => {
+      const night = chip.dataset.nightLine === 'true';
+      const show  = night ? showNight : showDay;
+      chip.style.display = show ? '' : 'none';
+    });
+
+    // Se uma linha seleccionada ficou oculta, desse-lecciona-a silenciosamente
+    let changed = false;
+    for (const [num] of this.selected) {
+      const route = this.routes.find(r => String(r.number) === String(num));
+      if (!route) continue;
+      const night = isNightLine(num);
+      const show  = night ? showNight : showDay;
+      if (!show) { this.selected.delete(num); changed = true; }
+    }
+    if (changed) { this._render(); this._emit(); }
   }
 
   // ---------------------------------------------------------------------------
@@ -189,6 +253,7 @@ export class RouteFilterBar {
   }
 
   destroy() {
+    if (this._timeCheckInterval) clearInterval(this._timeCheckInterval);
     if (this.container) this.container.innerHTML = '';
   }
 }

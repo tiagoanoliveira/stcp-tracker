@@ -7,11 +7,15 @@
   <meta name="theme-color" content="#0072c6">
   <title>STCP Tracker - Mapa de Autocarros</title>
   
+  <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="./src/ui/styles/busmap.css">
   <link rel="stylesheet" href="./src/ui/styles/loading.css">
   <link rel="stylesheet" href="./src/ui/styles/routeFilterBar.css">
   <link rel="stylesheet" href="./src/ui/styles/filterRow.css">
+  <link rel="stylesheet" href="./src/ui/styles/stopDetail.css">
+  <link rel="stylesheet" href="./src/ui/styles/favourites.css">
+  <link rel="stylesheet" href="./src/ui/styles/tutorial.css">
   
   <link rel="shortcut icon" href="./resources/favicon.svg">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYVRR1K1R2"></script>
@@ -39,7 +43,6 @@
     </button>
   </div>
 
-  <!-- Pill de filtro de linhas — independente, abaixo do header-overlay -->
   <div id="filter-row" class="busmap-filter-row">
     <div id="route-filter-bar"></div>
   </div>

@@ -1,0 +1,176 @@
+/* ============================================================
+   Tutorial — botão ?, modal e steps
+   ============================================================ */
+
+/* Botão Leaflet -------------------------------------------- */
+.leaflet-control-tutorial {
+  margin-bottom: 8px !important;
+  margin-left: 0 !important;
+}
+
+.tutorial-map-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.2);
+  background: #fff;
+  color: #0072C6;
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 5px rgba(0,0,0,.3);
+  transition: background .15s, color .15s;
+  line-height: 1;
+}
+.tutorial-map-btn:hover {
+  background: #0072C6;
+  color: #fff;
+}
+
+/* Backdrop + card ------------------------------------------ */
+.tutorial-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  align-items: center;
+  justify-content: center;
+}
+.tutorial-modal.visible {
+  display: flex;
+}
+
+.tutorial-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(2px);
+}
+
+.tutorial-card {
+  position: relative;
+  z-index: 1;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.22);
+  padding: 36px 32px 28px;
+  width: min(420px, 92vw);
+  text-align: center;
+  animation: tut-in .22s ease;
+}
+
+@keyframes tut-in {
+  from { opacity: 0; transform: scale(.94) translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.tutorial-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  transition: color .15s, background .15s;
+}
+.tutorial-close:hover { color: #1e293b; background: #f1f5f9; }
+
+/* Step content --------------------------------------------- */
+.tutorial-step-icon {
+  font-size: 2.8rem;
+  line-height: 1;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+}
+
+/* Imagens nos steps (favicon.svg, busmap.png, paragem.png) */
+.tut-icon-img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+.tutorial-step-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 10px;
+}
+
+.tutorial-step-body {
+  font-size: .9rem;
+  color: #475569;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+/* Dots ----------------------------------------------------- */
+.tutorial-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 22px;
+}
+
+.tut-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  cursor: pointer;
+  transition: background .2s, transform .2s;
+}
+.tut-dot.active {
+  background: #0072C6;
+  transform: scale(1.3);
+}
+
+/* Acções ---------------------------------------------------- */
+.tutorial-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tutorial-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+
+.tutorial-btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+}
+.tutorial-btn-secondary:hover { background: #e2e8f0; }
+
+.tutorial-btn-primary {
+  background: #0072C6;
+  color: #fff;
+}
+.tutorial-btn-primary:hover  { background: #005fa3; }
+.tutorial-btn-finish         { background: #22c55e; }
+.tutorial-btn-finish:hover   { background: #16a34a; }
+
+@media (max-width: 400px) {
+  .tutorial-card { padding: 28px 18px 22px; }
+  .tutorial-step-icon { font-size: 2.2rem; min-height: 44px; }
+  .tut-icon-img { width: 44px; height: 44px; }
+}

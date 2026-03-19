@@ -1,10 +1,30 @@
 /**
- * NextArrivals - Componente de UI para mostrar pr\u00f3ximas chegadas numa paragem.
+ * NextArrivals - Componente de UI para mostrar próximas chegadas numa paragem.
  * Inclui chips de filtro por linha; ao alterar o filtro dispara onFilterChange.
+ * Os chips de linhas diurnas/nocturnas são ocultados fora do seu horário:
+ *   - Linhas diurnas (sem 'M'): ocultadas entre 01:30 e 05:30
+ *   - Linhas nocturnas (com 'M'): visíveis entre 00:30 e 06:30
  */
 
 import { vehicleService } from '../../services/vehicleService.js';
 import { LoadingSpinner } from './LoadingSpinner.js';
+
+// ---------------------------------------------------------------------------
+// Helpers de visibilidade temporal (espelham a lógica do RouteFilterBar)
+// ---------------------------------------------------------------------------
+
+function isNightLine(number) {
+  return /M/i.test(String(number));
+}
+
+function getLineVisibility(date) {
+  const total = date.getHours() * 60 + date.getMinutes();
+  const dayHidden    = total >= 90  && total < 330; // 01:30 – 05:30
+  const nightVisible = total >= 30  && total < 390; // 00:30 – 06:30
+  return { showDay: !dayHidden, showNight: nightVisible };
+}
+
+// ---------------------------------------------------------------------------
 
 export class NextArrivals {
   constructor() {
@@ -13,7 +33,7 @@ export class NextArrivals {
     this.onArrivalClickCallback = null;
     this.onCloseCallback = null;
     this.onRefreshCallback = null;
-    this.onFilterChangeCallback = null; // ⭐ novo
+    this.onFilterChangeCallback = null;
     this.currentStopId = null;
     this.loadingSpinner = null;
 
@@ -21,6 +41,8 @@ export class NextArrivals {
     this.selectedRoutes = new Set();
     this.allArrivals = [];
     this.allVehicles = [];
+
+    this._timeCheckInterval = null;
   }
 
   create() {
@@ -38,12 +60,19 @@ export class NextArrivals {
             <p id="arrivals-stop-code" class="arrivals-stop-code"></p>
           </div>
         </div>
-        <button class="next-arrivals-close" title="Fechar">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
+        <div class="next-arrivals-header-actions">
+          <button class="next-arrivals-favourite" id="arrivals-favourite-btn" title="Adicionar aos favoritos" aria-label="Adicionar aos favoritos">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </button>
+          <button class="next-arrivals-close" title="Fechar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div id="arrivals-filter-bar" class="arrivals-filter-bar" style="display:none;">
@@ -56,7 +85,7 @@ export class NextArrivals {
       </div>
 
       <div class="next-arrivals-footer">
-        <p id="arrivals-last-update">\u00daltima atualiza\u00e7\u00e3o: <strong>--:--:--</strong></p>
+        <p id="arrivals-last-update">Última atualização: <strong>--:--:--</strong></p>
         <button class="next-arrivals-refresh" id="arrivals-refresh-btn" title="Atualizar">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="23 4 23 10 17 10"/>
@@ -81,6 +110,14 @@ export class NextArrivals {
       }
     });
 
+    // Botão de favorito — ligação ao FavouritesManager via callback
+    sheet.querySelector('#arrivals-favourite-btn').addEventListener('click', () => {
+      if (this.onFavouriteClickCallback) this.onFavouriteClickCallback(this.currentStopId);
+    });
+
+    // Verificar visibilidade a cada minuto
+    this._timeCheckInterval = setInterval(() => this._applyChipTimeVisibility(), 60_000);
+
     return sheet;
   }
 
@@ -102,8 +139,6 @@ export class NextArrivals {
     }
     this._renderFilterBar();
     this._renderArrivals();
-
-    // ⭐ Notificar o StopsMapApp para atualizar o mapa
     if (this.onFilterChangeCallback) {
       this.onFilterChangeCallback(new Set(this.selectedRoutes));
     }
@@ -124,6 +159,8 @@ export class NextArrivals {
       const isActive = this.selectedRoutes.has(route.number);
       const chip = document.createElement('button');
       chip.className = `filter-chip${isActive ? ' active' : ''}`;
+      chip.dataset.line = String(route.number);
+      chip.dataset.nightLine = isNightLine(route.number) ? 'true' : 'false';
       chip.style.backgroundColor = route.color || '#0072C6';
       chip.style.color = route.text_color || '#FFFFFF';
       chip.title = route.name || route.number;
@@ -131,6 +168,37 @@ export class NextArrivals {
       chip.addEventListener('click', () => this._toggleRoute(route.number));
       chipsContainer.appendChild(chip);
     });
+
+    this._applyChipTimeVisibility();
+  }
+
+  /**
+   * Oculta/mostra chips conforme o horário actual.
+   * Linhas diurnas ocultadas 01:30–05:30; nocturnas visíveis 00:30–06:30.
+   */
+  _applyChipTimeVisibility() {
+    const chipsContainer = this.element?.querySelector('#arrivals-filter-chips');
+    if (!chipsContainer) return;
+
+    const { showDay, showNight } = getLineVisibility(new Date());
+
+    chipsContainer.querySelectorAll('.filter-chip').forEach(chip => {
+      const night = chip.dataset.nightLine === 'true';
+      chip.style.display = (night ? showNight : showDay) ? '' : 'none';
+    });
+
+    // Se uma linha seleccionada ficou oculta, des-seleccioná-la silenciosamente
+    let changed = false;
+    for (const num of this.selectedRoutes) {
+      const night = isNightLine(num);
+      const show  = night ? showNight : showDay;
+      if (!show) { this.selectedRoutes.delete(num); changed = true; }
+    }
+    if (changed) {
+      this._renderFilterBar();
+      this._renderArrivals();
+      if (this.onFilterChangeCallback) this.onFilterChangeCallback(new Set(this.selectedRoutes));
+    }
   }
 
   _getFilteredArrivals() {
@@ -145,7 +213,7 @@ export class NextArrivals {
   // Loading
   // ---------------------------------------------------------------------------
 
-  showLoading(message = 'A carregar pr\u00f3ximas chegadas...') {
+  showLoading(message = 'A carregar próximas chegadas...') {
     if (!this.element) return;
     const listContainer = this.element.querySelector('#arrivals-list-panel');
     listContainer.classList.add('panel-loading');
@@ -171,12 +239,13 @@ export class NextArrivals {
     if (!this.element) this.create();
     this.currentStopId = stopId;
     const titleEl = this.element.querySelector('#arrivals-stop-name');
-    const codeEl = this.element.querySelector('#arrivals-stop-code');
+    const codeEl  = this.element.querySelector('#arrivals-stop-code');
     if (titleEl && stopName) titleEl.textContent = stopName;
-    if (codeEl && stopId) codeEl.textContent = `C\u00f3digo: ${stopId}`;
+    if (codeEl  && stopId)  codeEl.textContent  = `Código: ${stopId}`;
     this.showLoading();
     this.element.classList.add('visible');
     this.isVisible = true;
+    this._updateFavouriteBtn();
   }
 
   hide() {
@@ -213,8 +282,8 @@ export class NextArrivals {
 
     if (!filtered || filtered.length === 0) {
       listContainer.innerHTML = this.allArrivals.length === 0
-        ? `<p class="no-arrivals">\u26a0\ufe0f N\u00e3o h\u00e1, de momento, localiza\u00e7\u00f5es dos autocarros previstos para esta paragem - pode ter que aguardar que estes iniciem viagem.<br><br>Consulte <a href="index.html">aqui a localiza\u00e7\u00e3o em tempo real de todos os autocarros</a> ou verifique o hor\u00e1rio planeado na paragem.</p>`
-        : `<p class="no-arrivals">\u26a0\ufe0f Nenhuma chegada encontrada para as linhas seleccionadas.</p>`;
+        ? `<p class="no-arrivals">⚠️ Não há, de momento, localizações dos autocarros previstos para esta paragem - pode ter que aguardar que estes iniciem viagem.<br><br>Consulte <a href="index.html">aqui a localização em tempo real de todos os autocarros</a> ou verifique o horário planeado na paragem.</p>`
+        : `<p class="no-arrivals">⚠️ Nenhuma chegada encontrada para as linhas seleccionadas.</p>`;
       return;
     }
 
@@ -230,9 +299,9 @@ export class NextArrivals {
   createArrivalElement(arrival, vehicle) {
     const statusClass = arrival.status === 'ON_TIME' ? 'status-ontime' :
       (arrival.status === 'SCHEDULED' ? 'status-scheduled' : 'status-delayed');
-    const busColor = arrival.route_color || '#0072C6';
+    const busColor  = arrival.route_color      || '#0072C6';
     const textColor = arrival.route_text_color || '#FFFFFF';
-    const isRealtime = arrival.is_realtime === true;
+    const isRealtime  = arrival.is_realtime === true;
     const hasLocation = isRealtime && vehicle &&
       vehicleService.extractVehicleLocation(vehicle) !== null;
     const locationIcon = hasLocation ? this.getActiveLocationIcon() : this.getInactiveLocationIcon();
@@ -253,7 +322,7 @@ export class NextArrivals {
 
     let statusText = '';
     if (!isRealtime) {
-      statusText = 'Planeado - localiza\u00e7\u00e3o desconhecida';
+      statusText = 'Planeado - localização desconhecida';
     } else {
       statusText = this.getStatusText(arrival.status);
       if (arrival.delay_minutes > 1)
@@ -279,7 +348,27 @@ export class NextArrivals {
   }
 
   // ---------------------------------------------------------------------------
-  // \u00cdcones + helpers
+  // Botão de favorito
+  // ---------------------------------------------------------------------------
+
+  _updateFavouriteBtn() {
+    const btn = this.element?.querySelector('#arrivals-favourite-btn');
+    if (!btn || !this.currentStopId) return;
+    const isFav = this.onIsFavouriteCallback
+      ? this.onIsFavouriteCallback(this.currentStopId)
+      : false;
+    btn.classList.toggle('is-favourite', isFav);
+    btn.title = isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
+    // Preencher/esvaziar a estrela via atributo fill do SVG polygon
+    const poly = btn.querySelector('polygon');
+    if (poly) poly.setAttribute('fill', isFav ? 'currentColor' : 'none');
+  }
+
+  /** Chamado pelo app quando o estado de favorito muda externamente */
+  refreshFavouriteBtn() { this._updateFavouriteBtn(); }
+
+  // ---------------------------------------------------------------------------
+  // Ícones + helpers
   // ---------------------------------------------------------------------------
 
   getActiveLocationIcon() {
@@ -315,7 +404,7 @@ export class NextArrivals {
   }
 
   getStatusText(status) {
-    return { ON_TIME: 'No hor\u00e1rio', DELAYED: 'Atrasado', EARLY: 'Adiantado', SCHEDULED: 'Programado', ARRIVING: 'A chegar' }[status] || status;
+    return { ON_TIME: 'No horário', DELAYED: 'Atrasado', EARLY: 'Adiantado', SCHEDULED: 'Programado', ARRIVING: 'A chegar' }[status] || status;
   }
 
   formatArrivalTime(minutes) {
@@ -332,17 +421,19 @@ export class NextArrivals {
     const el = this.element.querySelector('#arrivals-last-update');
     if (el) {
       const t = timestamp || new Date();
-      el.innerHTML = `\u00daltima atualiza\u00e7\u00e3o: <strong>${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}</strong>`;
+      el.innerHTML = `Última atualização: <strong>${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}</strong>`;
     }
   }
 
-  onArrivalClick(callback) { this.onArrivalClickCallback = callback; }
-  onClose(callback) { this.onCloseCallback = callback; }
-  onRefresh(callback) { this.onRefreshCallback = callback; }
-  /** Chamado sempre que o filtro de linhas muda. Recebe Set<string> com as linhas activas (vazio = todas). */
-  onFilterChange(callback) { this.onFilterChangeCallback = callback; }
+  onArrivalClick(callback)  { this.onArrivalClickCallback  = callback; }
+  onClose(callback)         { this.onCloseCallback         = callback; }
+  onRefresh(callback)       { this.onRefreshCallback       = callback; }
+  onFilterChange(callback)  { this.onFilterChangeCallback  = callback; }
+  onFavouriteClick(callback){ this.onFavouriteClickCallback = callback; }
+  onIsFavourite(callback)   { this.onIsFavouriteCallback   = callback; }
 
   destroy() {
+    if (this._timeCheckInterval) clearInterval(this._timeCheckInterval);
     if (this.element) { this.element.remove(); this.element = null; }
     if (this.loadingSpinner) { this.loadingSpinner.remove(); this.loadingSpinner = null; }
   }
