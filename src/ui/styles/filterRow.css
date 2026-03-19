@@ -1,0 +1,80 @@
+/* =========================================================
+   filterRow.css — Pill flutuante de filtro de linhas
+   Utilizado em:
+     index.html    → #filter-row abaixo do .header-overlay
+     stopsmap.html → #filter-row abaixo do .search-overlay
+
+   Posicionamento (top) definido por cada página via override:
+     index.html    usa .busmap-filter-row
+     stopsmap.html usa .stopsmap-filter-row
+   ========================================================= */
+
+/* Base comum */
+#filter-row {
+  position: absolute;
+  left: 50%;
+  margin-left: 20px;
+  transform: translateX(-50%);
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  padding: 6px 14px;
+  background-color: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 28px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  height: 48px;
+  /* largura mínima generosa para mostrar vários chips */
+  min-width: 300px;
+  max-width: 820px;
+}
+
+/* index.html: header tem top:20px + height:56px + gap:12px = top:88px */
+.busmap-filter-row   { top: 88px; }
+
+/* stopsmap.html: search tem top:20px + altura dinâmica + gap:12px
+   A search-overlay tem altura dinâmica (auto), mas o input wrapper é 44px
+   + padding 6px*2 + border, ~68px. Com o input só (sem chips internos)
+   ficamos com top: 20px + 68px + 10px = 98px */
+.stopsmap-filter-row { top: 98px; }
+
+/* Indicador de scroll à direita */
+#filter-row::after {
+  content: '\203A';     /* › */
+  font-size: 20px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  flex-shrink: 0;
+  margin-left: 4px;
+  pointer-events: none;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0,0,0,.25);
+}
+
+/* Tablet */
+@media (max-width: 768px) {
+  #filter-row {
+    height: 44px;
+    padding: 4px 10px;
+    min-width: 240px;
+    max-width: 90vw;
+  }
+  .busmap-filter-row   { top: 72px;  } /* 12 + 48 + 12 */
+  .stopsmap-filter-row { top: 80px;  }
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  #filter-row {
+    height: 40px;
+    padding: 3px 10px;
+    min-width: 0;
+    max-width: calc(100vw - 80px);
+    margin-left: 25px;
+  }
+  .busmap-filter-row   { top: 68px;  } /* 12 + 44 + 12 */
+  .stopsmap-filter-row { top: 76px;  }
+}

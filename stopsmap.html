@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="./src/ui/styles/stopDetail.css">
   <link rel="stylesheet" href="./src/ui/styles/loading.css">
   <link rel="stylesheet" href="./src/ui/styles/routeFilterBar.css">
+  <link rel="stylesheet" href="./src/ui/styles/filterRow.css">
   
   <!-- Favicon -->
   <link rel="shortcut icon" href="./resources/favicon.svg">
@@ -26,21 +27,18 @@
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-
     gtag('config', 'G-BYVRR1K1R2');
   </script>
 </head>
 <body>
-  <!-- Mapa full-screen -->
   <div id="map"></div>
 
-  <!-- Logo no canto superior esquerdo (link para home) -->
   <a href="/" class="logo-overlay" title="Ir para o início">
     <img src="./resources/favicon.svg" alt="STCP Live Map Logo">
     <span class="logo-text">Paragens STCP</span>
   </a>
 
-  <!-- Barra de pesquisa + filtro de linhas -->
+  <!-- Barra de pesquisa (só o input, sem chips internos) -->
   <div class="search-overlay">
     <div class="search-input-wrapper">
       <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -54,7 +52,6 @@
         placeholder="Pesquisar paragem por nome ou código..."
         autocomplete="off"
       />
-      <!-- Botão de limpar pesquisa -->
       <button id="search-clear" class="search-clear-btn" title="Limpar pesquisa" aria-label="Limpar pesquisa">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <line x1="18" y1="6" x2="6" y2="18"/>
@@ -62,23 +59,21 @@
         </svg>
       </button>
     </div>
-    <!-- Barra de filtro de linhas (imediatamente abaixo da pesquisa) -->
+  </div>
+
+  <!-- Pill de filtro de linhas — independente, abaixo da search-overlay -->
+  <div id="filter-row" class="stopsmap-filter-row">
     <div id="route-filter-bar"></div>
   </div>
 
-  <!-- Rodapé no fundo centro -->
   <div class="footer-overlay">
     &copy; 2026 STCP Live Map • Website feito com 🤍 por <a href="https://www.tiagoanoliveira.pt/" target="_blank">Tiago Oliveira</a>. Dificuldades ou sugestões?
     <a href="https://tiagoanoliveira.pt/support/a260e7bee11b401b9fd09290e8a8d6d9">Clica aqui.</a>
   </div>
 
-  <!-- Mensagem de erro -->
   <div id="error-message" class="error-overlay"></div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
-  <!-- Nossa aplicação -->
   <script type="module" src="./src/pages/StopsMapApp.js"></script>
 </body>
 </html>

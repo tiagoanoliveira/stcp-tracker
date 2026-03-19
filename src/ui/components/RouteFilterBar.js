@@ -1,16 +1,12 @@
 /**
  * RouteFilterBar - Barra horizontal de chips de linha.
  *
- * Fase 4: cada chip tem um botão de direção (0 = ida / 1 = volta)
- * que aparece APENAS quando o chip está activo.
- *
  * Interface pública:
- *  mount()                      injeta HTML no container
- *  setRoutes(routes[])          define lista de linhas
- *  setLoading(bool)             spinner enquanto carrega
- *  getSelected()                Set<string> de números seleccionados
- *  onFilterChange(cb)           cb(Set<string>, routeObjects[])
- *                               routeObjects inclui campo direction (0|1)
+ *  mount()                  injeta HTML no container
+ *  setRoutes(routes[])      define lista de linhas
+ *  setLoading(bool)         spinner enquanto carrega
+ *  getSelected()            Set<string> de números seleccionados
+ *  onFilterChange(cb)       cb(Set<string>, routeObjects[]) — routeObjects inclui direction (0|1)
  */
 
 export class RouteFilterBar {
@@ -31,7 +27,7 @@ export class RouteFilterBar {
     }
     this.container.innerHTML = `
       <div class="rfb-inner">
-        <span class="rfb-label">Linhas:</span>
+        <span class="rfb-label">Filtrar por:</span>
         <div class="rfb-chips" id="rfb-chips-${this.containerId}"></div>
       </div>`;
   }
@@ -82,29 +78,23 @@ export class RouteFilterBar {
       const chip = document.createElement('div');
       chip.className = `rfb-chip${isActive ? ' active' : ''}`;
 
-      // Botão principal (número da linha)
       const mainBtn = document.createElement('button');
-      mainBtn.className    = 'rfb-chip-main';
+      mainBtn.className             = 'rfb-chip-main';
       mainBtn.style.backgroundColor = route.color      || '#187EC2';
       mainBtn.style.color           = route.text_color || '#FFFFFF';
       mainBtn.title       = route.name || route.number;
       mainBtn.textContent = route.number;
       mainBtn.addEventListener('click', () => this._toggleRoute(route));
-
       chip.appendChild(mainBtn);
 
-      // Botão de direção (ida/volta) - só visível quando activo
       if (isActive) {
         const dirBtn = document.createElement('button');
-        dirBtn.className  = 'rfb-chip-dir';
-        dirBtn.style.backgroundColor = this._darken(route.color || '#187EC2');
-        dirBtn.style.color           = route.text_color || '#FFFFFF';
-        dirBtn.title      = direction === 0 ? 'Mostrar volta (direcção 1)' : 'Mostrar ida (direcção 0)';
-        dirBtn.textContent = direction === 0 ? '\u2192' : '\u2190'; // → / ←
-        dirBtn.addEventListener('click', e => {
-          e.stopPropagation();
-          this._toggleDirection(route);
-        });
+        dirBtn.className              = 'rfb-chip-dir';
+        dirBtn.style.backgroundColor  = this._darken(route.color || '#187EC2');
+        dirBtn.style.color            = route.text_color || '#FFFFFF';
+        dirBtn.title      = direction === 0 ? 'Mostrar volta (direção 1)' : 'Mostrar ida (direção 0)';
+        dirBtn.textContent = direction === 0 ? '\u2192' : '\u2190';
+        dirBtn.addEventListener('click', e => { e.stopPropagation(); this._toggleDirection(route); });
         chip.appendChild(dirBtn);
       }
 
@@ -153,7 +143,6 @@ export class RouteFilterBar {
     return this.container?.querySelector(`#rfb-chips-${this.containerId}`);
   }
 
-  /** Escurece uma cor hex em ~20% para o botão de direcção */
   _darken(hex) {
     try {
       const n = parseInt(hex.replace('#', ''), 16);

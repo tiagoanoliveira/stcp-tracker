@@ -7,17 +7,13 @@
   <meta name="theme-color" content="#0072c6">
   <title>STCP Tracker - Mapa de Autocarros</title>
   
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
-  <!-- CSS da aplicação -->
   <link rel="stylesheet" href="./src/ui/styles/busmap.css">
   <link rel="stylesheet" href="./src/ui/styles/loading.css">
   <link rel="stylesheet" href="./src/ui/styles/routeFilterBar.css">
+  <link rel="stylesheet" href="./src/ui/styles/filterRow.css">
   
-  <!-- Favicon -->
   <link rel="shortcut icon" href="./resources/favicon.svg">
-  <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYVRR1K1R2"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -27,17 +23,13 @@
   </script>
 </head>
 <body>
-
-  <!-- Mapa full-screen -->
   <div id="map"></div>
 
-  <!-- Logo no canto superior esquerdo (link para reload da home) -->
   <a href="/" class="logo-overlay" title="Recarregar página">
     <img src="./resources/favicon.svg" alt="STCP Live Map Logo">
     <span class="logo-text">STCP Live</span>
   </a>
 
-  <!-- Header menu no topo centro (timestamp + refresh) -->
   <div class="header-overlay">
     <div id="last-update-time" class="header-timestamp">
       Última atualização: <strong>--:--:--</strong>
@@ -47,24 +39,19 @@
     </button>
   </div>
 
-  <!-- Barra de filtro de linhas: pill separado, imediatamente abaixo do header -->
-  <div id="filter-row">
+  <!-- Pill de filtro de linhas — independente, abaixo do header-overlay -->
+  <div id="filter-row" class="busmap-filter-row">
     <div id="route-filter-bar"></div>
   </div>
 
-  <!-- Rodapé no fundo centro -->
   <div class="footer-overlay">
     &copy; 2026 STCP Live Map • Website feito com 🤍 por <a href="https://www.tiagoanoliveira.pt/" target="_blank">Tiago Oliveira</a>. Dificuldades ou sugestões?
     <a href="https://tiagoanoliveira.pt/support/a260e7bee11b401b9fd09290e8a8d6d9">Clica aqui.</a>
   </div>
 
-  <!-- Mensagem de erro -->
   <div id="error-message" class="error-overlay"></div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
-  <!-- Nossa aplicação -->
   <script type="module" src="./src/pages/BusMapApp.js"></script>
 </body>
 </html>

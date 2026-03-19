@@ -1,10 +1,5 @@
 /**
  * BusMapApp - Mapa de autocarros em tempo real
- * Fase 2: barra de filtro por linha + overlay de polylines
- *
- * NOTA: scheduleService NÃO é carregado aqui - os dados de calendário/horários
- * só são necessários na página de paragens (stopsmap.html) para calcular
- * próximas passagens. Nesta página apenas mostramos posições em tempo real.
  */
 
 import { apiService }          from '../core/apiService.js';
@@ -35,17 +30,10 @@ export class BusMapApp {
     this.stopsControl       = null;
     this.loadingOverlay     = null;
 
-    // Estado do filtro activo
-    this._selectedRoutes    = new Set();  // Set<routeNumber string>
-    this._selectedRouteObjs = [];         // objectos com color, etc.
-
-    // Cache de todos os autocarros processados (sem filtro)
+    this._selectedRoutes    = new Set();
+    this._selectedRouteObjs = [];
     this._allProcessedBuses = [];
   }
-
-  // ---------------------------------------------------------------------------
-  // Init
-  // ---------------------------------------------------------------------------
 
   async initialize() {
     try {
@@ -64,7 +52,6 @@ export class BusMapApp {
       this.busMarkerManager   = new BusMarkerManager(this.mapManager.map);
       this.lineOverlayManager = new LineOverlayManager(this.mapManager.map);
 
-      // \u2b50 Barra de filtro de linhas
       this.routeFilterBar = new RouteFilterBar('route-filter-bar');
       this.routeFilterBar.mount();
       this.routeFilterBar.setLoading(true);
@@ -72,7 +59,6 @@ export class BusMapApp {
         this._handleRouteFilterChange(selected, routeObjs)
       );
 
-      // Carregar lista de linhas (n\u00e3o bloqueia o loading principal)
       routeService.fetchRoutesList().then(routes => {
         this.routeFilterBar.setRoutes(routes);
       }).catch(() => {
@@ -113,10 +99,6 @@ export class BusMapApp {
     autoRefreshManager.start('bus-map', () => this.fetchAndUpdateBuses(), this.refreshInterval);
   }
 
-  // ---------------------------------------------------------------------------
-  // Fetch + update de autocarros
-  // ---------------------------------------------------------------------------
-
   async fetchAndUpdateBuses() {
     try {
       const rawBusData = await apiService.fetchBusData();
@@ -129,12 +111,10 @@ export class BusMapApp {
       const processed = await vehicleService.processBusDataBatch(rawBusData);
       this._allProcessedBuses = processed;
 
-      // Registar associa\u00e7\u00e3o busId -> routeNumber para o filterByRoutes
       processed.forEach(bus => {
         this.busMarkerManager.setRouteForMarker(bus.id, bus.line || '');
       });
 
-      // Aplicar filtro activo ou mostrar todos
       const toShow = this._selectedRoutes.size > 0
         ? processed.filter(b => this._selectedRoutes.has(String(b.line || '')))
         : processed;
@@ -152,10 +132,6 @@ export class BusMapApp {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Filtro de linhas
-  // ---------------------------------------------------------------------------
-
   async _handleRouteFilterChange(selected, routeObjs) {
     this._selectedRoutes    = selected;
     this._selectedRouteObjs = routeObjs;
@@ -166,13 +142,12 @@ export class BusMapApp {
       return;
     }
 
-    // 1. Filtrar markers imediatamente (feedback r\u00e1pido)
     this.busMarkerManager.filterByRoutes(selected);
 
-    // 2. Carregar shape + paragens das linhas seleccionadas
+    // Usar r.direction do routeObj (corrige bug: antes era sempre 0)
     const routesToFetch = routeObjs.map(r => ({
       routeId:    String(r.id || r.number),
-      direction:  0,
+      direction:  r.direction ?? 0,
       color:      r.color      || '#187EC2',
       text_color: r.text_color || '#FFFFFF'
     }));
@@ -180,7 +155,6 @@ export class BusMapApp {
     const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
     this.lineOverlayManager.setRoutes(overlayData);
 
-    // 3. Recentrar nos autocarros vis\u00edveis (ou na linha se n\u00e3o houver)
     const visiblePositions = this.busMarkerManager.filterByRoutes(selected);
     if (visiblePositions.length > 0) {
       this._fitToPositions(visiblePositions);
@@ -189,18 +163,13 @@ export class BusMapApp {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Utils de mapa
-  // ---------------------------------------------------------------------------
-
   _fitToPositions(positions) {
     if (!this.mapManager || positions.length === 0) return;
     if (positions.length === 1) {
       this.mapManager.centerOn(positions[0], 16);
     } else {
       this.mapManager.fitBounds(positions, {
-        paddingTopLeft:     [60, 100],
-        paddingBottomRight: [60, 60],
+        paddingTopLeft: [60, 100], paddingBottomRight: [60, 60],
         maxZoom: 16, minZoom: 11
       });
     }
