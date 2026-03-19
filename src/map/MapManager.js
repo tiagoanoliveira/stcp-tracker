@@ -28,7 +28,6 @@ export class MapManager {
     );
     const positionGetter = getUserPosition || (() => this.userPosition);
     this.map = this.mapInitializer.initialize(positionGetter);
-    console.log(`✓ MapManager inicializado para elemento #${this.elementId}`);
     return this.map;
   }
 
@@ -43,7 +42,6 @@ export class MapManager {
       }, 50);
       setTimeout(() => {
         clearInterval(checkInterval);
-        console.warn('⚠ Timeout ao aguardar mapa estar pronto');
         resolve();
       }, 3000);
     });

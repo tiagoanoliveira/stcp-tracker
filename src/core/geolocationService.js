@@ -18,7 +18,6 @@ class GeolocationService {
   async getCurrentPosition(options = {}) {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
-        console.warn('⚠ Geolocalização não suportada pelo navegador');
         reject(new Error('Geolocation not supported'));
         return;
       }
@@ -36,12 +35,10 @@ class GeolocationService {
             position.coords.latitude,
             position.coords.longitude
           ];
-          console.log('✓ Localização obtida:', this.userPosition);
           eventBus.emit('geolocation:update', this.userPosition);
           resolve(this.userPosition);
         },
         error => {
-          console.warn('⚠ Não foi possível obter a localização:', error);
           eventBus.emit('geolocation:error', error);
           reject(error);
         },
@@ -55,12 +52,10 @@ class GeolocationService {
    */
   watchPosition(options = {}) {
     if (!navigator.geolocation) {
-      console.warn('⚠ Geolocalização não suportada pelo navegador');
       return;
     }
 
     if (this.isWatching) {
-      console.log('Já a monitorizar localização');
       return;
     }
 
@@ -77,18 +72,15 @@ class GeolocationService {
           position.coords.latitude,
           position.coords.longitude
         ];
-        console.log('📏 Localização atualizada:', this.userPosition);
         eventBus.emit('geolocation:update', this.userPosition);
       },
       error => {
-        console.warn('⚠ Erro ao monitorizar localização:', error);
         eventBus.emit('geolocation:error', error);
       },
       defaultOptions
     );
 
     this.isWatching = true;
-    console.log('⏳ A monitorizar localização do utilizador');
   }
 
   /**
@@ -99,7 +91,6 @@ class GeolocationService {
       navigator.geolocation.clearWatch(this.watchId);
       this.watchId = null;
       this.isWatching = false;
-      console.log('⚠ Monitorização de localização parada');
     }
   }
 

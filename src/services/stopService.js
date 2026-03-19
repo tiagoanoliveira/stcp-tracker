@@ -25,12 +25,9 @@ class StopService {
     const now = Date.now();
     
     if (cached && (now - cached.timestamp) < this.cacheTTL) {
-      console.log(`💾 Cache hit: ${cacheKey}`);
       return cached.data;
     }
-    
-    console.log(`🌐 Fetching nearby stops: ${lat}, ${lng}, ${radius}m`);
-    
+
     try {
       const response = await apiService.fetchNearbyStops(lat, lng, radius);
       const stops = response.stops || [];
@@ -51,7 +48,6 @@ class StopService {
       });
       
       this.nearbyCache.set(cacheKey, { data: normalized, timestamp: now });
-      console.log(`✅ ${normalized.length} paragens carregadas`);
       return normalized;
       
     } catch (error) {
@@ -88,12 +84,10 @@ class StopService {
     }
     
     if (localResults.length > 0) {
-      console.log(`💾 Pesquisa local: ${localResults.length} resultados para "${query}"`);
       return localResults;
     }
 
     // 2. Cache local sem resultados → pesquisar via API STCP
-    console.log(`🌐 Pesquisa via API: "${query}"`);
     try {
       const response = await apiService.fetchSearchStops(query);
       const stops = response.stops || [];
@@ -118,8 +112,6 @@ class StopService {
         this.allStopsCache.set(stop.stop_id, stop);
         return stop;
       });
-
-      console.log(`✅ API encontrou ${normalized.length} paragens para "${query}"`);
       return normalized;
 
     } catch (error) {
@@ -140,7 +132,6 @@ class StopService {
    */
   clearCache() {
     this.nearbyCache.clear();
-    console.log('🧹 Cache de paragens limpo');
   }
 
   /**
@@ -158,7 +149,6 @@ class StopService {
     }
     
     if (removed > 0) {
-      console.log(`🧹 ${removed} entradas de cache expiradas removidas`);
     }
   }
 }

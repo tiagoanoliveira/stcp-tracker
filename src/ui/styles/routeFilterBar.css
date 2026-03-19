@@ -1,0 +1,145 @@
+/* =========================================================
+   RouteFilterBar — barra de chips de linha
+   Contextos suportados:
+   - #filter-row (index.html)       : pill independente abaixo do header
+   - .search-overlay (stopsmap.html): segunda linha dentro do pill de pesquisa
+   ========================================================= */
+
+/* Wrapper base: sem fundo, borda nem sombra próprios */
+#route-filter-bar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+/* ---- Inner layout ---- */
+.rfb-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  min-height: 36px;
+  width: 100%;
+}
+
+/* Label "Filtrar por:" */
+.rfb-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ---- Chips container (scrollável horizontalmente) ---- */
+.rfb-chips {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex: 1;
+}
+.rfb-chips::-webkit-scrollbar { display: none; }
+
+/* ---- Chip wrapper ---- */
+.rfb-chip {
+  display: inline-flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  opacity: 0.6;
+  transition: opacity .15s, transform .1s, box-shadow .15s;
+}
+.rfb-chip:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
+}
+.rfb-chip.active {
+  opacity: 1;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+
+/* ---- Botão principal (número da linha) ---- */
+.rfb-chip-main {
+  border: none;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.rfb-chip.active .rfb-chip-main { padding-right: 6px; }
+
+/* ---- Botão de direção (→ / ←) ---- */
+.rfb-chip-dir {
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+  padding: 4px 7px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: filter .15s;
+}
+.rfb-chip-dir:hover { filter: brightness(1.15); }
+
+/* ---- Linha circular: botão decorativo (sem acção) ---- */
+.rfb-chip-circular {
+  cursor: default;
+  opacity: 0.75;
+  font-size: 11px;
+}
+.rfb-chip-circular:hover { filter: none; }
+
+/* ---- Botão limpar todos os filtros ---- */
+.rfb-clear-btn {
+  display: none;           /* mostrado via JS quando há filtros activos */
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 4px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+  padding: 0;
+}
+.rfb-clear-btn:hover  { background: rgba(0, 0, 0, 0.32); transform: scale(1.1); }
+.rfb-clear-btn:active { transform: scale(0.95); }
+.rfb-clear-btn svg    { width: 14px; height: 14px; pointer-events: none; }
+
+/* ---- Loading / vazio ---- */
+.rfb-loading,
+.rfb-empty {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  padding: 4px 0;
+}
+
+/* ---- Disabled ---- */
+#route-filter-bar[data-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 480px) {
+  .rfb-inner     { min-height: 32px; }
+  .rfb-chip-main { font-size: 11px; padding: 3px 8px; }
+  .rfb-chip-dir  { font-size: 12px; padding: 3px 6px; }
+  .rfb-label     { font-size: 11px; }
+  .rfb-clear-btn { width: 24px; height: 24px; }
+  .rfb-clear-btn svg { width: 12px; height: 12px; }
+}

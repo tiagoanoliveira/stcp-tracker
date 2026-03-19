@@ -18,7 +18,6 @@ class EventBus {
       this.events[eventName] = [];
     }
     this.events[eventName].push(callback);
-    console.log(`🚤 Subscritor adicionado para evento: ${eventName}`);
   }
 
   /**
@@ -29,7 +28,6 @@ class EventBus {
   off(eventName, callback) {
     if (!this.events[eventName]) return;
     this.events[eventName] = this.events[eventName].filter(cb => cb !== callback);
-    console.log(`🚣 Subscritor removido do evento: ${eventName}`);
   }
 
   /**
@@ -39,7 +37,6 @@ class EventBus {
    */
   emit(eventName, data) {
     if (!this.events[eventName]) return;
-    console.log(`📰 Emitindo evento: ${eventName}`, data);
     this.events[eventName].forEach(callback => {
       try {
         callback(data);
@@ -56,10 +53,8 @@ class EventBus {
   clear(eventName) {
     if (eventName) {
       delete this.events[eventName];
-      console.log(`🖮 Evento limpo: ${eventName}`);
     } else {
       this.events = {};
-      console.log('🖮 Todos os eventos foram limpos');
     }
   }
 }

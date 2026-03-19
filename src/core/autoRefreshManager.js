@@ -18,11 +18,9 @@ class AutoRefreshManager {
    */
   start(id, callback, interval = 5000) {
     if (this.refreshes[id]) {
-      console.log(`🚨 Refresh '${id}' já está ativo`);
       return;
     }
 
-    console.log(`🔄 Iniciando refresh automático '${id}' a cada ${interval}ms`);
 
     let isRefreshing = false;
 
@@ -30,14 +28,12 @@ class AutoRefreshManager {
       const startTime = Date.now();
       try {
         if (isRefreshing) {
-          console.log(`⚠ Refresh '${id}' ainda em progresso, pulando este ciclo`);
           return;
         }
         isRefreshing = true;
         await callback();
         const duration = Date.now() - startTime;
         eventBus.emit(`refresh:complete:${id}`, { duration });
-        console.log(`✓ Refresh '${id}' concluído em ${duration}ms`);
       } catch (error) {
         console.error(`❌ Erro durante refresh '${id}':`, error);
         eventBus.emit(`refresh:error:${id}`, error);
@@ -67,13 +63,11 @@ class AutoRefreshManager {
       return;
     }
 
-    console.log(`🔁 Forçando refresh para '${id}'`);
     const startTime = Date.now();
     try {
       await this.refreshes[id].callback();
       const duration = Date.now() - startTime;
       eventBus.emit(`refresh:complete:${id}`, { duration, forced: true });
-      console.log(`✓ Refresh forçado '${id}' concluído em ${duration}ms`);
     } catch (error) {
       console.error(`❌ Erro durante refresh forçado '${id}':`, error);
       eventBus.emit(`refresh:error:${id}`, error);
@@ -86,13 +80,11 @@ class AutoRefreshManager {
    */
   stop(id) {
     if (!this.refreshes[id]) {
-      console.log(`⚠ Refresh '${id}' não ativo`);
       return;
     }
 
     clearTimeout(this.refreshes[id].timeout);
     delete this.refreshes[id];
-    console.log(`⚠ Refresh automático '${id}' parado`);
     eventBus.emit(`refresh:stopped:${id}`);
   }
 
@@ -101,7 +93,6 @@ class AutoRefreshManager {
    */
   stopAll() {
     Object.keys(this.refreshes).forEach(id => this.stop(id));
-    console.log('⚠ Todos os refreshes foram parados');
   }
 
   /**
@@ -116,7 +107,6 @@ class AutoRefreshManager {
     }
 
     this.refreshes[id].interval = interval;
-    console.log(`🔄 Intervalo de '${id}' alterado para ${interval}ms`);
   }
 
   /**
