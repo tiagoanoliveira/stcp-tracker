@@ -1,6 +1,6 @@
 /**
- * StopsMapApp - Aplica\u00e7\u00e3o de mapa de paragens
- * Fase 3: RouteFilterBar global + LineOverlayManager
+ * StopsMapApp - Aplicação de mapa de paragens
+ * Fase 3+4: RouteFilterBar global + LineOverlayManager + direction toggle
  *
  * Dois modos de uso da barra de filtro:
  *
@@ -8,30 +8,31 @@
  *    - Seleccionar linha(s) substitui os markers de paragem pelas paragens
  *      dessa(s) linha(s) e desenha as polylines no mapa.
  *    - Limpar filtro volta ao comportamento normal (loadNearbyStops).
+ *    - Botão →/← no chip muda a direcção (ida/volta) e redesenha.
  *
  * B) MODO DETALHE (painel de chegadas aberto)
- *    - A barra de filtro global fica desactivada (pointer-events:none + opacidade).
- *    - Os chips no painel de chegadas controlam tanto a lista como os markers
- *      de autocarros E desenham a polyline da linha seleccionada.
+ *    - A barra de filtro global fica desactivada.
+ *    - Os chips no painel de chegadas controlam markers de autocarros
+ *      E desenham a polyline da linha seleccionada.
  */
 
-import { geolocationService }   from '../core/geolocationService.js';
-import { apiService }            from '../core/apiService.js';
-import { stopService }           from '../services/stopService.js';
-import { vehicleService }        from '../services/vehicleService.js';
+import { geolocationService }    from '../core/geolocationService.js';
+import { apiService }             from '../core/apiService.js';
+import { stopService }            from '../services/stopService.js';
+import { vehicleService }         from '../services/vehicleService.js';
 import { plannedArrivalsService } from '../services/plannedArrivalsService.js';
-import { scheduleService }       from '../services/scheduleService.js';
-import { routeService }          from '../services/routeService.js';
-import { MapManager }            from '../map/MapManager.js';
-import { StopMarkerManager }     from '../map/markers/StopMarkerManager.js';
-import { BusMarkerManager }      from '../map/markers/BusMarkerManager.js';
-import { LineOverlayManager }    from '../map/LineOverlayManager.js';
-import { createCenterControl }   from '../map/controls/CenterControl.js';
-import { createBusMapControl }   from '../map/controls/BusMapControl.js';
-import { NextArrivals }          from '../ui/components/NextArrivals.js';
-import { LoadingSpinner }        from '../ui/components/LoadingSpinner.js';
-import { RouteFilterBar }        from '../ui/components/RouteFilterBar.js';
-import { iconCache }             from '../ui/design/iconCache.js';
+import { scheduleService }        from '../services/scheduleService.js';
+import { routeService }           from '../services/routeService.js';
+import { MapManager }             from '../map/MapManager.js';
+import { StopMarkerManager }      from '../map/markers/StopMarkerManager.js';
+import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
+import { LineOverlayManager }     from '../map/LineOverlayManager.js';
+import { createCenterControl }    from '../map/controls/CenterControl.js';
+import { createBusMapControl }    from '../map/controls/BusMapControl.js';
+import { NextArrivals }           from '../ui/components/NextArrivals.js';
+import { LoadingSpinner }         from '../ui/components/LoadingSpinner.js';
+import { RouteFilterBar }         from '../ui/components/RouteFilterBar.js';
+import { iconCache }              from '../ui/design/iconCache.js';
 
 export class StopsMapApp {
   constructor(options = {}) {
@@ -56,15 +57,14 @@ export class StopsMapApp {
     this.suppressMapChangeUntil = 0;
     this._searchGeneration      = 0;
 
-    this.currentRadius   = 1000;
-    this.isLoadingStops  = false;
+    this.currentRadius     = 1000;
+    this.isLoadingStops    = false;
     this.loadStopsDebounce = null;
 
-    // Filtro global de linhas (modo A - sem paragem aberta)
+    // Filtro global de linhas (modo A)
     this._globalSelectedRoutes    = new Set();
     this._globalSelectedRouteObjs = [];
-    // Modo linha activo: os markers de paragem s\u00e3o das linhas (n\u00e3o proximity)
-    this._lineFilterMode = false;
+    this._lineFilterMode          = false;
   }
 
   // ---------------------------------------------------------------------------
@@ -98,17 +98,16 @@ export class StopsMapApp {
       this.nextArrivals.onRefresh(() => this.handleRefreshArrivals());
       this.nextArrivals.onFilterChange(selected => this.handleArrivalFilterChange(selected));
 
-      // \u2b50 Barra de filtro global de linhas
+      // Barra de filtro global de linhas
       this.routeFilterBar = new RouteFilterBar('route-filter-bar');
       this.routeFilterBar.mount();
       this.routeFilterBar.setLoading(true);
       this.routeFilterBar.onFilterChange((selected, routeObjs) =>
         this._handleGlobalRouteFilterChange(selected, routeObjs)
       );
-      // Carregar lista sem bloquear
-      routeService.fetchRoutesList().then(routes => {
-        this.routeFilterBar.setRoutes(routes);
-      }).catch(() => this.routeFilterBar.setLoading(false));
+      routeService.fetchRoutesList()
+        .then(routes => this.routeFilterBar.setRoutes(routes))
+        .catch(() => this.routeFilterBar.setLoading(false));
 
       await this.setupGeolocation();
       this.setupEventListeners();
@@ -130,7 +129,7 @@ export class StopsMapApp {
       this.mapManager.updateUserMarker(position);
       this.mapManager.centerOn(position, 15);
     } catch (error) {
-      console.warn('\u26A0\uFE0F N\u00e3o foi poss\u00edvel obter localiza\u00e7\u00e3o:', error.message);
+      console.warn('\u26A0\uFE0F Não foi possível obter localização:', error.message);
       this.mapManager.centerOn([41.1579, -8.6291], 13);
     }
   }
@@ -165,7 +164,7 @@ export class StopsMapApp {
   handleMapChange() {
     if (this.nextArrivals?.isVisible) return;
     if (this.isSearchActive) return;
-    if (this._lineFilterMode) return;          // em modo linha n\u00e3o recarrega por movimento
+    if (this._lineFilterMode) return;
     if (Date.now() < this.suppressMapChangeUntil) return;
     clearTimeout(this.loadStopsDebounce);
     this.loadStopsDebounce = setTimeout(() => this.loadNearbyStops(), 500);
@@ -202,14 +201,12 @@ export class StopsMapApp {
   // ---------------------------------------------------------------------------
 
   async _handleGlobalRouteFilterChange(selected, routeObjs) {
-    // Ignorar enquanto o painel de chegadas estiver aberto
     if (this.nextArrivals?.isVisible) return;
 
     this._globalSelectedRoutes    = selected;
     this._globalSelectedRouteObjs = routeObjs;
 
     if (selected.size === 0) {
-      // Voltar ao modo normal
       this._lineFilterMode = false;
       this.lineOverlayManager.clearAll();
       this.stopMarkerManager.clearAllMarkers();
@@ -219,53 +216,36 @@ export class StopsMapApp {
     }
 
     this._lineFilterMode = true;
-    this._setGlobalFilterBarDisabled(false);
 
-    // 1. Buscar shape + paragens de todas as linhas seleccionadas em paralelo
+    // direction vem do RouteFilterBar (0 = ida, 1 = volta)
     const routesToFetch = routeObjs.map(r => ({
       routeId:    String(r.id || r.number),
-      direction:  0,
+      direction:  r.direction ?? 0,
       color:      r.color      || '#187EC2',
       text_color: r.text_color || '#FFFFFF'
     }));
 
     const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
-
-    // 2. Desenhar polylines
     this.lineOverlayManager.setRoutes(overlayData);
 
-    // 3. Substituir markers de paragem pelas paragens das linhas
+    // Paragens da(s) linha(s)
     const allStops = [];
-    overlayData.forEach(r => {
-      (r.stops?.stops || []).forEach(s => allStops.push(s));
-    });
-
-    // Deduplicar por stop_id
-    const uniqueStops = Array.from(
-      new Map(allStops.map(s => [s.stop_id, s])).values()
-    );
+    overlayData.forEach(r => (r.stops?.stops || []).forEach(s => allStops.push(s)));
+    const uniqueStops = Array.from(new Map(allStops.map(s => [s.stop_id, s])).values());
 
     this.stopMarkerManager.clearAllMarkers();
     if (uniqueStops.length > 0) {
-      this.stopMarkerManager.updateStopMarkers(
-        uniqueStops, false, stop => this.handleStopClick(stop)
-      );
+      this.stopMarkerManager.updateStopMarkers(uniqueStops, false, stop => this.handleStopClick(stop));
     }
 
-    // 4. Centrar no conjunto de linhas
     this.lineOverlayManager.fitBounds();
   }
 
-  /**
-   * Desactiva/activa a barra de filtro global visualmente
-   * (quando o painel de chegadas est\u00e1 aberto, o filtro global n\u00e3o deve ser usado).
-   */
   _setGlobalFilterBarDisabled(disabled) {
     const el = document.getElementById('route-filter-bar');
     if (!el) return;
-    el.style.opacity        = disabled ? '0.4' : '';
-    el.style.pointerEvents  = disabled ? 'none' : '';
-    el.title                = disabled ? 'Feche o painel de chegadas para usar o filtro de linhas' : '';
+    el.dataset.disabled   = disabled ? 'true' : 'false';
+    el.title              = disabled ? 'Feche o painel de chegadas para usar o filtro de linhas' : '';
   }
 
   // ---------------------------------------------------------------------------
@@ -323,8 +303,6 @@ export class StopsMapApp {
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     this.mapManager.map.closePopup();
-
-    // Desactivar filtro global enquanto o painel est\u00e1 aberto
     this._setGlobalFilterBarDisabled(true);
 
     const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
@@ -353,7 +331,7 @@ export class StopsMapApp {
     } catch (error) {
       console.error('\u274C Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
-      this.showError('Erro ao carregar informa\u00e7\u00f5es da paragem');
+      this.showError('Erro ao carregar informações da paragem');
     }
   }
 
@@ -363,28 +341,35 @@ export class StopsMapApp {
       this.currentBusPositions = [];
       return;
     }
-    const busesToShow = [], busPositions = [];
+
+    const busesToShow = [];
+    const busPositions = [];
+
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
       const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
-      if (vehicle) {
-        const processedBus = await vehicleService.processBusData(vehicle);
-        if (processedBus) {
-          busesToShow.push(processedBus);
-          busPositions.push([processedBus.latitude, processedBus.longitude]);
-          const routeNum = String(
-            arrival.route_short_name || arrival.route_number ||
-            arrival.route_id || processedBus.line || ''
-          );
-          this.busMarkerManager.setRouteForMarker(processedBus.id, routeNum);
-        }
-      }
+      if (!vehicle) continue;
+
+      // processBusData é agora síncrono (sem await) - headsign lazy no popup
+      const processedBus = vehicleService.processBusData(vehicle);
+      if (!processedBus) continue;
+
+      busesToShow.push(processedBus);
+      busPositions.push([processedBus.latitude, processedBus.longitude]);
+
+      const routeNum = String(
+        arrival.route_short_name || arrival.route_number ||
+        arrival.route_id         || processedBus.line    || ''
+      );
+      this.busMarkerManager.setRouteForMarker(processedBus.id, routeNum);
     }
+
     if (busesToShow.length === 0) {
       this.busMarkerManager.clearAllMarkers();
       this.currentBusPositions = [];
       return;
     }
+
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this.currentBusPositions = busPositions;
 
@@ -395,30 +380,23 @@ export class StopsMapApp {
         this.busMapCentered = true;
         setTimeout(() => this._recenterOnPositions(visiblePositions), 150);
       }
-    } else {
-      if (centerMap && !this.busMapCentered) {
-        this.busMapCentered = true;
-        setTimeout(() => this.recenterOnBuses(), 150);
-      }
+    } else if (centerMap && !this.busMapCentered) {
+      this.busMapCentered = true;
+      setTimeout(() => this.recenterOnBuses(), 150);
     }
   }
 
   // ---------------------------------------------------------------------------
   // Filtro de linhas no painel de chegadas (Modo B)
-  // Quando o utilizador toca num chip no painel:
-  //  - filtra markers de autocarros
-  //  - desenha/remove a polyline da linha no mapa
   // ---------------------------------------------------------------------------
 
   async handleArrivalFilterChange(selectedRoutes) {
-    // Filtrar autocarros no mapa
     const visiblePositions = this.busMarkerManager.filterByRoutes(selectedRoutes);
 
-    // Desenhar polylines das linhas seleccionadas (usando info das rotas j\u00e1 nos chips)
     if (selectedRoutes.size === 0) {
       this.lineOverlayManager.clearAll();
     } else {
-      // Obter objectos de rota com cores a partir dos chips do NextArrivals
+      // No painel de chegadas não temos direction toggle, usa sempre ida (0)
       const routeObjs = (this.nextArrivals?.availableRoutes || [])
         .filter(r => selectedRoutes.has(r.number))
         .map(r => ({
@@ -432,7 +410,6 @@ export class StopsMapApp {
       this.lineOverlayManager.setRoutes(overlayData);
     }
 
-    // Recentrar
     if (visiblePositions.length > 0) {
       this._recenterOnPositions(visiblePositions);
     } else if (selectedRoutes.size > 0 && this.lineOverlayManager.hasActiveLayers()) {
@@ -440,9 +417,7 @@ export class StopsMapApp {
     }
   }
 
-  recenterOnBuses() {
-    this._recenterOnPositions(this.currentBusPositions);
-  }
+  recenterOnBuses() { this._recenterOnPositions(this.currentBusPositions); }
 
   _recenterOnPositions(positions) {
     if (!this.mapManager || positions.length === 0) return;
@@ -475,24 +450,25 @@ export class StopsMapApp {
   handleCloseArrivals() {
     this.stopAutoRefresh();
     this.busMarkerManager.clearAllMarkers();
-    this.lineOverlayManager.clearAll();     // limpar polylines do modo detalhe
+    this.lineOverlayManager.clearAll();
     this.busMapCentered      = false;
     this.currentBusPositions = [];
 
-    const wasSearchActive  = this.isSearchActive;
-    const returnPosition   = this.currentStopPosition;
+    const wasSearchActive = this.isSearchActive;
+    const returnPosition  = this.currentStopPosition;
     this.currentStopId       = null;
     this.currentStopPosition = null;
 
-    // Reactivar barra de filtro global
     this._setGlobalFilterBarDisabled(false);
 
-    if (returnPosition) { this.suppressMapChangeUntil = Date.now() + 1800; this.mapManager.centerOn(returnPosition, 16); }
+    if (returnPosition) {
+      this.suppressMapChangeUntil = Date.now() + 1800;
+      this.mapManager.centerOn(returnPosition, 16);
+    }
 
     if (wasSearchActive) {
       this._clearSearch(false, 700);
     } else if (this._lineFilterMode && this._globalSelectedRoutes.size > 0) {
-      // Re-aplicar filtro global se estava activo antes de abrir a paragem
       this._handleGlobalRouteFilterChange(this._globalSelectedRoutes, this._globalSelectedRouteObjs);
     } else {
       this.stopMarkerManager.showAllMarkers();
