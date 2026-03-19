@@ -1,17 +1,13 @@
 {
-  "name": "Horários em tempo real - STCP",
-  "short_name": "STCP Live",
-  "description": "Próximas chegadas em tempo real",
-  "scope": "/",
+  "name": "STCP Tracker",
+  "short_name": "STCP",
+  "description": "Mapa em tempo real dos autocarros STCP no Porto",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#0066cc",
+  "theme_color": "#0072c6",
+  "orientation": "portrait-primary",
   "icons": [
-    {
-      "src": "./resources/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
-    }
+    { "src": "./resources/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

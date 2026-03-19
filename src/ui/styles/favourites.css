@@ -1,0 +1,178 @@
+/* ============================================================
+   Favoritos — FAB, Drawer e itens
+   ============================================================ */
+
+/* FAB -------------------------------------------------------- */
+.fav-fab {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 1200;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: #fff;
+  color: #f59e0b;
+  box-shadow: 0 2px 8px rgba(0,0,0,.22);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .18s, color .18s, transform .15s;
+}
+.fav-fab:hover  { background: #fef3c7; transform: scale(1.08); }
+.fav-fab.active { background: #f59e0b; color: #fff; }
+
+/* Drawer ---------------------------------------------------- */
+.fav-panel {
+  position: fixed;
+  top: 0;
+  right: -320px;
+  width: 300px;
+  max-width: 92vw;
+  height: 100dvh;
+  z-index: 1300;
+  background: #fff;
+  box-shadow: -4px 0 24px rgba(0,0,0,.18);
+  display: flex;
+  flex-direction: column;
+  transition: right .25s cubic-bezier(.4,0,.2,1);
+  border-radius: 16px 0 0 16px;
+  overflow: hidden;
+}
+.fav-panel.open { right: 0; }
+
+.fav-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+
+.fav-panel-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.fav-panel-title svg { color: #f59e0b; }
+
+.fav-panel-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: background .15s;
+}
+.fav-panel-close:hover { background: #f1f5f9; }
+
+.fav-panel-hint {
+  font-size: .72rem;
+  color: #94a3b8;
+  padding: 8px 16px 6px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+/* Lista ----------------------------------------------------- */
+.fav-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.fav-item {
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid #f8fafc;
+  min-height: 48px;
+}
+
+.fav-item-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  text-decoration: none;
+  color: #1e293b;
+  font-size: .88rem;
+  font-weight: 500;
+  padding: 10px 4px 10px 0;
+  overflow: hidden;
+}
+.fav-item-link:hover .fav-item-name { text-decoration: underline; }
+
+.fav-item-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fav-line-badge {
+  display: inline-block;
+  background: #0072C6;
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 4px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.fav-item-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #cbd5e1;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: color .15s, background .15s;
+}
+.fav-item-remove:hover { color: #ef4444; background: #fef2f2; }
+
+.fav-empty {
+  text-align: center;
+  color: #94a3b8;
+  font-size: .85rem;
+  padding: 32px 20px;
+  line-height: 1.6;
+}
+
+/* Botão estrela no header do NextArrivals ------------------- */
+.next-arrivals-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.next-arrivals-favourite {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #cbd5e1;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  transition: color .15s, background .15s;
+}
+.next-arrivals-favourite:hover     { color: #f59e0b; background: #fef3c7; }
+.next-arrivals-favourite.is-favourite { color: #f59e0b; }
