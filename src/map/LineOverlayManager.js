@@ -139,7 +139,7 @@ export class LineOverlayManager {
 
     stops.forEach(stop => {
       const marker = L.circleMarker([stop.latitude, stop.longitude], {
-        radius:      7,
+        radius:      5,
         fillColor:   '#FFFFFF',
         color:       lineColor,
         weight:      2,
