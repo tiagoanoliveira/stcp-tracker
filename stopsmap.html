@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="./src/ui/styles/stopsmap.css">
   <link rel="stylesheet" href="./src/ui/styles/stopDetail.css">
   <link rel="stylesheet" href="./src/ui/styles/loading.css">
+  <link rel="stylesheet" href="./src/ui/styles/routeFilterBar.css">
   
   <!-- Favicon -->
   <link rel="shortcut icon" href="./resources/favicon.svg">
@@ -29,7 +30,7 @@
     <span class="logo-text">Paragens STCP</span>
   </a>
 
-  <!-- Barra de pesquisa -->
+  <!-- Barra de pesquisa + filtro de linhas -->
   <div class="search-overlay">
     <div class="search-input-wrapper">
       <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -51,6 +52,8 @@
         </svg>
       </button>
     </div>
+    <!-- Barra de filtro de linhas (imediatamente abaixo da pesquisa) -->
+    <div id="route-filter-bar"></div>
   </div>
 
   <!-- Rodapé no fundo centro -->

@@ -1,13 +1,16 @@
 /**
  * BusMapApp - Mapa de autocarros em tempo real
  * Fase 2: barra de filtro por linha + overlay de polylines
+ *
+ * NOTA: scheduleService NÃO é carregado aqui - os dados de calendário/horários
+ * só são necessários na página de paragens (stopsmap.html) para calcular
+ * próximas passagens. Nesta página apenas mostramos posições em tempo real.
  */
 
 import { apiService }          from '../core/apiService.js';
 import { geolocationService }  from '../core/geolocationService.js';
 import { autoRefreshManager }  from '../core/autoRefreshManager.js';
 import { vehicleService }      from '../services/vehicleService.js';
-import { scheduleService }     from '../services/scheduleService.js';
 import { routeService }        from '../services/routeService.js';
 import { MapManager }          from '../map/MapManager.js';
 import { BusMarkerManager }    from '../map/markers/BusMarkerManager.js';
@@ -23,18 +26,18 @@ export class BusMapApp {
     this.mapElementId    = options.mapElementId    || 'map';
     this.refreshInterval = options.refreshInterval || 5000;
 
-    this.mapManager        = null;
-    this.busMarkerManager  = null;
+    this.mapManager         = null;
+    this.busMarkerManager   = null;
     this.lineOverlayManager = null;
-    this.routeFilterBar    = null;
-    this.lastUpdateDisplay = new LastUpdateDisplay();
-    this.centerControl     = null;
-    this.stopsControl      = null;
-    this.loadingOverlay    = null;
+    this.routeFilterBar     = null;
+    this.lastUpdateDisplay  = new LastUpdateDisplay();
+    this.centerControl      = null;
+    this.stopsControl       = null;
+    this.loadingOverlay     = null;
 
     // Estado do filtro activo
-    this._selectedRoutes    = new Set();   // Set<routeNumber string>
-    this._selectedRouteObjs = [];          // Array de objectos com color, etc.
+    this._selectedRoutes    = new Set();  // Set<routeNumber string>
+    this._selectedRouteObjs = [];         // objectos com color, etc.
 
     // Cache de todos os autocarros processados (sem filtro)
     this._allProcessedBuses = [];
@@ -61,21 +64,20 @@ export class BusMapApp {
       this.busMarkerManager   = new BusMarkerManager(this.mapManager.map);
       this.lineOverlayManager = new LineOverlayManager(this.mapManager.map);
 
-      this.loadingOverlay.update('A carregar calend\u00e1rio...');
-      await scheduleService.loadScheduleData();
-
-      // \u2b50 Inicializar barra de filtro de linhas
+      // \u2b50 Barra de filtro de linhas
       this.routeFilterBar = new RouteFilterBar('route-filter-bar');
       this.routeFilterBar.mount();
       this.routeFilterBar.setLoading(true);
-      this.routeFilterBar.onFilterChange((selected, routeObjs) => this._handleRouteFilterChange(selected, routeObjs));
+      this.routeFilterBar.onFilterChange((selected, routeObjs) =>
+        this._handleRouteFilterChange(selected, routeObjs)
+      );
 
-      // Carregar lista de linhas em paralelo com geolocaliza\u00e7\u00e3o
-      const [routesResult] = await Promise.allSettled([
-        routeService.fetchRoutesList()
-      ]);
-      const routes = routesResult.status === 'fulfilled' ? routesResult.value : [];
-      this.routeFilterBar.setRoutes(routes);
+      // Carregar lista de linhas (n\u00e3o bloqueia o loading principal)
+      routeService.fetchRoutesList().then(routes => {
+        this.routeFilterBar.setRoutes(routes);
+      }).catch(() => {
+        this.routeFilterBar.setLoading(false);
+      });
 
       this.setupGeolocation();
       this.setupEventListeners();
@@ -103,10 +105,8 @@ export class BusMapApp {
   }
 
   setupEventListeners() {
-    const refreshNowBtn = document.getElementById('refresh-now');
-    if (refreshNowBtn) {
-      refreshNowBtn.addEventListener('click', () => autoRefreshManager.forceRefresh('bus-map'));
-    }
+    const btn = document.getElementById('refresh-now');
+    if (btn) btn.addEventListener('click', () => autoRefreshManager.forceRefresh('bus-map'));
   }
 
   startAutoRefresh() {
@@ -129,19 +129,18 @@ export class BusMapApp {
       const processed = await vehicleService.processBusDataBatch(rawBusData);
       this._allProcessedBuses = processed;
 
-      // Registar associa\u00e7\u00e3o busId -> routeNumber para o BusMarkerManager
+      // Registar associa\u00e7\u00e3o busId -> routeNumber para o filterByRoutes
       processed.forEach(bus => {
         this.busMarkerManager.setRouteForMarker(bus.id, bus.line || '');
       });
 
-      // Aplicar filtro activo (se existir) ou mostrar todos
+      // Aplicar filtro activo ou mostrar todos
       const toShow = this._selectedRoutes.size > 0
         ? processed.filter(b => this._selectedRoutes.has(String(b.line || '')))
         : processed;
 
       this.busMarkerManager.updateBusMarkers(toShow);
 
-      // Ap\u00f3s atualizar markers, re-aplicar visibilidade do filtro
       if (this._selectedRoutes.size > 0) {
         this.busMarkerManager.filterByRoutes(this._selectedRoutes);
       }
@@ -162,19 +161,18 @@ export class BusMapApp {
     this._selectedRouteObjs = routeObjs;
 
     if (selected.size === 0) {
-      // Sem filtro: mostrar todos os autocarros e remover overlays
       this.lineOverlayManager.clearAll();
       this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
       return;
     }
 
-    // 1. Filtrar markers de autocarros imediatamente (feedback visual r\u00e1pido)
+    // 1. Filtrar markers imediatamente (feedback r\u00e1pido)
     this.busMarkerManager.filterByRoutes(selected);
 
-    // 2. Carregar shape + paragens para as linhas seleccionadas
+    // 2. Carregar shape + paragens das linhas seleccionadas
     const routesToFetch = routeObjs.map(r => ({
       routeId:    String(r.id || r.number),
-      direction:  0, // ida por defeito; TODO fase 3: suporte a direction toggle
+      direction:  0,
       color:      r.color      || '#187EC2',
       text_color: r.text_color || '#FFFFFF'
     }));
@@ -182,7 +180,7 @@ export class BusMapApp {
     const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
     this.lineOverlayManager.setRoutes(overlayData);
 
-    // 3. Recentrar o mapa nos autocarros vis\u00edveis (prioridade) ou na linha
+    // 3. Recentrar nos autocarros vis\u00edveis (ou na linha se n\u00e3o houver)
     const visiblePositions = this.busMarkerManager.filterByRoutes(selected);
     if (visiblePositions.length > 0) {
       this._fitToPositions(visiblePositions);
@@ -201,10 +199,9 @@ export class BusMapApp {
       this.mapManager.centerOn(positions[0], 16);
     } else {
       this.mapManager.fitBounds(positions, {
-        paddingTopLeft:     [60, 100], // 100px para a barra de filtro no topo
+        paddingTopLeft:     [60, 100],
         paddingBottomRight: [60, 60],
-        maxZoom: 16,
-        minZoom: 11
+        maxZoom: 16, minZoom: 11
       });
     }
   }
