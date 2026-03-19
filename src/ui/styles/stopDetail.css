@@ -340,8 +340,8 @@
 }
 
 @media (max-width: 480px) {
-  .next-arrivals { max-height: 40vh; }
-  .next-arrivals-header { padding: 12px; }
+  .next-arrivals { max-height: 45dvh; }
+  .next-arrivals-header { padding: 6px 12px; }
   .next-arrivals-title { gap: 8px; }
   .next-arrivals-icon { width: 30px; height: 30px; }
   .next-arrivals-title-text h2 { font-size: 15px; }
@@ -355,7 +355,7 @@
   .arrival-status { font-size: 12px; }
   .arrival-location-icon { width: 30px; height: 30px; }
   .arrival-time { font-size: 15px; min-width: 55px; }
-  .next-arrivals-footer { padding: 10px 12px; }
+  .next-arrivals-footer { padding: 6px 12px; }
   .next-arrivals-footer p { font-size: 12px; }
   .next-arrivals-refresh { width: 30px; height: 30px; }
   .next-arrivals-refresh svg { width: 14px; height: 14px; }
