@@ -73,7 +73,6 @@ export class StopsMapApp {
 
   async initialize() {
     try {
-      console.log('\uD83D\uDE80 Inicializando StopsMapApp...');
       this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de paragens...');
 
       await scheduleService.loadScheduleData();

@@ -38,7 +38,6 @@ export class BusMapApp {
 
   async initialize() {
     try {
-      console.log('\uD83D\uDE80 Inicializando BusMapApp...');
       this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de autocarros...');
 
       this.mapManager = new MapManager(this.mapElementId);
@@ -77,7 +76,6 @@ export class BusMapApp {
       this.loadingOverlay = null;
 
       this.startAutoRefresh();
-      console.log('\u2705 BusMapApp inicializado');
     } catch (error) {
       console.error('\u274C Erro na inicializa\u00e7\u00e3o:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();

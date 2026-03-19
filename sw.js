@@ -3,7 +3,7 @@
  * Cache estratégico para funcionamento offline
  */
 
-const CACHE_NAME = 'stcp-live-v6.2';
+const CACHE_NAME = 'stcp-live-v6.3';
 
 // Ficheiros essenciais para cachear
 const urlsToCache = [
@@ -48,16 +48,12 @@ const urlsToCache = [
 
 // Instalação do Service Worker
 self.addEventListener('install', event => {
-  console.log('🔧 Service Worker: Instalando v4...');
-  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('✓ Cache aberta:', CACHE_NAME);
         return cache.addAll(urlsToCache);
       })
       .then(() => {
-        console.log('✓ Todos os ficheiros cacheados');
         return self.skipWaiting();
       })
       .catch(err => {
@@ -68,22 +64,19 @@ self.addEventListener('install', event => {
 
 // Ativação - Limpar caches antigas
 self.addEventListener('activate', event => {
-  console.log('✅ Service Worker: Ativando v4...');
-  
+
   event.waitUntil(
     caches.keys()
       .then(cacheNames => {
         return Promise.all(
           cacheNames.map(cacheName => {
             if (cacheName !== CACHE_NAME) {
-              console.log('🗑 Deletando cache antiga:', cacheName);
               return caches.delete(cacheName);
             }
           })
         );
       })
       .then(() => {
-        console.log('✓ Service Worker ativo e a controlar páginas');
         return self.clients.claim();
       })
   );

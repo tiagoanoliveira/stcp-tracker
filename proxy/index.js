@@ -321,7 +321,6 @@ async function handleRequest(request) {
 }
 
 async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
-  console.log(`[${endpoint.toUpperCase()}] Fetching: ${stcpApiUrl}`);
   const response = await fetch(stcpApiUrl, {
     method: 'GET',
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.1)', 'Accept': 'application/json' },
@@ -340,7 +339,6 @@ async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
 }
 
 async function proxyRawRequest(stcpApiUrl, endpoint) {
-  console.log(`[${endpoint.toUpperCase()}] Fetching (raw): ${stcpApiUrl}`);
   return await fetch(stcpApiUrl, {
     method: 'GET',
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.1)', 'Accept': 'application/json' },

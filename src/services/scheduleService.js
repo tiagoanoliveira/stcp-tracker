@@ -25,9 +25,7 @@ class ScheduleService {
    */
   async loadScheduleData() {
     try {
-      console.log('🔄 Carregando calendário...');
       this.specialPeriods = await apiService.fetchCalendarData();
-      console.log(`✓ ${this.specialPeriods.length} períodos especiais carregados`);
     } catch (error) {
       console.error('❌ Erro ao carregar calendário:', error);
       this.specialPeriods = [];
@@ -67,7 +65,6 @@ class ScheduleService {
     if (specialPeriod) {
       if (specialPeriod.description === 'FERIADO') {
         serviceId = 'DOMINGOS|FERIADOS';
-        console.log(`🌟 FERIADO detectado - usando horário de domingo`);
       } else if (specialPeriod.description === 'FERIAS') {
         if (weekday === 0) {
           serviceId = 'H';
@@ -76,7 +73,6 @@ class ScheduleService {
         } else {
           serviceId = 'F';
         }
-        console.log(`🌙 FÉRIAS ESCOLARES detectadas - usando horário ${serviceId}`);
       }
     }
 
@@ -84,7 +80,6 @@ class ScheduleService {
     this.cachedServiceDate = yyyyMMdd;
     this.cachedServiceId = serviceId;
     
-    console.log(`📏 Service ID determinado para ${yyyyMMdd}: ${serviceId}`);
     return serviceId;
   }
 
@@ -202,7 +197,6 @@ class ScheduleService {
     this.cachedServiceDate = null;
     this.cachedServiceId = null;
     this.routeSchedulesCache.clear();
-    console.log('🧹 Cache de schedules limpo');
   }
 }
 
