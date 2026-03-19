@@ -102,7 +102,7 @@ export class LineOverlayManager {
     this.map.fitBounds(bounds, {
       paddingTopLeft:     [40, 40],
       paddingBottomRight: [40, bottomPad + 40],
-      maxZoom: 16
+      maxZoom: 17
     });
   }
 
@@ -142,7 +142,7 @@ export class LineOverlayManager {
         radius:      7,
         fillColor:   '#FFFFFF',
         color:       lineColor,
-        weight:      3,
+        weight:      2,
         opacity:     1,
         fillOpacity: 1
       });
