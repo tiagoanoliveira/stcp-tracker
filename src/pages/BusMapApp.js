@@ -31,7 +31,8 @@ export class BusMapApp {
     this.loadingOverlay     = null;
 
     this._selectedRoutes    = new Set();
-    this._selectedRouteObjs = [];
+    // Map<routeNumber, direction> para filtrar markers por linha e direção
+    this._routeDirMap       = new Map();
     this._allProcessedBuses = [];
   }
 
@@ -111,8 +112,9 @@ export class BusMapApp {
       const processed = await vehicleService.processBusDataBatch(rawBusData);
       this._allProcessedBuses = processed;
 
+      // Guardar linha E direção de cada marcador
       processed.forEach(bus => {
-        this.busMarkerManager.setRouteForMarker(bus.id, bus.line || '');
+        this.busMarkerManager.setRouteForMarker(bus.id, bus.line || '', bus.direction);
       });
 
       const toShow = this._selectedRoutes.size > 0
@@ -122,7 +124,7 @@ export class BusMapApp {
       this.busMarkerManager.updateBusMarkers(toShow);
 
       if (this._selectedRoutes.size > 0) {
-        this.busMarkerManager.filterByRoutes(this._selectedRoutes);
+        this.busMarkerManager.filterByRoutes(this._selectedRoutes, this._routeDirMap);
       }
 
       this.lastUpdateDisplay.update();
@@ -133,18 +135,23 @@ export class BusMapApp {
   }
 
   async _handleRouteFilterChange(selected, routeObjs) {
-    this._selectedRoutes    = selected;
-    this._selectedRouteObjs = routeObjs;
+    this._selectedRoutes = selected;
+
+    // Actualizar mapa linha -> direção
+    this._routeDirMap = new Map(routeObjs.map(r => [String(r.number), r.direction ?? 0]));
 
     if (selected.size === 0) {
       this.lineOverlayManager.clearAll();
       this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
+      // Repor todos os markers visíveis
+      this.busMarkerManager.filterByRoutes(new Set());
       return;
     }
 
-    this.busMarkerManager.filterByRoutes(selected);
+    // Filtrar markers imediatamente por linha e direção
+    this.busMarkerManager.filterByRoutes(selected, this._routeDirMap);
 
-    // Usar r.direction do routeObj (corrige bug: antes era sempre 0)
+    // Carregar shapes
     const routesToFetch = routeObjs.map(r => ({
       routeId:    String(r.id || r.number),
       direction:  r.direction ?? 0,
@@ -155,7 +162,7 @@ export class BusMapApp {
     const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
     this.lineOverlayManager.setRoutes(overlayData);
 
-    const visiblePositions = this.busMarkerManager.filterByRoutes(selected);
+    const visiblePositions = this.busMarkerManager.filterByRoutes(selected, this._routeDirMap);
     if (visiblePositions.length > 0) {
       this._fitToPositions(visiblePositions);
     } else if (this.lineOverlayManager.hasActiveLayers()) {

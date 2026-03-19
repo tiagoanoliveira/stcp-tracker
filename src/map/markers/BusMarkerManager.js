@@ -2,7 +2,6 @@
  * BusMarkerManager - Gestão de marcadores de autocarros
  *
  * Popup lazy: o destino (headsign) é resolvido apenas no primeiro clique.
- * Enquanto não é resolvido mostra "A carregar...".
  */
 
 import { iconCache }      from '../../ui/design/iconCache.js';
@@ -12,20 +11,37 @@ export class BusMarkerManager {
   constructor(map) {
     this.map = map;
     this.markers       = {};   // busId -> L.Marker
-    this._busData      = {};   // busId -> objecto processado (sem destination)
+    this._busData      = {};   // busId -> objecto processado
     this._markerRoutes = {};   // busId -> routeNumber string
+    this._markerDirs   = {};   // busId -> direction number (0|1)
   }
 
-  setRouteForMarker(busId, routeNumber) {
+  setRouteForMarker(busId, routeNumber, direction) {
     this._markerRoutes[busId] = String(routeNumber || '');
+    this._markerDirs[busId]   = direction != null ? Number(direction) : null;
   }
 
-  filterByRoutes(selectedRoutes) {
+  /**
+   * Filtra marcadores por linha e, opcionalmente, por direção.
+   * @param {Set<string>}         selectedRoutes  - números de linha seleccionados
+   * @param {Map<string,number>}  [routeDirMap]   - mapa linha -> direção (0|1)
+   */
+  filterByRoutes(selectedRoutes, routeDirMap) {
     const showAll = !selectedRoutes || selectedRoutes.size === 0;
     const visiblePositions = [];
+
     Object.entries(this.markers).forEach(([id, marker]) => {
-      const routeNum = this._markerRoutes[id] || '';
-      const visible  = showAll || selectedRoutes.has(routeNum);
+      const routeNum  = this._markerRoutes[id] || '';
+      const markerDir = this._markerDirs[id];
+
+      let visible = showAll || selectedRoutes.has(routeNum);
+
+      // Se há mapa de direções e o autobocarro tem direção conhecida,
+      // filtrar também pela direção seleccionada para essa linha
+      if (visible && routeDirMap && routeDirMap.has(routeNum) && markerDir !== null) {
+        visible = markerDir === routeDirMap.get(routeNum);
+      }
+
       if (visible) {
         if (!this.map.hasLayer(marker)) marker.addTo(this.map);
         const ll = marker.getLatLng();
@@ -46,7 +62,6 @@ export class BusMarkerManager {
       if (this.markers[bus.id]) {
         this.markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
         this.markers[bus.id].setIcon(icon);
-        // Actualizar popup apenas se já tinha sido resolvido (destination != null)
         if (bus.destination !== null) {
           this.markers[bus.id].bindPopup(this._createPopupContent(bus));
         }
@@ -62,13 +77,8 @@ export class BusMarkerManager {
   _createBusMarker(bus) {
     const icon   = iconCache.getBusIcon(bus.line);
     const marker = L.marker([bus.latitude, bus.longitude], { icon }).addTo(this.map);
-
-    // Popup inicial com loading
     marker.bindPopup(this._createLoadingPopup(bus), { maxWidth: 220 });
-
-    // Lazy: ao abrir o popup pela primeira vez, resolve o headsign
     marker.on('popupopen', () => this._resolvePopupHeadsign(bus.id, marker));
-
     this.markers[bus.id] = marker;
     return marker;
   }
@@ -76,13 +86,12 @@ export class BusMarkerManager {
   async _resolvePopupHeadsign(busId, marker) {
     const bus = this._busData[busId];
     if (!bus) return;
-    // Já resolvido anteriormente
     if (bus.destination !== null) {
       marker.setPopupContent(this._createPopupContent(bus));
       return;
     }
     const destination = await vehicleService.resolveHeadsign(bus);
-    bus.destination = destination;   // guardar para futuras aberturas
+    bus.destination = destination;
     this._busData[busId] = bus;
     marker.setPopupContent(this._createPopupContent(bus));
   }
@@ -113,6 +122,7 @@ export class BusMarkerManager {
       delete this.markers[id];
       delete this._busData[id];
       delete this._markerRoutes[id];
+      delete this._markerDirs[id];
     }
   }
 
@@ -127,6 +137,7 @@ export class BusMarkerManager {
   clearAllMarkers() {
     Object.keys(this.markers).forEach(id => this.removeBusMarker(id));
     this._markerRoutes = {};
+    this._markerDirs   = {};
     this._busData      = {};
   }
 

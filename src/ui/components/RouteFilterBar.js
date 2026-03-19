@@ -9,6 +9,9 @@
  *  onFilterChange(cb)       cb(Set<string>, routeObjects[]) — routeObjects inclui direction (0|1)
  */
 
+// Linhas circulares: só existão na direção 0
+const CIRCULAR_LINES = new Set(['300', '301', '302', '303']);
+
 export class RouteFilterBar {
   constructor(containerId) {
     this.containerId = containerId;
@@ -29,7 +32,17 @@ export class RouteFilterBar {
       <div class="rfb-inner">
         <span class="rfb-label">Filtrar por:</span>
         <div class="rfb-chips" id="rfb-chips-${this.containerId}"></div>
+        <button class="rfb-clear-btn" id="rfb-clear-${this.containerId}" title="Limpar filtros" aria-label="Limpar todos os filtros" style="display:none">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 5H7l-5 7 5 7h13a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"/>
+            <line x1="18" y1="9" x2="12" y2="15"/>
+            <line x1="12" y1="9" x2="18" y2="15"/>
+          </svg>
+        </button>
       </div>`;
+
+    const clearBtn = this.container.querySelector(`#rfb-clear-${this.containerId}`);
+    if (clearBtn) clearBtn.addEventListener('click', () => this._clearAll());
   }
 
   setRoutes(routes = []) {
@@ -61,19 +74,22 @@ export class RouteFilterBar {
   // ---------------------------------------------------------------------------
 
   _render() {
-    const chipsEl = this._chipsEl();
+    const chipsEl  = this._chipsEl();
+    const clearBtn = this.container?.querySelector(`#rfb-clear-${this.containerId}`);
     if (!chipsEl) return;
     chipsEl.innerHTML = '';
 
     if (this.routes.length === 0) {
       chipsEl.innerHTML = '<span class="rfb-empty">Sem linhas disponíveis</span>';
+      if (clearBtn) clearBtn.style.display = 'none';
       return;
     }
 
     this.routes.forEach(route => {
-      const entry     = this.selected.get(route.number);
-      const isActive  = Boolean(entry);
-      const direction = entry?.direction ?? 0;
+      const entry      = this.selected.get(route.number);
+      const isActive   = Boolean(entry);
+      const direction  = entry?.direction ?? 0;
+      const isCircular = CIRCULAR_LINES.has(String(route.number));
 
       const chip = document.createElement('div');
       chip.className = `rfb-chip${isActive ? ' active' : ''}`;
@@ -89,17 +105,30 @@ export class RouteFilterBar {
 
       if (isActive) {
         const dirBtn = document.createElement('button');
-        dirBtn.className              = 'rfb-chip-dir';
-        dirBtn.style.backgroundColor  = this._darken(route.color || '#187EC2');
-        dirBtn.style.color            = route.text_color || '#FFFFFF';
-        dirBtn.title      = direction === 0 ? 'Mostrar volta (direção 1)' : 'Mostrar ida (direção 0)';
-        dirBtn.textContent = direction === 0 ? '\u2192' : '\u2190';
-        dirBtn.addEventListener('click', e => { e.stopPropagation(); this._toggleDirection(route); });
+        dirBtn.style.backgroundColor = this._darken(route.color || '#187EC2');
+        dirBtn.style.color           = route.text_color || '#FFFFFF';
+
+        if (isCircular) {
+          // Linha circular: botão decorativo, sem ação
+          dirBtn.className   = 'rfb-chip-dir rfb-chip-circular';
+          dirBtn.textContent = '\u25CB';   // ○ (círculo vazio)
+          dirBtn.title       = 'Linha circular — sentido único';
+          dirBtn.setAttribute('aria-disabled', 'true');
+          dirBtn.tabIndex = -1;
+        } else {
+          dirBtn.className   = 'rfb-chip-dir';
+          dirBtn.title       = direction === 0 ? 'Mostrar volta (direção 1)' : 'Mostrar ida (direção 0)';
+          dirBtn.textContent = direction === 0 ? '\u2192' : '\u2190';
+          dirBtn.addEventListener('click', e => { e.stopPropagation(); this._toggleDirection(route); });
+        }
         chip.appendChild(dirBtn);
       }
 
       chipsEl.appendChild(chip);
     });
+
+    // Mostrar/esconder botão de limpar
+    if (clearBtn) clearBtn.style.display = this.selected.size > 0 ? 'flex' : 'none';
   }
 
   // ---------------------------------------------------------------------------
@@ -121,6 +150,12 @@ export class RouteFilterBar {
     if (!entry) return;
     entry.direction = entry.direction === 0 ? 1 : 0;
     this.selected.set(route.number, entry);
+    this._render();
+    this._emit();
+  }
+
+  _clearAll() {
+    this.selected.clear();
     this._render();
     this._emit();
   }
