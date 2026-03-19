@@ -5,12 +5,11 @@
 /* Botão Leaflet -------------------------------------------- */
 .leaflet-control-tutorial {
   margin-bottom: 8px !important;
-  margin-left: 0 !important;
 }
 
 .tutorial-map-btn {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 2px solid rgba(0,0,0,.2);
   background: #fff;
@@ -87,6 +86,19 @@
   font-size: 2.8rem;
   line-height: 1;
   margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+}
+
+/* Imagens nos steps (favicon.svg, busmap.png, paragem.png) */
+.tut-icon-img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
 }
 
 .tutorial-step-title {
@@ -158,5 +170,6 @@
 
 @media (max-width: 400px) {
   .tutorial-card { padding: 28px 18px 22px; }
-  .tutorial-step-icon { font-size: 2.2rem; }
+  .tutorial-step-icon { font-size: 2.2rem; min-height: 44px; }
+  .tut-icon-img { width: 44px; height: 44px; }
 }
