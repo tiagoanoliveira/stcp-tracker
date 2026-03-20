@@ -47,7 +47,7 @@ const STCP_ROUTES = [
   { id: '601',  number: '601', name: 'Cordoaria - Aeroporto (via Mar Shopping)',      color: '#00AC00', text_color: '#ffffff' },
   { id: '602',  number: '602', name: 'Cordoaria - Aeroporto (via Padrão Moreira)',    color: '#00AC00', text_color: '#ffffff' },
   { id: '603',  number: '603', name: 'Marquês - Maia (Zoo)',                          color: '#00AC00', text_color: '#FFFFFF' },
-  { id: '603',  number: '603', name: 'Hospital de S. João - Aeroporto (via Crestins)',color: '#00AC00', text_color: '#FFFFFF' },
+  { id: '604',  number: '604', name: 'Hospital de S. João - Aeroporto (via Crestins)',color: '#00AC00', text_color: '#FFFFFF' },
   { id: '700',  number: '700', name: 'Bolhão - Campo',                                color: '#FF0000', text_color: '#FFFFFF' },
   { id: '701',  number: '701', name: 'Bolhão - Codiceira',                            color: '#FF0000', text_color: '#FFFFFF' },
   { id: '702',  number: '702', name: 'Bolhão - Travagem',                             color: '#FF0000', text_color: '#FFFFFF' },
