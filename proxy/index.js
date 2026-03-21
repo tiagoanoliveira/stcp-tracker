@@ -71,6 +71,17 @@ const STCP_ROUTES = [
   { id: '906',  number: '906', name: 'Trindade - Madalena',                           color: '#FF7900', text_color: '#FFFFFF' },
   { id: '907',  number: '907', name: 'Boavista (Bom Sucesso) - Vila d Este',          color: '#FF7900', text_color: '#FFFFFF' },
   { id: '1M',   number: '1M',  name: 'Aliados - Matosinhos (Praia)',                  color: '#000000', text_color: '#FFFFFF' },
+  { id: '2M',   number: '2M',  name: 'Aliados - Hospital de S. João',                 color: '#000000', text_color: '#FFFFFF' },
+  { id: '3M',   number: '3M',  name: 'Aliados - Aeroporto',                           color: '#000000', text_color: '#FFFFFF' },
+  { id: '4M',   number: '4M',  name: 'Aliados - Maia (Câmara)',                       color: '#000000', text_color: '#FFFFFF' },
+  { id: '5M',   number: '5M',  name: 'Aliados - Ermesinde (Estação)',                 color: '#000000', text_color: '#FFFFFF' },
+  { id: '7M',   number: '7M',  name: 'Aliados - Valongo',                             color: '#000000', text_color: '#FFFFFF' },
+  { id: '8M',   number: '8M',  name: 'Aliados - S. Pedro da Cova',                    color: '#000000', text_color: '#FFFFFF' },
+  { id: '9M',   number: '9M',  name: 'Aliados - Gondomar (via TIC)',                  color: '#000000', text_color: '#FFFFFF' },
+  { id: '10M',   number: '10M',  name: 'Aliados - Vila D Este',                       color: '#000000', text_color: '#FFFFFF' },
+  { id: '11M',   number: '11M',  name: 'Hospital S. João - Coimbrões (via Aliados)',  color: '#000000', text_color: '#FFFFFF' },
+  { id: '12M',   number: '12M',  name: 'Aliados - Sto. Ovídio',                       color: '#000000', text_color: '#FFFFFF' },
+  { id: '13M',   number: '13M',  name: 'Aliados - Matosinhos (Mercado)',              color: '#000000', text_color: '#FFFFFF' },
 ];
 
 async function handleRequest(request) {
