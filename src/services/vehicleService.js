@@ -28,10 +28,13 @@ class VehicleService {
    * numérico (separado por |), que pode diferir entre a anotação do veículo
    * e o trip_id das próximas chegadas das paragens.
    *
-   * Exemplo:
-   *   Veículo : "600_0_2|218|D6|T7|N16"
-   *   Paragem : "600_0_2|219|D6|T7|N16"
-   *   Chave   : "600_0_2|D6|T7|N16"  (igual em ambos)
+   * Formato: <linha_dir> | <seq_variável> | <dia> | <turno> | <nº_serviço>
+   * Chave  : <linha_dir> | <dia> | <turno> | <nº_serviço>  (sem índice 1)
+   *
+   * Exemplos:
+   *   "600_0_2|218|D6|T7|N16" → "600_0_2|D6|T7|N16"
+   *   "600_0_2|219|D6|T7|N16" → "600_0_2|D6|T7|N16"  ✓ match
+   *   "207_0_1|218|D6|T5|N14" → "207_0_1|D6|T5|N14"
    *
    * @param {string} tripId
    * @returns {string|null}
@@ -39,8 +42,6 @@ class VehicleService {
   tripMatchKey(tripId) {
     if (!tripId) return null;
     const parts = tripId.split('|');
-    // O formato é: <linha_dir>|<seq>|<dia>|<turno>|<servico>|...
-    // Removemos o 2º elemento (índice 1) que é o número de sequência variável.
     if (parts.length < 2) return tripId; // formato inesperado — usar tal-qual
     return [parts[0], ...parts.slice(2)].join('|');
   }
@@ -55,9 +56,7 @@ class VehicleService {
    */
   matchTripIds(vehicleTripId, arrivalTripId) {
     if (!vehicleTripId || !arrivalTripId) return false;
-    // Tentativa de correspondência exacta (caso os dados já coincidam)
     if (vehicleTripId === arrivalTripId) return true;
-    // Correspondência ignorando o 2º segmento
     return this.tripMatchKey(vehicleTripId) === this.tripMatchKey(arrivalTripId);
   }
 
@@ -65,16 +64,40 @@ class VehicleService {
    * Encontra o veículo correspondente a um trip_id de chegada.
    * Usa matchTripIds() para tolerar a diferença no 2º segmento numérico.
    *
+   * Emite console.debug com os trip_ids considerados para facilitar depuração.
+   *
    * @param {Array}  vehicles - lista de veículos devolvida pela API
    * @param {string} tripId   - trip_id da chegada em tempo real
    * @returns {object|null}
    */
   matchVehicleToTrip(vehicles, tripId) {
     if (!Array.isArray(vehicles) || !tripId) return null;
-    return vehicles.find(vehicle => {
+
+    const arrivalKey = this.tripMatchKey(tripId);
+    console.debug(`[matchVehicle] a procurar veículo para tripId=${tripId} (chave=${arrivalKey})`);
+
+    const match = vehicles.find(vehicle => {
       const vehicleTripId = this.extractTripId(vehicle);
-      return this.matchTripIds(vehicleTripId, tripId);
+      const vehicleKey    = this.tripMatchKey(vehicleTripId);
+      const isMatch       = this.matchTripIds(vehicleTripId, tripId);
+      if (isMatch) {
+        console.debug(`[matchVehicle] ✓ veículo ${vehicle.id}: tripId=${vehicleTripId} (chave=${vehicleKey})`);
+      }
+      return isMatch;
     });
+
+    if (!match) {
+      // Listar alguns trip_ids de veículos da mesma linha para diagnóstico
+      const linePrefix = tripId.split('_')[0];
+      const sameLine = vehicles
+        .filter(v => this.extractTripId(v)?.startsWith(linePrefix))
+        .map(v => this.extractTripId(v))
+        .slice(0, 5);
+      console.debug(`[matchVehicle] ✗ sem match para ${tripId}.`,
+        sameLine.length ? `Veículos na linha ${linePrefix}: ${sameLine.join(', ')}` : `Nenhum veículo na linha ${linePrefix}.`);
+    }
+
+    return match || null;
   }
 
   extractVehicleLocation(vehicle) {

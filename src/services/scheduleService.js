@@ -5,6 +5,7 @@
  */
 
 import { apiService } from '../core/apiService.js';
+import { vehicleService } from './vehicleService.js';
 
 class ScheduleService {
   constructor() {
@@ -55,12 +56,6 @@ class ScheduleService {
 
   // ---------------------------------------------------------------------------
   // fetchActiveServiceId(stopId) — obtém o service_id REAL da API da STCP.
-  //
-  // Consulta GET https://stcp.pt/api/stops/{stopId}/services?date={YYYY-MM-DD}
-  // e devolve o campo active_service_id.
-  // Guarda em cache por 30 minutos por paragem+data.
-  //
-  // Em caso de falha retorna o valor do fallback síncrono (getServiceIdAtual).
   // ---------------------------------------------------------------------------
   async fetchActiveServiceId(stopId) {
     const dateNow  = new Date();
@@ -80,8 +75,6 @@ class ScheduleService {
       if (data?.active_service_id) {
         const serviceId = data.active_service_id;
         this.stopServiceCache.set(cacheKey, { serviceId, timestamp: Date.now() });
-        // Actualizar também o fallback síncrono para que getServiceIdAtual()
-        // devolva o valor correcto enquanto o cache estiver válido.
         this.cachedServiceDate = yyyyMMdd;
         this.cachedServiceId   = serviceId;
         return serviceId;
@@ -97,21 +90,30 @@ class ScheduleService {
 
   // ---------------------------------------------------------------------------
   // getServiceIdForStop(stopId) — ponto de entrada preferêncial.
-  // Chame este método em vez de getServiceIdAtual() sempre que tiver um stopId.
   // ---------------------------------------------------------------------------
   async getServiceIdForStop(stopId) {
     return this.fetchActiveServiceId(stopId);
   }
 
   // ---------------------------------------------------------------------------
-  // getHeadsignForTrip — sem alterações de assinatura; usa getServiceIdAtual()
-  // internamente pois apenas tem o routeId, não o stopId.
+  // getHeadsignForTrip — resolve o destino de um autocarro pelo trip_id.
+  //
+  // PROBLEMA CORRIGIDO: a comparação anterior usava t.trip_id === tripId
+  // (exacta), o que falhava porque o trip_id do veículo contém um segmento
+  // numérico variável (ex: "218") que difere do trip_id no schedule da rota
+  // (ex: "219"). Agora usa vehicleService.matchTripIds() para tolerar
+  // essa diferença, comparando apenas:
+  //   <linha_dir> | <dia> | <turno> | <nº_serviço>
+  // e ignorando o 2º segmento.
   // ---------------------------------------------------------------------------
   async getHeadsignForTrip(tripId, routeId, directionId) {
     if (!tripId || !routeId || directionId == null) {
       console.warn(`\u26a0\ufe0f Parâmetros inválidos: tripId=${tripId}, routeId=${routeId}, dir=${directionId}`);
       return 'Destino Desconhecido';
     }
+
+    const vehicleKey = vehicleService.tripMatchKey(tripId);
+    console.debug(`[headsign] a resolver tripId=${tripId} → chave=${vehicleKey}, rota=${routeId}, dir=${directionId}`);
 
     try {
       const serviceId = this.getServiceIdAtual();
@@ -122,13 +124,28 @@ class ScheduleService {
         return 'Destino Desconhecido';
       }
 
-      const trip = schedule.schedule.find(t => t.trip_id === tripId);
+      // Procurar primeiro por match exacto, depois por match tolerante
+      let trip = schedule.schedule.find(t => t.trip_id === tripId);
+
+      if (!trip) {
+        trip = schedule.schedule.find(t => vehicleService.matchTripIds(t.trip_id, tripId));
+        if (trip) {
+          console.debug(`[headsign] match tolerante: schedule trip_id=${trip.trip_id} → ${trip.trip_headsign}`);
+        }
+      } else {
+        console.debug(`[headsign] match exacto: trip_id=${trip.trip_id} → ${trip.trip_headsign}`);
+      }
+
       if (trip?.trip_headsign) return trip.trip_headsign;
 
-      // Fallback: primeiro trip
+      // Fallback: listar os primeiros trip_ids disponíveis para ajudar na depuração
+      const sampleIds = schedule.schedule.slice(0, 3).map(t => t.trip_id);
+      console.warn(`\u26a0\ufe0f Trip ${tripId} (chave: ${vehicleKey}) não encontrado no schedule.`,
+        `Primeiros trip_ids disponíveis:`, sampleIds);
+
       const firstTrip = schedule.schedule[0];
       if (firstTrip?.trip_headsign) {
-        console.warn(`\u26a0\ufe0f Trip ${tripId} não encontrado, usando fallback: ${firstTrip.trip_headsign}`);
+        console.warn(`\u26a0\ufe0f Usando fallback: ${firstTrip.trip_headsign}`);
         return firstTrip.trip_headsign;
       }
 
