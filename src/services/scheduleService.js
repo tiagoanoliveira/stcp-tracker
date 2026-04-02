@@ -11,192 +11,167 @@ class ScheduleService {
     // Cache de schedules de rotas
     this.routeSchedulesCache = new Map(); // "route_service_dir" -> { data, timestamp }
     this.cacheTTL = 30 * 60 * 1000; // 30 minutos
-    
-    // Períodos especiais (feriados, férias)
-    this.specialPeriods = [];
-    
-    // Cache de service_id por data
+
+    // Cache de service_id por paragem+data (TTL igual ao acima)
+    // Chave: "stopId_YYYYMMDD" -> { serviceId, timestamp }
+    this.stopServiceCache = new Map();
+
+    // Fallback síncrono (calculado localmente enquanto a API não responde)
     this.cachedServiceId = null;
     this.cachedServiceDate = null;
   }
 
-  /**
-   * Carregar calendário (ainda necessário para determinar tipo de dia)
-   */
+  // ---------------------------------------------------------------------------
+  // loadScheduleData: já não depende do calendar.json para determinar o
+  // service_id — mantemos apenas para compatibilidade com código existente.
+  // ---------------------------------------------------------------------------
   async loadScheduleData() {
-    try {
-      this.specialPeriods = await apiService.fetchCalendarData();
-    } catch (error) {
-      console.error('❌ Erro ao carregar calendário:', error);
-      this.specialPeriods = [];
-    }
+    // Não é necessário carregar o calendar.json;
+    // o service_id é agora obtido diretamente pela API da STCP.
   }
 
-  /**
-   * Obter service_id para a data atual
-   * Retorna: "DIAS UTEIS", "SABADOS", "DOMINGOS|FERIADOS", "F", "G", "H"
-   */
+  // ---------------------------------------------------------------------------
+  // getServiceIdAtual() — fallback síncrono baseado no dia da semana.
+  // Usado apenas quando fetchActiveServiceId() ainda não devolveu resultado.
+  // ---------------------------------------------------------------------------
   getServiceIdAtual() {
-    const dateNow = new Date();
+    const dateNow  = new Date();
     const yyyyMMdd = dateNow.toISOString().slice(0, 10).replace(/-/g, '');
 
-    // Verificar cache
     if (this.cachedServiceDate === yyyyMMdd && this.cachedServiceId) {
       return this.cachedServiceId;
     }
 
-    // Determinar tipo de dia base
     const weekday = dateNow.getDay();
     let serviceId;
-    
-    if (weekday === 0) {
-      serviceId = 'DOMINGOS|FERIADOS'; // Domingo
-    } else if (weekday === 6) {
-      serviceId = 'SABADOS'; // Sábado
-    } else {
-      serviceId = 'DIAS UTEIS'; // Útil (segunda a sexta)
-    }
+    if (weekday === 0)      serviceId = 'DOMINGOS|FERIADOS';
+    else if (weekday === 6) serviceId = 'SABADOS';
+    else                    serviceId = 'DIAS UTEIS';
 
-    // Verificar se está num período especial
-    const specialPeriod = this.specialPeriods.find(period => 
-      period.start_date <= yyyyMMdd && period.end_date >= yyyyMMdd
-    );
-
-    if (specialPeriod) {
-      if (specialPeriod.description === 'FERIADO') {
-        serviceId = 'DOMINGOS|FERIADOS';
-      } else if (specialPeriod.description === 'FERIAS') {
-        if (weekday === 0) {
-          serviceId = 'H';
-        } else if (weekday === 6) {
-          serviceId = 'G';
-        } else {
-          serviceId = 'F';
-        }
-      }
-    }
-
-    // Cachear o resultado
     this.cachedServiceDate = yyyyMMdd;
-    this.cachedServiceId = serviceId;
-    
+    this.cachedServiceId   = serviceId;
     return serviceId;
   }
 
-  /**
-   * ⭐ NOVO: Obtém headsign de um trip_id via API
-   * @param {string} tripId - ID da viagem
-   * @param {string} routeId - ID da rota (ex: "200")
-   * @param {string|number} directionId - Direção (0 ou 1)
-   * @returns {Promise<string>} Headsign/destino
-   */
+  // ---------------------------------------------------------------------------
+  // fetchActiveServiceId(stopId) — obtém o service_id REAL da API da STCP.
+  //
+  // Consulta GET https://stcp.pt/api/stops/{stopId}/services?date={YYYY-MM-DD}
+  // e devolve o campo active_service_id.
+  // Guarda em cache por 30 minutos por paragem+data.
+  //
+  // Em caso de falha retorna o valor do fallback síncrono (getServiceIdAtual).
+  // ---------------------------------------------------------------------------
+  async fetchActiveServiceId(stopId) {
+    const dateNow  = new Date();
+    const dateStr  = dateNow.toISOString().slice(0, 10);          // "2026-04-02"
+    const yyyyMMdd = dateStr.replace(/-/g, '');                    // "20260402"
+    const cacheKey = `${stopId}_${yyyyMMdd}`;
+
+    // Verificar cache
+    const cached = this.stopServiceCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.cacheTTL) {
+      return cached.serviceId;
+    }
+
+    try {
+      const data = await apiService.fetchStopServices(stopId, dateStr);
+
+      if (data?.active_service_id) {
+        const serviceId = data.active_service_id;
+        this.stopServiceCache.set(cacheKey, { serviceId, timestamp: Date.now() });
+        // Actualizar também o fallback síncrono para que getServiceIdAtual()
+        // devolva o valor correcto enquanto o cache estiver válido.
+        this.cachedServiceDate = yyyyMMdd;
+        this.cachedServiceId   = serviceId;
+        return serviceId;
+      }
+    } catch (error) {
+      console.error(`\u274c Erro ao obter service_id para ${stopId}:`, error);
+    }
+
+    // Fallback: cálculo local pelo dia da semana
+    console.warn(`\u26a0\ufe0f fetchActiveServiceId: a usar fallback síncrono para ${stopId}`);
+    return this.getServiceIdAtual();
+  }
+
+  // ---------------------------------------------------------------------------
+  // getServiceIdForStop(stopId) — ponto de entrada preferêncial.
+  // Chame este método em vez de getServiceIdAtual() sempre que tiver um stopId.
+  // ---------------------------------------------------------------------------
+  async getServiceIdForStop(stopId) {
+    return this.fetchActiveServiceId(stopId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // getHeadsignForTrip — sem alterações de assinatura; usa getServiceIdAtual()
+  // internamente pois apenas tem o routeId, não o stopId.
+  // ---------------------------------------------------------------------------
   async getHeadsignForTrip(tripId, routeId, directionId) {
     if (!tripId || !routeId || directionId == null) {
-      console.warn(`⚠️ Parâmetros inválidos: tripId=${tripId}, routeId=${routeId}, dir=${directionId}`);
+      console.warn(`\u26a0\ufe0f Parâmetros inválidos: tripId=${tripId}, routeId=${routeId}, dir=${directionId}`);
       return 'Destino Desconhecido';
     }
 
     try {
       const serviceId = this.getServiceIdAtual();
-      const schedule = await this.getRouteSchedule(routeId, serviceId, directionId);
-      
+      const schedule  = await this.getRouteSchedule(routeId, serviceId, directionId);
+
       if (!schedule || !schedule.schedule) {
-        console.warn(`⚠️ Sem schedule para ${routeId} (${serviceId}, dir ${directionId})`);
+        console.warn(`\u26a0\ufe0f Sem schedule para ${routeId} (${serviceId}, dir ${directionId})`);
         return 'Destino Desconhecido';
       }
-      
-      // Procurar trip no schedule
+
       const trip = schedule.schedule.find(t => t.trip_id === tripId);
-      
-      if (trip && trip.trip_headsign) {
-        return trip.trip_headsign;
-      }
-      
-      // Fallback: usar o primeiro trip da mesma direção
+      if (trip?.trip_headsign) return trip.trip_headsign;
+
+      // Fallback: primeiro trip
       const firstTrip = schedule.schedule[0];
-      if (firstTrip && firstTrip.trip_headsign) {
-        console.warn(`⚠️ Trip ${tripId} não encontrado, usando fallback: ${firstTrip.trip_headsign}`);
+      if (firstTrip?.trip_headsign) {
+        console.warn(`\u26a0\ufe0f Trip ${tripId} não encontrado, usando fallback: ${firstTrip.trip_headsign}`);
         return firstTrip.trip_headsign;
       }
-      
+
       return 'Destino Desconhecido';
-      
     } catch (error) {
-      console.error(`❌ Erro ao obter headsign para trip ${tripId}:`, error);
+      console.error(`\u274c Erro ao obter headsign para trip ${tripId}:`, error);
       return 'Destino Desconhecido';
     }
   }
 
-  /**
-   * ⭐ NOVO: Obtém schedule completo de uma rota (com cache)
-   * @param {string} routeId - ID da rota
-   * @param {string} serviceId - ID do serviço
-   * @param {string|number} directionId - Direção
-   * @returns {Promise<Object>} Schedule da rota
-   */
   async getRouteSchedule(routeId, serviceId, directionId) {
     const cacheKey = `${routeId}_${serviceId}_${directionId}`;
-    const cached = this.routeSchedulesCache.get(cacheKey);
-    const now = Date.now();
-    
-    // Verificar cache
+    const cached   = this.routeSchedulesCache.get(cacheKey);
+    const now      = Date.now();
+
     if (cached && (now - cached.timestamp) < this.cacheTTL) {
       return cached.data;
     }
-    
+
     try {
-      // Buscar da API
       const data = await apiService.fetchRouteSchedule(routeId, serviceId, directionId);
-      
       if (data) {
-        // Guardar em cache
         this.routeSchedulesCache.set(cacheKey, { data, timestamp: now });
       }
-      
       return data;
-      
     } catch (error) {
-      console.error(`❌ Erro ao obter schedule de ${routeId}:`, error);
-      
-      // Retornar cache antigo se existir
+      console.error(`\u274c Erro ao obter schedule de ${routeId}:`, error);
       if (cached) {
-        console.warn('⚠️ A usar cache expirado como fallback');
+        console.warn('\u26a0\ufe0f A usar cache expirado como fallback');
         return cached.data;
       }
-      
       return null;
     }
   }
 
-  /**
-   * Verificar se uma data é feriado
-   */
-  isHoliday(yyyyMMdd) {
-    return this.specialPeriods.some(period => 
-      period.description === 'FERIADO' &&
-      period.start_date <= yyyyMMdd &&
-      period.end_date >= yyyyMMdd
-    );
-  }
+  isHoliday(yyyyMMdd) { return false; }     // mantido por compatibilidade
+  isSchoolHoliday(yyyyMMdd) { return false; } // mantido por compatibilidade
 
-  /**
-   * Verificar se uma data está em férias escolares
-   */
-  isSchoolHoliday(yyyyMMdd) {
-    return this.specialPeriods.some(period => 
-      period.description === 'FERIAS' &&
-      period.start_date <= yyyyMMdd &&
-      period.end_date >= yyyyMMdd
-    );
-  }
-
-  /**
-   * Limpar cache
-   */
   clearCache() {
     this.cachedServiceDate = null;
-    this.cachedServiceId = null;
+    this.cachedServiceId   = null;
     this.routeSchedulesCache.clear();
+    this.stopServiceCache.clear();
   }
 }
 
