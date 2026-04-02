@@ -23,11 +23,58 @@ class VehicleService {
   extractDirection(bus)   { return this.extractAnnotation(bus, 'stcp:sentido:'); }
   extractTripId(bus)      { return this.extractAnnotation(bus, 'stcp:nr_viagem:'); }
 
+  /**
+   * Constrói uma chave de comparação de trip_id ignorando o 2º segmento
+   * numérico (separado por |), que pode diferir entre a anotação do veículo
+   * e o trip_id das próximas chegadas das paragens.
+   *
+   * Exemplo:
+   *   Veículo : "600_0_2|218|D6|T7|N16"
+   *   Paragem : "600_0_2|219|D6|T7|N16"
+   *   Chave   : "600_0_2|D6|T7|N16"  (igual em ambos)
+   *
+   * @param {string} tripId
+   * @returns {string|null}
+   */
+  tripMatchKey(tripId) {
+    if (!tripId) return null;
+    const parts = tripId.split('|');
+    // O formato é: <linha_dir>|<seq>|<dia>|<turno>|<servico>|...
+    // Removemos o 2º elemento (índice 1) que é o número de sequência variável.
+    if (parts.length < 2) return tripId; // formato inesperado — usar tal-qual
+    return [parts[0], ...parts.slice(2)].join('|');
+  }
+
+  /**
+   * Verifica se dois trip_ids correspondem ao mesmo serviço,
+   * ignorando o 2º segmento numérico variável.
+   *
+   * @param {string} vehicleTripId  - trip_id vindo da anotação stcp:nr_viagem do veículo
+   * @param {string} arrivalTripId  - trip_id vindo das próximas chegadas da paragem
+   * @returns {boolean}
+   */
+  matchTripIds(vehicleTripId, arrivalTripId) {
+    if (!vehicleTripId || !arrivalTripId) return false;
+    // Tentativa de correspondência exacta (caso os dados já coincidam)
+    if (vehicleTripId === arrivalTripId) return true;
+    // Correspondência ignorando o 2º segmento
+    return this.tripMatchKey(vehicleTripId) === this.tripMatchKey(arrivalTripId);
+  }
+
+  /**
+   * Encontra o veículo correspondente a um trip_id de chegada.
+   * Usa matchTripIds() para tolerar a diferença no 2º segmento numérico.
+   *
+   * @param {Array}  vehicles - lista de veículos devolvida pela API
+   * @param {string} tripId   - trip_id da chegada em tempo real
+   * @returns {object|null}
+   */
   matchVehicleToTrip(vehicles, tripId) {
     if (!Array.isArray(vehicles) || !tripId) return null;
-    return vehicles.find(vehicle =>
-      vehicle.annotations?.value?.some(a => decodeURIComponent(a) === `stcp:nr_viagem:${tripId}`)
-    );
+    return vehicles.find(vehicle => {
+      const vehicleTripId = this.extractTripId(vehicle);
+      return this.matchTripIds(vehicleTripId, tripId);
+    });
   }
 
   extractVehicleLocation(vehicle) {
