@@ -1,7 +1,11 @@
 /**
  * Schedule Service - Lógica de horários e serviços
- * Usa: apiService
- * Responsável por: determinar service_id, obter headsigns via API
+ * Usa: apiService, vehicleService
+ *
+ * IMPORTANTE: o service_id é SEMPRE obtido via API da STCP
+ * (GET /{stopId}/services?date=YYYY-MM-DD).
+ * O cálculo por dia da semana foi REMOVIDO por ser impreciso
+ * (não cobre feriados nem períodos escolares).
  */
 
 import { apiService } from '../core/apiService.js';
@@ -13,57 +17,31 @@ class ScheduleService {
     this.routeSchedulesCache = new Map(); // "route_service_dir" -> { data, timestamp }
     this.cacheTTL = 30 * 60 * 1000; // 30 minutos
 
-    // Cache de service_id por paragem+data (TTL igual ao acima)
+    // Cache de service_id por paragem+data
     // Chave: "stopId_YYYYMMDD" -> { serviceId, timestamp }
     this.stopServiceCache = new Map();
 
-    // Fallback síncrono (calculado localmente enquanto a API não responde)
-    this.cachedServiceId = null;
-    this.cachedServiceDate = null;
+    // Último service_id válido obtido da API (usado como "global" por
+    // getHeadsignForTrip que não tem stopId disponível)
+    this._lastKnownServiceId   = null;
+    this._lastKnownServiceDate = null; // "YYYYMMDD"
   }
 
   // ---------------------------------------------------------------------------
-  // loadScheduleData: já não depende do calendar.json para determinar o
-  // service_id — mantemos apenas para compatibilidade com código existente.
+  // loadScheduleData: mantido por compatibilidade (não faz nada).
   // ---------------------------------------------------------------------------
-  async loadScheduleData() {
-    // Não é necessário carregar o calendar.json;
-    // o service_id é agora obtido diretamente pela API da STCP.
-  }
-
-  // ---------------------------------------------------------------------------
-  // getServiceIdAtual() — fallback síncrono baseado no dia da semana.
-  // Usado apenas quando fetchActiveServiceId() ainda não devolveu resultado.
-  // ---------------------------------------------------------------------------
-  getServiceIdAtual() {
-    const dateNow  = new Date();
-    const yyyyMMdd = dateNow.toISOString().slice(0, 10).replace(/-/g, '');
-
-    if (this.cachedServiceDate === yyyyMMdd && this.cachedServiceId) {
-      return this.cachedServiceId;
-    }
-
-    const weekday = dateNow.getDay();
-    let serviceId;
-    if (weekday === 0)      serviceId = 'DOMINGOS|FERIADOS';
-    else if (weekday === 6) serviceId = 'SABADOS';
-    else                    serviceId = 'DIAS UTEIS';
-
-    this.cachedServiceDate = yyyyMMdd;
-    this.cachedServiceId   = serviceId;
-    return serviceId;
-  }
+  async loadScheduleData() {}
 
   // ---------------------------------------------------------------------------
   // fetchActiveServiceId(stopId) — obtém o service_id REAL da API da STCP.
+  // É o único método autorizado a determinar o service_id.
   // ---------------------------------------------------------------------------
   async fetchActiveServiceId(stopId) {
     const dateNow  = new Date();
-    const dateStr  = dateNow.toISOString().slice(0, 10);          // "2026-04-02"
-    const yyyyMMdd = dateStr.replace(/-/g, '');                    // "20260402"
+    const dateStr  = dateNow.toISOString().slice(0, 10);  // "2026-04-02"
+    const yyyyMMdd = dateStr.replace(/-/g, '');            // "20260402"
     const cacheKey = `${stopId}_${yyyyMMdd}`;
 
-    // Verificar cache
     const cached = this.stopServiceCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < this.cacheTTL) {
       return cached.serviceId;
@@ -75,17 +53,18 @@ class ScheduleService {
       if (data?.active_service_id) {
         const serviceId = data.active_service_id;
         this.stopServiceCache.set(cacheKey, { serviceId, timestamp: Date.now() });
-        this.cachedServiceDate = yyyyMMdd;
-        this.cachedServiceId   = serviceId;
+        // Guardar como último service_id conhecido (usado por getGlobalServiceId)
+        this._lastKnownServiceId   = serviceId;
+        this._lastKnownServiceDate = yyyyMMdd;
+        console.debug(`[scheduleService] service_id para ${stopId}: ${serviceId}`);
         return serviceId;
       }
     } catch (error) {
-      console.error(`\u274c Erro ao obter service_id para ${stopId}:`, error);
+      console.error(`❌ Erro ao obter service_id para ${stopId}:`, error);
     }
 
-    // Fallback: cálculo local pelo dia da semana
-    console.warn(`\u26a0\ufe0f fetchActiveServiceId: a usar fallback síncrono para ${stopId}`);
-    return this.getServiceIdAtual();
+    // Sem fallback semanal — propagar erro para o chamador poder lidar
+    throw new Error(`Não foi possível obter o service_id para a paragem ${stopId}. Verifique a ligação ao proxy.`);
   }
 
   // ---------------------------------------------------------------------------
@@ -96,37 +75,58 @@ class ScheduleService {
   }
 
   // ---------------------------------------------------------------------------
+  // getGlobalServiceId() — devolve o último service_id obtido da API.
+  //
+  // Usado por getHeadsignForTrip (que não tem stopId), desde que pelo menos
+  // uma paragem já tenha sido consultada na sessão actual.
+  //
+  // Se ainda nenhuma paragem foi aberta, faz uma chamada com uma paragem
+  // bem conhecida (CAMP2 — Campanã) para inicializar o service_id.
+  // ---------------------------------------------------------------------------
+  async getGlobalServiceId() {
+    const yyyyMMdd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    // Cache válido para hoje
+    if (this._lastKnownServiceId && this._lastKnownServiceDate === yyyyMMdd) {
+      return this._lastKnownServiceId;
+    }
+
+    // Ainda não inicializado: consultar uma paragem genérica para obter o service_id
+    console.debug('[scheduleService] getGlobalServiceId: a inicializar com paragem CAMP2...');
+    return this.fetchActiveServiceId('CAMP2');
+  }
+
+  // ---------------------------------------------------------------------------
   // getHeadsignForTrip — resolve o destino de um autocarro pelo trip_id.
   //
-  // PROBLEMA CORRIGIDO: a comparação anterior usava t.trip_id === tripId
-  // (exacta), o que falhava porque o trip_id do veículo contém um segmento
-  // numérico variável (ex: "218") que difere do trip_id no schedule da rota
-  // (ex: "219"). Agora usa vehicleService.matchTripIds() para tolerar
-  // essa diferença, comparando apenas:
-  //   <linha_dir> | <dia> | <turno> | <nº_serviço>
-  // e ignorando o 2º segmento.
+  // USA getGlobalServiceId() — NUNCA o cálculo por dia da semana.
+  // Usa vehicleService.matchTripIds() para tolerar a diferença no
+  // 2º segmento numérico do trip_id (ex: 218 vs 219).
   // ---------------------------------------------------------------------------
   async getHeadsignForTrip(tripId, routeId, directionId) {
     if (!tripId || !routeId || directionId == null) {
-      console.warn(`\u26a0\ufe0f Parâmetros inválidos: tripId=${tripId}, routeId=${routeId}, dir=${directionId}`);
+      console.warn(`⚠️ Parâmetros inválidos: tripId=${tripId}, routeId=${routeId}, dir=${directionId}`);
       return 'Destino Desconhecido';
     }
 
     const vehicleKey = vehicleService.tripMatchKey(tripId);
-    console.debug(`[headsign] a resolver tripId=${tripId} → chave=${vehicleKey}, rota=${routeId}, dir=${directionId}`);
+    console.debug(`[headsign] tripId=${tripId} (chave=${vehicleKey}), rota=${routeId}, dir=${directionId}`);
 
     try {
-      const serviceId = this.getServiceIdAtual();
-      const schedule  = await this.getRouteSchedule(routeId, serviceId, directionId);
+      const serviceId = await this.getGlobalServiceId();
+      console.debug(`[headsign] service_id usado: ${serviceId}`);
+
+      const schedule = await this.getRouteSchedule(routeId, serviceId, directionId);
 
       if (!schedule || !schedule.schedule) {
-        console.warn(`\u26a0\ufe0f Sem schedule para ${routeId} (${serviceId}, dir ${directionId})`);
+        console.warn(`⚠️ Sem schedule para ${routeId} (${serviceId}, dir ${directionId})`);
         return 'Destino Desconhecido';
       }
 
-      // Procurar primeiro por match exacto, depois por match tolerante
+      // 1º tentativa: match exacto
       let trip = schedule.schedule.find(t => t.trip_id === tripId);
 
+      // 2ª tentativa: match tolerante (ignora 2º segmento numérico)
       if (!trip) {
         trip = schedule.schedule.find(t => vehicleService.matchTripIds(t.trip_id, tripId));
         if (trip) {
@@ -138,20 +138,20 @@ class ScheduleService {
 
       if (trip?.trip_headsign) return trip.trip_headsign;
 
-      // Fallback: listar os primeiros trip_ids disponíveis para ajudar na depuração
+      // Sem match: mostrar amostras para diagnóstico
       const sampleIds = schedule.schedule.slice(0, 3).map(t => t.trip_id);
-      console.warn(`\u26a0\ufe0f Trip ${tripId} (chave: ${vehicleKey}) não encontrado no schedule.`,
-        `Primeiros trip_ids disponíveis:`, sampleIds);
+      console.warn(`⚠️ Trip ${tripId} (chave: ${vehicleKey}) não encontrado no schedule.`,
+        'Primeiros trip_ids disponíveis:', sampleIds);
 
       const firstTrip = schedule.schedule[0];
       if (firstTrip?.trip_headsign) {
-        console.warn(`\u26a0\ufe0f Usando fallback: ${firstTrip.trip_headsign}`);
+        console.warn(`⚠️ Usando fallback: ${firstTrip.trip_headsign}`);
         return firstTrip.trip_headsign;
       }
 
       return 'Destino Desconhecido';
     } catch (error) {
-      console.error(`\u274c Erro ao obter headsign para trip ${tripId}:`, error);
+      console.error(`❌ Erro ao obter headsign para trip ${tripId}:`, error);
       return 'Destino Desconhecido';
     }
   }
@@ -172,21 +172,21 @@ class ScheduleService {
       }
       return data;
     } catch (error) {
-      console.error(`\u274c Erro ao obter schedule de ${routeId}:`, error);
+      console.error(`❌ Erro ao obter schedule de ${routeId}:`, error);
       if (cached) {
-        console.warn('\u26a0\ufe0f A usar cache expirado como fallback');
+        console.warn('⚠️ A usar cache expirado como fallback');
         return cached.data;
       }
       return null;
     }
   }
 
-  isHoliday(yyyyMMdd) { return false; }     // mantido por compatibilidade
-  isSchoolHoliday(yyyyMMdd) { return false; } // mantido por compatibilidade
+  isHoliday(yyyyMMdd) { return false; }       // mantido por compatibilidade
+  isSchoolHoliday(yyyyMMdd) { return false; }  // mantido por compatibilidade
 
   clearCache() {
-    this.cachedServiceDate = null;
-    this.cachedServiceId   = null;
+    this._lastKnownServiceId   = null;
+    this._lastKnownServiceDate = null;
     this.routeSchedulesCache.clear();
     this.stopServiceCache.clear();
   }
