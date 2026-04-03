@@ -5,6 +5,14 @@
  * destino (headsign). Esse campo fica como null até ao primeiro clique no
  * marker, altura em que resolveHeadsign() é chamado e o popup é actualizado.
  * Isto elimina as chamadas /route/{id}/schedule na inicialização.
+ *
+ * TRIP MATCHING: A STCP disponibiliza o trip_id no formato:
+ *   {linha}_{dir}_{seq}|{nr_viagem}|{dia}|{turno}|{servico}
+ * Exemplo: "600_0_2|218|D6|T7|N16" (localização FIWARE)
+ *          "600_0_2|219|D6|T7|N16" (chegadas em tempo real)
+ * O 2º segmento (nr_viagem) pode diferir entre as duas fontes.
+ * O matching é feito comparando o 1º segmento (prefixo) e os últimos
+ * dois segmentos (turno|servico), ignorando o nr_viagem do meio.
  */
 
 import { scheduleService } from './scheduleService.js';
@@ -23,11 +31,48 @@ class VehicleService {
   extractDirection(bus)   { return this.extractAnnotation(bus, 'stcp:sentido:'); }
   extractTripId(bus)      { return this.extractAnnotation(bus, 'stcp:nr_viagem:'); }
 
+  /**
+   * Extrai a "chave de viagem" de um trip_id para efeitos de matching.
+   * Formato: {prefixo}|{nr_viagem}|{dia}|{turno}|{servico}
+   * A chave de match usa o prefixo + turno + servico, ignorando o nr_viagem.
+   * Se o trip_id não tiver pipes (formato simples), devolve o próprio trip_id.
+   * @param {string} tripId
+   * @returns {string|null}
+   */
+  _tripMatchKey(tripId) {
+    if (!tripId) return null;
+    const parts = tripId.split('|');
+    if (parts.length < 5) return tripId; // formato simples, comparar direto
+    // prefixo (600_0_2) + turno (T7) + servico (N16)
+    return `${parts[0]}|${parts[3]}|${parts[4]}`;
+  }
+
+  /**
+   * Verifica se dois trip_ids correspondem à mesma viagem.
+   * Ignora o 2º segmento (nr_viagem) que pode diferir entre FIWARE e STCP API.
+   * @param {string} vehicleTripId - trip_id vindo do FIWARE (nr_viagem da localização)
+   * @param {string} arrivalTripId - trip_id vindo das chegadas em tempo real
+   * @returns {boolean}
+   */
+  tripIdsMatch(vehicleTripId, arrivalTripId) {
+    if (!vehicleTripId || !arrivalTripId) return false;
+    if (vehicleTripId === arrivalTripId) return true;
+    return this._tripMatchKey(vehicleTripId) === this._tripMatchKey(arrivalTripId);
+  }
+
+  /**
+   * Encontra o veículo que corresponde a um trip_id de uma chegada.
+   * Usa tripIdsMatch para tolerar diferenças no nr_viagem.
+   * @param {Array} vehicles - lista de veículos do FIWARE
+   * @param {string} tripId - trip_id vindo das chegadas em tempo real
+   * @returns {Object|null}
+   */
   matchVehicleToTrip(vehicles, tripId) {
     if (!Array.isArray(vehicles) || !tripId) return null;
-    return vehicles.find(vehicle =>
-      vehicle.annotations?.value?.some(a => decodeURIComponent(a) === `stcp:nr_viagem:${tripId}`)
-    );
+    return vehicles.find(vehicle => {
+      const vehicleTripId = this.extractTripId(vehicle);
+      return this.tripIdsMatch(vehicleTripId, tripId);
+    }) || null;
   }
 
   extractVehicleLocation(vehicle) {
