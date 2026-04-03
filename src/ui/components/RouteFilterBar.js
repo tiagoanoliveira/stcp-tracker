@@ -17,7 +17,7 @@ const CIRCULAR_LINES = new Set(['300', '301', '302', '303']);
 
 /** Devolve true se a linha é nocturna (número contém 'M', case-insensitive) */
 function isNightLine(number) {
-  return /M/i.test(String(number));
+  return /M$/i.test(String(number));
 }
 
 /**
