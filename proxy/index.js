@@ -1,5 +1,5 @@
 // Cloudflare Worker - CORS Proxy para STCP API
-// v4.2 - Adicionado endpoint /{stopId}/services para service_id real
+// v4.2 - Adicionado endpoint /{stopId}/services?date={date}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -233,7 +233,7 @@ async function handleRequest(request) {
           headers: {
             ...corsHeaders,
             'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=86400', // 24h - dados estáticos
+            'Cache-Control': 'public, max-age=86400',
             'X-Proxy-Version': '4.2',
             'X-Endpoint': 'routes_list'
           }
@@ -282,7 +282,18 @@ async function handleRequest(request) {
     const stopId   = firstSegment;
     const endpoint = pathParts[1] || 'realtime';
 
-    // --- 5a. Stop info
+    // --- 5a. Serviços ativos de uma paragem para uma data
+    // GET /{stopId}/services?date=YYYY-MM-DD
+    if (endpoint === 'services') {
+      const date = url.searchParams.get('date');
+      if (!date) return errorResponse('Parâmetro "date" é obrigatório. Uso: /{stopId}/services?date=YYYY-MM-DD', 400);
+      return await proxyRequest(
+        `https://stcp.pt/api/stops/${stopId}/services?date=${date}`,
+        'stop_services', 'public, max-age=3600'
+      );
+    }
+
+    // --- 5b. Info da paragem
     if (endpoint === 'info') {
       const rawResponse = await proxyRawRequest(`https://stcp.pt/api/stops/${stopId}`, 'stop_info');
       if (!rawResponse.ok)
@@ -314,23 +325,9 @@ async function handleRequest(request) {
       });
     }
 
-    // --- 5b. Stop services (service_id activo para uma data)
-    //         GET /{stopId}/services?date=YYYY-MM-DD
-    if (endpoint === 'services') {
-      const date = url.searchParams.get('date');
-      if (!date)
-        return errorResponse('Parâmetro "date" é obrigatório. Uso: /{STOP_ID}/services?date=YYYY-MM-DD', 400);
-
-      return await proxyRequest(
-        `https://stcp.pt/api/stops/${encodeURIComponent(stopId)}/services?date=${encodeURIComponent(date)}`,
-        'stop_services',
-        'public, max-age=600' // 10 min — o service_id muda no máximo uma vez por dia
-      );
-    }
-
     const validStopEndpoints = ['realtime', 'routes', 'schedule'];
     if (!validStopEndpoints.includes(endpoint))
-      return errorResponse(`Endpoint inválido: ${endpoint}. Use: ${[...validStopEndpoints, 'info', 'services'].join(', ')}`, 400);
+      return errorResponse(`Endpoint inválido: ${endpoint}. Use: ${validStopEndpoints.join(', ')}, info ou services`, 400);
 
     let stcpApiUrl = `https://stcp.pt/api/stops/${stopId}/${endpoint}`;
     if (url.search) stcpApiUrl += url.search;

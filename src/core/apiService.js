@@ -30,7 +30,7 @@ class ApiService {
   async fetchBusData() {
     try {
       const data = await this.fetchWithRetry(this.fiwareUrl, {}, this.retries, this.delayMs, 5000);
-      if (!Array.isArray(data)) { console.error('\u274c Dados inválidos recebidos da API FIWARE'); return []; }
+      if (!Array.isArray(data)) { console.error('\u274c Dados inv\u00e1lidos recebidos da API FIWARE'); return []; }
       return data;
     } catch (error) {
       console.error('\u274c Erro ao obter dados dos autocarros:', error);
@@ -67,29 +67,26 @@ class ApiService {
   }
 
   /**
-   * Obtém os serviços activos para uma paragem numa data específica.
-   * Encaminhado via Cloudflare Worker para evitar CORS.
-   * Endpoint proxy: GET /{stopId}/services?date=YYYY-MM-DD
-   *
-   * @param {string} stopId  - Código da paragem (ex: "PLNT2")
-   * @param {string} dateStr - Data no formato "YYYY-MM-DD" (ex: "2026-04-02")
-   * @returns {Promise<{active_service_id: string, services: Array}|null>}
+   * Obtém os serviços ativos para uma paragem numa data específica.
+   * Passa pelo proxy Cloudflare Worker para evitar erros de CORS.
+   * Rota do proxy: GET /{stopId}/services?date={date}
+   * @param {string} stopId - Código da paragem (ex: "PLNT2")
+   * @param {string} date - Data no formato YYYY-MM-DD (ex: "2026-04-02")
+   * @returns {Promise<Object>} Objeto com active_service_id e lista de serviços
    */
-  async fetchStopServices(stopId, dateStr) {
+  async fetchStopServices(stopId, date) {
     try {
-      return await this.fetchWithRetry(
-        `${this.proxyUrl}/${encodeURIComponent(stopId)}/services?date=${encodeURIComponent(dateStr)}`,
-        {},
-        this.retries,
-        this.delayMs,
-        5000
-      );
+      return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/services?date=${date}`);
     } catch (error) {
-      console.error(`\u274c Erro ao obter serviços da paragem ${stopId} para ${dateStr}:`, error);
+      console.error(`\u274c Erro ao obter serviços da paragem ${stopId} para ${date}:`, error);
       return null;
     }
   }
 
+  /**
+   * Info completa de uma paragem (nome, coordenadas, linhas com cores)
+   * Usa o endpoint GET /{stopId}/info do worker.
+   */
   async fetchStopInfo(stopId) {
     try {
       return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/info`);
@@ -103,7 +100,7 @@ class ApiService {
     try {
       return await this.fetchWithRetry(`${this.proxyUrl}/nearby/${lat}/${lng}/${radius}`);
     } catch (error) {
-      console.error(`\u274c Erro ao obter paragens próximas (${lat}, ${lng}, ${radius}m):`, error);
+      console.error(`\u274c Erro ao obter paragens pr\u00f3ximas (${lat}, ${lng}, ${radius}m):`, error);
       return { stops: [] };
     }
   }
