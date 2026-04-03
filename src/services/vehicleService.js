@@ -1,10 +1,13 @@
 /**
  * Vehicle Service - Lógica centralizada de processamento de dados de autocarros
  *
- * LAZY HEADSIGN: processBusData / processBusDataBatch já NÃO resolvem o
- * destino (headsign). Esse campo fica como null até ao primeiro clique no
- * marker, altura em que resolveHeadsign() é chamado e o popup é actualizado.
- * Isto elimina as chamadas /route/{id}/schedule na inicialização.
+ * LAZY HEADSIGN: processBusData / processBusDataBatch não resolvem o destino.
+ * Esse campo fica null até ao primeiro clique no marker.
+ *
+ * TRIP MATCHING: O trip_id tem o formato:
+ *   {linha}_{dir}_{seq}|{nr_viagem}|{dia}|{turno}|{servico}
+ * O nr_viagem (2º segmento) pode diferir entre FIWARE e API STCP.
+ * O matching delega em scheduleService._tripMatchKey que ignora esse segmento.
  */
 
 import { scheduleService } from './scheduleService.js';
@@ -19,33 +22,25 @@ class VehicleService {
     return null;
   }
 
-  extractLineNumber(bus)  { return this.extractAnnotation(bus, 'stcp:route:'); }
-  extractDirection(bus)   { return this.extractAnnotation(bus, 'stcp:sentido:'); }
-  extractTripId(bus)      { return this.extractAnnotation(bus, 'stcp:nr_viagem:'); }
+  extractLineNumber(bus) { return this.extractAnnotation(bus, 'stcp:route:'); }
+  extractDirection(bus)  { return this.extractAnnotation(bus, 'stcp:sentido:'); }
+  extractTripId(bus)     { return this.extractAnnotation(bus, 'stcp:nr_viagem:'); }
+
+  /**
+   * Compara dois trip_ids ignorando o nr_viagem (2º segmento).
+   * Delega a lógica de chave em scheduleService._tripMatchKey.
+   */
+  tripIdsMatch(vehicleTripId, arrivalTripId) {
+    if (!vehicleTripId || !arrivalTripId) return false;
+    if (vehicleTripId === arrivalTripId) return true;
+    return scheduleService._tripMatchKey(vehicleTripId) === scheduleService._tripMatchKey(arrivalTripId);
+  }
 
   matchVehicleToTrip(vehicles, tripId) {
     if (!Array.isArray(vehicles) || !tripId) return null;
-    return vehicles.find(vehicle =>
-      vehicle.annotations?.value?.some(a => decodeURIComponent(a) === `stcp:nr_viagem:${tripId}`)
-    );
+    return vehicles.find(v => this.tripIdsMatch(this.extractTripId(v), tripId)) || null;
   }
 
-  extractVehicleLocation(vehicle) {
-    if (!vehicle?.location?.value) return null;
-    const coords = vehicle.location.value.coordinates;
-    if (!coords || coords.length < 2) return null;
-    return {
-      latitude:  coords[1],
-      longitude: coords[0],
-      bearing:   vehicle.bearing?.value || vehicle.heading?.value || 0,
-      speed:     vehicle.speed?.value || 0
-    };
-  }
-
-  /**
-   * Processa um autocarro SEM resolver o headsign (lazy).
-   * O campo destination fica null até ao clique no marker.
-   */
   processBusData(bus) {
     const line      = this.extractLineNumber(bus);
     const direction = this.extractDirection(bus);
@@ -63,30 +58,27 @@ class VehicleService {
       longitude:   lon,
       speed:       bus.speed?.value ?? 'N/A',
       busNumber:   bus.fleetVehicleId?.value ?? 'N/A',
-      destination: null,   // resolvido lazy ao clicar
+      destination: null, // resolvido lazy ao clicar
       direction,
       tripId
     };
   }
 
-  /**
-   * Processa múltiplos autocarros em paralelo (síncrono, sem headsign).
-   */
   processBusDataBatch(buses) {
     if (!Array.isArray(buses)) return [];
-    return buses.map(b => this.processBusData(b)).filter(b => b !== null);
+    return buses.map(b => this.processBusData(b)).filter(Boolean);
   }
 
   /**
-   * Resolve o headsign de um autocarro já processado.
-   * Chamado apenas quando o utilizador clica no marker.
-   * @param {object} bus - resultado de processBusData
-   * @returns {Promise<string>}
+   * Resolve o headsign ao clicar no marker.
+   * O serviceId é obtido do cache (aquecido em loadScheduleData)
+   * e passado directamente a getHeadsignForTrip.
    */
   async resolveHeadsign(bus) {
     if (!bus.tripId || !bus.line || bus.direction == null) return 'Destino desconhecido';
     try {
-      return await scheduleService.getHeadsignForTrip(bus.tripId, bus.line, bus.direction);
+      const serviceId = await scheduleService.getServiceIdAtual();
+      return await scheduleService.getHeadsignForTrip(bus.tripId, bus.line, bus.direction, serviceId);
     } catch {
       return 'Destino desconhecido';
     }
