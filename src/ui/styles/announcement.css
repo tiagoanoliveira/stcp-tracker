@@ -9,15 +9,12 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 1010;
-
   display: flex;
   align-items: center;
   gap: 8px;
-
   padding: 8px 16px 8px 14px;
 
-  /* largura controlada pelo JS via el.style.width / el.style.left */
-  max-width: 92vw;
+  max-width: 92dvw;
   width: max-content;
   box-sizing: border-box;
 

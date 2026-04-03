@@ -104,7 +104,6 @@ export class AnnouncementBanner {
     if (filterRow) {
       const rect = filterRow.getBoundingClientRect();
       // Alinha exatamente com o filter-row: mesma posição left, mesma largura
-      el.style.width     = `${rect.width}px`;
       el.style.transform = 'none';   // cancela o translateX(-50%) do CSS base
       el.style.top       = `${rect.bottom + 8}px`;
     } else {
@@ -113,7 +112,6 @@ export class AnnouncementBanner {
       const bottom = header ? header.getBoundingClientRect().bottom : 70;
       el.style.top       = `${bottom + 8}px`;
       el.style.left      = '50%';
-      el.style.width     = '';
       el.style.transform = 'translateX(-50%)';
     }
   }
