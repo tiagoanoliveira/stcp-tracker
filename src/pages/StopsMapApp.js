@@ -23,6 +23,7 @@ import { FavouritesPanel }        from '../ui/components/FavouritesPanel.js';
 import { TutorialModal }          from '../ui/components/TutorialModal.js';
 import { favouritesManager }      from '../services/FavouritesManager.js';
 import { iconCache }              from '../ui/design/iconCache.js';
+import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 
 export class StopsMapApp {
   constructor(options = {}) {
@@ -63,6 +64,11 @@ export class StopsMapApp {
   async initialize() {
     try {
       this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de paragens...');
+
+      AnnouncementBanner.show(
+        '⚠️ Localização em tempo real dos autocarros temporariamente indisponível.',
+        { type: 'warning', id: 'rt-unavailable' }
+      );
 
       await scheduleService.loadScheduleData();
 

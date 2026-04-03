@@ -22,6 +22,7 @@ import { TutorialModal }          from '../ui/components/TutorialModal.js';
 import { createCenterControl }    from '../map/controls/CenterControl.js';
 import { createStopsControl }     from '../map/controls/StopsControl.js';
 import { createTutorialControl }  from '../map/controls/TutorialControl.js';
+import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -56,6 +57,11 @@ export class BusMapApp {
   async initialize() {
     try {
       this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de autocarros...');
+
+      AnnouncementBanner.show(
+        '⚠️ Localização em tempo real dos autocarros temporariamente indisponível.',
+        { type: 'warning', id: 'rt-unavailable' }
+      );
 
       await scheduleService.loadScheduleData();
 
