@@ -24,6 +24,7 @@ import { TutorialModal }          from '../ui/components/TutorialModal.js';
 import { favouritesManager }      from '../services/FavouritesManager.js';
 import { iconCache }              from '../ui/design/iconCache.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
+import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
 
 export class StopsMapApp {
   constructor(options = {}) {
@@ -65,10 +66,12 @@ export class StopsMapApp {
     try {
       this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de paragens...');
 
-      AnnouncementBanner.show(
-        '⚠️ Localização em tempo real dos autocarros temporariamente indisponível.',
-        { type: 'warning', id: 'rt-unavailable' }
-      );
+      if (!REALTIME_BUSES_ENABLED) {
+        AnnouncementBanner.show(
+          '⚠️ Localização em tempo real dos autocarros temporariamente indisponível.',
+          { type: 'warning', id: 'rt-unavailable', dismissible: false }
+        );
+      }
 
       await scheduleService.loadScheduleData();
 
@@ -371,10 +374,12 @@ export class StopsMapApp {
         this.nextArrivals.updateLastUpdate();
         return;
       }
-      const vehicles = await apiService.fetchBusData();
+      const vehicles = REALTIME_BUSES_ENABLED ? await apiService.fetchBusData() : [];
       this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
-      await this.updateBusMap(arrivals, vehicles, centerMap);
+      if (REALTIME_BUSES_ENABLED) {
+        await this.updateBusMap(arrivals, vehicles, centerMap);
+      }
     } catch (error) {
       console.error('\u274C Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();

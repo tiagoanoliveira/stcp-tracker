@@ -23,6 +23,7 @@ import { createCenterControl }    from '../map/controls/CenterControl.js';
 import { createStopsControl }     from '../map/controls/StopsControl.js';
 import { createTutorialControl }  from '../map/controls/TutorialControl.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
+import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -58,10 +59,12 @@ export class BusMapApp {
     try {
       this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de autocarros...');
 
-      AnnouncementBanner.show(
-        '⚠️ Localização em tempo real dos autocarros temporariamente indisponível.',
-        { type: 'warning', id: 'rt-unavailable' }
-      );
+      if (!REALTIME_BUSES_ENABLED) {
+        AnnouncementBanner.show(
+          '⚠️ Localização em tempo real dos autocarros temporariamente indisponível.',
+          { type: 'warning', id: 'rt-unavailable', dismissible: false }
+        );
+      }
 
       await scheduleService.loadScheduleData();
 
@@ -113,13 +116,15 @@ export class BusMapApp {
       this.setupEventListeners();
       this.lastUpdateDisplay.initialize();
 
-      this.loadingOverlay.update('A carregar autocarros...');
-      await this.fetchAndUpdateBuses();
+      if (REALTIME_BUSES_ENABLED) {
+        this.loadingOverlay.update('A carregar autocarros...');
+        await this.fetchAndUpdateBuses();
+        this.startAutoRefresh();
+      }
 
       this.loadingOverlay.remove();
       this.loadingOverlay = null;
 
-      this.startAutoRefresh();
       await this._handleDeepLink();
 
       // Mostrar tutorial na primeira visita (após tudo carregado)
@@ -223,12 +228,16 @@ export class BusMapApp {
 
     if (selected.size === 0) {
       this.lineOverlayManager.clearAll();
-      this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
-      this.busMarkerManager.filterByRoutes(new Set());
+      if (REALTIME_BUSES_ENABLED) {
+        this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
+        this.busMarkerManager.filterByRoutes(new Set());
+      }
       return;
     }
 
-    this.busMarkerManager.filterByRoutes(selected, this._routeDirMap);
+    if (REALTIME_BUSES_ENABLED) {
+      this.busMarkerManager.filterByRoutes(selected, this._routeDirMap);
+    }
 
     const routesToFetch = routeObjs.map(r => ({
       routeId:    String(r.id || r.number),
@@ -239,10 +248,14 @@ export class BusMapApp {
     const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
     this.lineOverlayManager.setRoutes(overlayData);
 
-    const visiblePositions = this.busMarkerManager.filterByRoutes(selected, this._routeDirMap);
-    if (visiblePositions.length > 0) {
-      this._fitToPositions(visiblePositions);
-    } else if (this.lineOverlayManager.hasActiveLayers()) {
+    if (REALTIME_BUSES_ENABLED) {
+      const visiblePositions = this.busMarkerManager.filterByRoutes(selected, this._routeDirMap);
+      if (visiblePositions.length > 0) {
+        this._fitToPositions(visiblePositions);
+        return;
+      }
+    }
+    if (this.lineOverlayManager.hasActiveLayers()) {
       this.lineOverlayManager.fitBounds();
     }
   }
@@ -278,10 +291,12 @@ export class BusMapApp {
         this.nextArrivals.updateLastUpdate();
         return;
       }
-      const vehicles = await apiService.fetchBusData();
+      const vehicles = REALTIME_BUSES_ENABLED ? await apiService.fetchBusData() : [];
       this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
-      await this._updateArrivalsOnMap(arrivals, vehicles, centerMap);
+      if (REALTIME_BUSES_ENABLED) {
+        await this._updateArrivalsOnMap(arrivals, vehicles, centerMap);
+      }
     } catch (error) {
       console.error('\u274C Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
@@ -333,10 +348,12 @@ export class BusMapApp {
     this._busMapCentered      = false;
     this._currentBusPositions = [];
     this._clearStopFromURL();
-    if (this._selectedRoutes.size > 0) {
-      this.busMarkerManager.filterByRoutes(this._selectedRoutes, this._routeDirMap);
-    } else {
-      this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
+    if (REALTIME_BUSES_ENABLED) {
+      if (this._selectedRoutes.size > 0) {
+        this.busMarkerManager.filterByRoutes(this._selectedRoutes, this._routeDirMap);
+      } else {
+        this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
+      }
     }
   }
 
