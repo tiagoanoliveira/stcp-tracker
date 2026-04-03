@@ -1,9 +1,18 @@
 /**
  * routeService - Acesso aos dados de linhas (shape, paragens, listagem)
+ * Suporta rotas STCP normais (via proxy) e rotas custom (dados locais).
  * Todos os resultados são cacheados em memória para evitar pedidos repetidos.
  */
 
-import { apiService } from '../core/apiService.js';
+import { apiService }        from '../core/apiService.js';
+import {
+  CUSTOM_ROUTES_LIST,
+  getCustomRouteShape,
+  getCustomRouteStops,
+} from '../data/customRoutes.js';
+
+// Set com IDs das rotas custom para lookup O(1)
+const CUSTOM_ROUTE_IDS = new Set(CUSTOM_ROUTES_LIST.map(r => r.id));
 
 class RouteService {
   constructor() {
@@ -29,11 +38,16 @@ class RouteService {
 
   /**
    * Obter shape (polyline) de uma linha numa direcção.
-   * @param {string} routeId  - ex: '200', '1M'
+   * Para rotas custom, devolve os dados locais sem chamada de rede.
+   * @param {string} routeId  - ex: '200', '1M', 'MB1'
    * @param {0|1}    direction - 0 = ida, 1 = volta
    * @returns {Promise<{route_id, direction_id, coordinates: [{lat,lng,sequence}]}>}
    */
   async fetchRouteShape(routeId, direction = 0) {
+    if (CUSTOM_ROUTE_IDS.has(routeId)) {
+      return getCustomRouteShape(routeId);
+    }
+
     const key = this._cacheKey('shape', routeId, direction);
     const cached = this._fromCache(key);
     if (cached) return cached;
@@ -52,9 +66,14 @@ class RouteService {
 
   /**
    * Obter paragens de uma linha numa direcção.
+   * Para rotas custom, devolve os dados locais sem chamada de rede.
    * @returns {Promise<{route_id, direction_id, stops: [{stop_id,stop_name,latitude,longitude,stop_sequence}]}>}
    */
   async fetchRouteStops(routeId, direction = 0) {
+    if (CUSTOM_ROUTE_IDS.has(routeId)) {
+      return getCustomRouteStops(routeId);
+    }
+
     const key = this._cacheKey('stops', routeId, direction);
     const cached = this._fromCache(key);
     if (cached) return cached;
@@ -87,7 +106,7 @@ class RouteService {
   }
 
   /**
-   * Obter shape E paragens para múltiplas linhas em paralelo (para filtros com várias linhas).
+   * Obter shape E paragens para múltiplas linhas em paralelo.
    * @param {Array<{routeId, direction, color, text_color}>} routes
    * @returns {Promise<Array<{routeId, direction, color, text_color, shape, stops}>>}
    */
@@ -104,6 +123,7 @@ class RouteService {
 
   /**
    * Listar todas as linhas disponíveis.
+   * Combina a lista do proxy com as rotas custom locais.
    * @returns {Promise<Array<{id, number, name, color, text_color}>>}
    */
   async fetchRoutesList() {
@@ -115,12 +135,19 @@ class RouteService {
       const data = await apiService.fetchWithRetry(
         `${apiService.proxyUrl}/routes/list`
       );
-      const routes = data?.routes || [];
-      this._toCache(key, routes);
-      return routes;
+      const remoteRoutes = data?.routes || [];
+      // Juntar rotas custom que ainda não estejam na lista remota
+      const remoteIds = new Set(remoteRoutes.map(r => r.id));
+      const merged = [
+        ...remoteRoutes,
+        ...CUSTOM_ROUTES_LIST.filter(r => !remoteIds.has(r.id)),
+      ];
+      this._toCache(key, merged);
+      return merged;
     } catch (e) {
       console.error('❌ Erro ao obter lista de linhas:', e);
-      return [];
+      // Fallback: pelo menos as rotas custom ficam disponíveis
+      return [...CUSTOM_ROUTES_LIST];
     }
   }
 
