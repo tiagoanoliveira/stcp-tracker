@@ -1,0 +1,170 @@
+/* ============================================================
+   announcement.css — Banner de aviso flutuante
+   Posicionado abaixo do #filter-row via JS (_reposition()).
+   Mesma estética glassmorphism da barra de filtros.
+   ============================================================ */
+
+/* Base */
+.ab {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1010;           /* acima do filter-row (1000) */
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 7px 14px 7px 12px;
+  max-width: min(560px, 92vw);
+
+  border-radius: 28px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+
+  animation: ab-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Entrada */
+@keyframes ab-enter {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Saída */
+.ab-exit {
+  animation: ab-exit 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes ab-exit {
+  from { opacity: 1; transform: translateX(-50%) translateY(0); }
+  to   { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+}
+
+/* ---- Tipos ---- */
+
+/* Warning (■ laranja/âmbar) */
+.ab-warning {
+  background-color: rgba(220, 120, 10, 0.18);
+  color: #5a3200;
+}
+
+.ab-warning .ab-icon svg {
+  stroke: #c06800;
+}
+
+/* Info (azul) */
+.ab-info {
+  background-color: rgba(20, 100, 200, 0.15);
+  color: #0a2d60;
+}
+
+.ab-info .ab-icon svg {
+  stroke: #1460c0;
+}
+
+/* Error (vermelho) */
+.ab-error {
+  background-color: rgba(200, 30, 30, 0.15);
+  color: #5a0a0a;
+}
+
+.ab-error .ab-icon svg {
+  stroke: #b01010;
+}
+
+/* ---- Elementos internos ---- */
+
+.ab-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.ab-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ab-message {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ab-close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 150ms, background 150ms;
+  padding: 0;
+  margin-left: 2px;
+  color: inherit;
+}
+
+.ab-close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.ab-close svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+}
+
+/* ---- Dark mode ---- */
+@media (prefers-color-scheme: dark) {
+  .ab-warning {
+    background-color: rgba(220, 140, 20, 0.22);
+    color: #ffd580;
+  }
+  .ab-warning .ab-icon svg { stroke: #ffc040; }
+
+  .ab-info {
+    background-color: rgba(60, 140, 255, 0.20);
+    color: #a8d0ff;
+  }
+  .ab-info .ab-icon svg { stroke: #70b8ff; }
+
+  .ab-error {
+    background-color: rgba(255, 60, 60, 0.20);
+    color: #ffb0b0;
+  }
+  .ab-error .ab-icon svg { stroke: #ff7070; }
+
+  .ab-close:hover { background: rgba(255, 255, 255, 0.12); }
+}
+
+/* ---- Responsivo ---- */
+@media (max-width: 768px) {
+  .ab {
+    font-size: 12px;
+    padding: 6px 12px 6px 10px;
+    max-width: 94vw;
+  }
+}
+
+@media (max-width: 480px) {
+  .ab {
+    font-size: 11.5px;
+    padding: 5px 10px;
+    max-width: 96vw;
+    white-space: normal;  /* permite quebrar linha em ecrãs muito pequenos */
+  }
+}
