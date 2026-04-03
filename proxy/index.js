@@ -1,5 +1,5 @@
 // Cloudflare Worker - CORS Proxy para STCP API
-// v4.1 - Lista estática de linhas STCP (cores oficiais)
+// v4.2 - Adicionado endpoint /{stopId}/services?date={date}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,9 +92,9 @@ async function handleRequest(request) {
     return new Response(
       JSON.stringify({
         message: 'STCP CORS Proxy',
-        version: '4.1',
+        version: '4.2',
         endpoints: {
-          stop_endpoints:     ['realtime', 'routes', 'schedule', 'info'],
+          stop_endpoints:     ['realtime', 'routes', 'schedule', 'info', 'services'],
           location_endpoints: ['nearby'],
           route_endpoints:    ['schedule', 'shape', 'stops', 'list'],
           search_endpoints:   ['search']
@@ -104,6 +104,7 @@ async function handleRequest(request) {
           routes:         'GET /{STOP_ID}/routes',
           stop_schedule:  'GET /{STOP_ID}/schedule?route_id={ROUTE}&service_id={SERVICE}',
           stop_info:      'GET /{STOP_ID}/info',
+          stop_services:  'GET /{STOP_ID}/services?date={YYYY-MM-DD}',
           nearby:         'GET /nearby/{LAT}/{LNG}/{RADIUS}',
           route_schedule: 'GET /route/{ROUTE_ID}/schedule?service_id={SERVICE}&direction_id={DIR}',
           route_shape:    'GET /route/{ROUTE_ID}/shape?direction_id={DIR}',
@@ -175,7 +176,7 @@ async function handleRequest(request) {
             ...corsHeaders,
             'Content-Type': 'application/json',
             'Cache-Control': 'public, max-age=3600',
-            'X-Proxy-Version': '4.1',
+            'X-Proxy-Version': '4.2',
             'X-Endpoint': 'route_shape'
           }
         });
@@ -212,7 +213,7 @@ async function handleRequest(request) {
             ...corsHeaders,
             'Content-Type': 'application/json',
             'Cache-Control': 'public, max-age=3600',
-            'X-Proxy-Version': '4.1',
+            'X-Proxy-Version': '4.2',
             'X-Endpoint': 'route_stops'
           }
         });
@@ -232,8 +233,8 @@ async function handleRequest(request) {
           headers: {
             ...corsHeaders,
             'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=86400', // 24h - dados estáticos
-            'X-Proxy-Version': '4.1',
+            'Cache-Control': 'public, max-age=86400',
+            'X-Proxy-Version': '4.2',
             'X-Endpoint': 'routes_list'
           }
         }
@@ -269,7 +270,7 @@ async function handleRequest(request) {
           ...corsHeaders,
           'Content-Type': 'application/json',
           'Cache-Control': 'public, max-age=300',
-          'X-Proxy-Version': '4.1',
+          'X-Proxy-Version': '4.2',
           'X-Endpoint': 'search'
         }
       });
@@ -281,6 +282,18 @@ async function handleRequest(request) {
     const stopId   = firstSegment;
     const endpoint = pathParts[1] || 'realtime';
 
+    // --- 5a. Serviços ativos de uma paragem para uma data
+    // GET /{stopId}/services?date=YYYY-MM-DD
+    if (endpoint === 'services') {
+      const date = url.searchParams.get('date');
+      if (!date) return errorResponse('Parâmetro "date" é obrigatório. Uso: /{stopId}/services?date=YYYY-MM-DD', 400);
+      return await proxyRequest(
+        `https://stcp.pt/api/stops/${stopId}/services?date=${date}`,
+        'stop_services', 'public, max-age=3600'
+      );
+    }
+
+    // --- 5b. Info da paragem
     if (endpoint === 'info') {
       const rawResponse = await proxyRawRequest(`https://stcp.pt/api/stops/${stopId}`, 'stop_info');
       if (!rawResponse.ok)
@@ -306,7 +319,7 @@ async function handleRequest(request) {
           ...corsHeaders,
           'Content-Type': 'application/json',
           'Cache-Control': 'public, max-age=1800',
-          'X-Proxy-Version': '4.1',
+          'X-Proxy-Version': '4.2',
           'X-Endpoint': 'stop_info'
         }
       });
@@ -314,7 +327,7 @@ async function handleRequest(request) {
 
     const validStopEndpoints = ['realtime', 'routes', 'schedule'];
     if (!validStopEndpoints.includes(endpoint))
-      return errorResponse(`Endpoint inválido: ${endpoint}. Use: ${validStopEndpoints.join(', ')} ou info`, 400);
+      return errorResponse(`Endpoint inválido: ${endpoint}. Use: ${validStopEndpoints.join(', ')}, info ou services`, 400);
 
     let stcpApiUrl = `https://stcp.pt/api/stops/${stopId}/${endpoint}`;
     if (url.search) stcpApiUrl += url.search;
@@ -334,7 +347,7 @@ async function handleRequest(request) {
 async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
   const response = await fetch(stcpApiUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.1)', 'Accept': 'application/json' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.2)', 'Accept': 'application/json' },
   });
   const data = await response.text();
   return new Response(data, {
@@ -343,7 +356,7 @@ async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
       ...corsHeaders,
       'Content-Type': 'application/json',
       'Cache-Control': cacheControl,
-      'X-Proxy-Version': '4.1',
+      'X-Proxy-Version': '4.2',
       'X-Endpoint': endpoint
     }
   });
@@ -352,7 +365,7 @@ async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
 async function proxyRawRequest(stcpApiUrl, endpoint) {
   return await fetch(stcpApiUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.1)', 'Accept': 'application/json' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.2)', 'Accept': 'application/json' },
   });
 }
 

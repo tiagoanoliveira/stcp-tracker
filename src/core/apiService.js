@@ -6,7 +6,6 @@ class ApiService {
   constructor() {
     this.fiwareUrl = 'https://broker.fiware.urbanplatform.portodigital.pt/v2/entities?q=vehicleType==bus&limit=1000';
     this.proxyUrl = 'https://stcp-worker.tiagoanoliveira.pt';
-    this.stcpUrl = 'https://stcp.pt/api';
     this.retries = 3;
     this.delayMs = 500;
     this.timeoutMs = 10000;
@@ -68,15 +67,16 @@ class ApiService {
   }
 
   /**
-   * Obtém os serviços ativos para uma paragem numa data específica
-   * Usa o endpoint GET /stops/{stopId}/services?date={date} da API STCP
+   * Obtém os serviços ativos para uma paragem numa data específica.
+   * Passa pelo proxy Cloudflare Worker para evitar erros de CORS.
+   * Rota do proxy: GET /{stopId}/services?date={date}
    * @param {string} stopId - Código da paragem (ex: "PLNT2")
    * @param {string} date - Data no formato YYYY-MM-DD (ex: "2026-04-02")
    * @returns {Promise<Object>} Objeto com active_service_id e lista de serviços
    */
   async fetchStopServices(stopId, date) {
     try {
-      return await this.fetchWithRetry(`${this.stcpUrl}/stops/${stopId}/services?date=${date}`);
+      return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/services?date=${date}`);
     } catch (error) {
       console.error(`\u274c Erro ao obter serviços da paragem ${stopId} para ${date}:`, error);
       return null;
@@ -84,9 +84,8 @@ class ApiService {
   }
 
   /**
-   * ⭐ NOVO: Info completa de uma paragem (nome, coordenadas, linhas com cores)
+   * Info completa de uma paragem (nome, coordenadas, linhas com cores)
    * Usa o endpoint GET /{stopId}/info do worker.
-   * Cache de 30 min no worker; aqui sem cache extra (j\u00e1 vem cacheado).
    */
   async fetchStopInfo(stopId) {
     try {

@@ -20,8 +20,17 @@ class ScheduleService {
   }
 
   /**
+   * Stub de compatibilidade — chamado pelo BusMapApp na inicialização.
+   * O serviço já não carrega dados estáticos locais; retorna imediatamente.
+   */
+  async loadScheduleData() {
+    // Nada a carregar: os dados são obtidos on-demand via API.
+    return;
+  }
+
+  /**
    * Obter service_id para a data atual
-   * Usa o endpoint /stops/{id}/services?date={date} da API STCP.
+   * Usa o endpoint /{stopId}/services?date={date} do proxy (que faz forward para a API STCP).
    * Faz fallback para lógica local se a API falhar.
    * @param {string} [stopId] - Qualquer paragem válida para consultar o serviço (default: BOLH1)
    * @returns {Promise<string>} service_id ativo hoje
@@ -77,7 +86,7 @@ class ScheduleService {
   }
 
   /**
-   * ⭐ NOVO: Obtém headsign de um trip_id via API
+   * Obtém headsign de um trip_id via API
    * @param {string} tripId - ID da viagem
    * @param {string} routeId - ID da rota (ex: "200")
    * @param {string|number} directionId - Direção (0 ou 1)
@@ -121,7 +130,7 @@ class ScheduleService {
   }
 
   /**
-   * ⭐ NOVO: Obtém schedule completo de uma rota (com cache)
+   * Obtém schedule completo de uma rota (com cache)
    * @param {string} routeId - ID da rota
    * @param {string} serviceId - ID do serviço
    * @param {string|number} directionId - Direção
@@ -138,11 +147,9 @@ class ScheduleService {
     }
 
     try {
-      // Buscar da API
       const data = await apiService.fetchRouteSchedule(routeId, serviceId, directionId);
 
       if (data) {
-        // Guardar em cache
         this.routeSchedulesCache.set(cacheKey, { data, timestamp: now });
       }
 
@@ -151,7 +158,6 @@ class ScheduleService {
     } catch (error) {
       console.error(`❌ Erro ao obter schedule de ${routeId}:`, error);
 
-      // Retornar cache antigo se existir
       if (cached) {
         console.warn('⚠️ A usar cache expirado como fallback');
         return cached.data;
