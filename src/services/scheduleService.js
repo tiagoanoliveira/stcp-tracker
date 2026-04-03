@@ -1,178 +1,133 @@
 /**
  * Schedule Service - Lógica de horários e serviços
  * Usa: apiService
- * Responsável por: determinar service_id, obter headsigns via API
  */
 
 import { apiService } from '../core/apiService.js';
 
 class ScheduleService {
   constructor() {
-    // Cache de schedules de rotas
-    this.routeSchedulesCache = new Map(); // "route_service_dir" -> { data, timestamp }
+    this.routeSchedulesCache = new Map(); // "route_serviceId_dir" -> { data, timestamp }
     this.cacheTTL = 30 * 60 * 1000; // 30 minutos
 
-    // Cache de service_id por data (chave: YYYY-MM-DD)
-    this.cachedServiceId = null;
+    this.cachedServiceId   = null;
     this.cachedServiceDate = null;
-    // Promise em andamento para evitar chamadas duplicadas
     this._serviceIdPromise = null;
   }
 
   /**
-   * Stub de compatibilidade — chamado pelo BusMapApp na inicialização.
-   * O serviço já não carrega dados estáticos locais; retorna imediatamente.
+   * Chamado pelo BusMapApp na inicialização.
+   * Pré-aquece o cache do service_id ativo para que resolveHeadsign
+   * e plannedArrivalsService o encontrem já pronto.
+   * @param {string} [stopId] - Paragem usada para consultar o serviço (default: BOLH1).
+   *   Se possível, passe uma paragem real do contexto atual.
    */
-  async loadScheduleData() {
-    // Nada a carregar: os dados são obtidos on-demand via API.
-    return;
+  async loadScheduleData(stopId = 'BOLH1') {
+    await this.getServiceIdAtual(stopId);
   }
 
   /**
-   * Obter service_id para a data atual
-   * Usa o endpoint /{stopId}/services?date={date} do proxy (que faz forward para a API STCP).
-   * Faz fallback para lógica local se a API falhar.
-   * @param {string} [stopId] - Qualquer paragem válida para consultar o serviço (default: BOLH1)
-   * @returns {Promise<string>} service_id ativo hoje
+   * Devolve o service_id ativo hoje.
+   * Consulta o proxy /{stopId}/services?date=YYYY-MM-DD e guarda em cache pelo dia.
+   * Fallback para lógica por dia da semana se a API falhar.
+   * @param {string} [stopId]
+   * @returns {Promise<string>}
    */
   async getServiceIdAtual(stopId = 'BOLH1') {
     const dateNow = new Date();
     const dateKey = dateNow.toISOString().slice(0, 10); // YYYY-MM-DD
 
-    // Devolver do cache se ainda for válido para hoje
     if (this.cachedServiceDate === dateKey && this.cachedServiceId) {
       return this.cachedServiceId;
     }
 
-    // Evitar chamadas duplicadas em paralelo
-    if (this._serviceIdPromise) {
-      return this._serviceIdPromise;
-    }
+    if (this._serviceIdPromise) return this._serviceIdPromise;
 
     this._serviceIdPromise = (async () => {
       try {
         const data = await apiService.fetchStopServices(stopId, dateKey);
-        if (data && data.active_service_id) {
-          const serviceId = data.active_service_id;
+        if (data?.active_service_id) {
           this.cachedServiceDate = dateKey;
-          this.cachedServiceId = serviceId;
-          return serviceId;
+          this.cachedServiceId   = data.active_service_id;
+          return data.active_service_id;
         }
       } catch (error) {
         console.warn('⚠️ Não foi possível obter service_id da API, a usar fallback local:', error);
       }
-
-      // Fallback: determinar pelo dia da semana
       const serviceId = this._getServiceIdByWeekday(dateNow);
       this.cachedServiceDate = dateKey;
-      this.cachedServiceId = serviceId;
+      this.cachedServiceId   = serviceId;
       return serviceId;
-    })().finally(() => {
-      this._serviceIdPromise = null;
-    });
+    })().finally(() => { this._serviceIdPromise = null; });
 
     return this._serviceIdPromise;
   }
 
-  /**
-   * Fallback: determinar service_id apenas pelo dia da semana
-   * (usado quando a API não está disponível)
-   */
+  /** Fallback por dia da semana */
   _getServiceIdByWeekday(date) {
-    const weekday = date.getDay();
-    if (weekday === 0) return 'DOMINGOS|FERIADOS';
-    if (weekday === 6) return 'SÁBADOS';
+    const d = date.getDay();
+    if (d === 0) return 'DOMINGOS|FERIADOS';
+    if (d === 6) return 'SÁBADOS';
     return 'DIAS UTEIS';
   }
 
   /**
-   * Obtém headsign de um trip_id via API
-   * @param {string} tripId - ID da viagem
-   * @param {string} routeId - ID da rota (ex: "200")
-   * @param {string|number} directionId - Direção (0 ou 1)
-   * @returns {Promise<string>} Headsign/destino
+   * Devolve o headsign (destino) de um trip_id.
+   * O serviceId deve ser passado pelo chamador (já resolvido via getServiceIdAtual).
+   * @param {string} tripId
+   * @param {string} routeId
+   * @param {string|number} directionId
+   * @param {string} serviceId - service_id ativo (ex: "DOMINGOS|FERIADOS")
+   * @returns {Promise<string>}
    */
-  async getHeadsignForTrip(tripId, routeId, directionId) {
-    if (!tripId || !routeId || directionId == null) {
-      console.warn(`⚠️ Parâmetros inválidos: tripId=${tripId}, routeId=${routeId}, dir=${directionId}`);
-      return 'Destino Desconhecido';
+  async getHeadsignForTrip(tripId, routeId, directionId, serviceId) {
+    if (!tripId || !routeId || directionId == null || !serviceId) {
+      console.warn(`⚠️ Parâmetros inválidos: tripId=${tripId}, routeId=${routeId}, dir=${directionId}, serviceId=${serviceId}`);
+      return 'Destino desconhecido';
     }
 
-    try {
-      const serviceId = await this.getServiceIdAtual();
-      const schedule = await this.getRouteSchedule(routeId, serviceId, directionId);
-
-      if (!schedule || !schedule.schedule) {
-        console.warn(`⚠️ Sem schedule para ${routeId} (${serviceId}, dir ${directionId})`);
-        return 'Destino Desconhecido';
-      }
-
-      // Procurar trip no schedule
-      const trip = schedule.schedule.find(t => t.trip_id === tripId);
-
-      if (trip && trip.trip_headsign) {
-        return trip.trip_headsign;
-      }
-
-      // Fallback: usar o primeiro trip da mesma direção
-      const firstTrip = schedule.schedule[0];
-      if (firstTrip && firstTrip.trip_headsign) {
-        console.warn(`⚠️ Trip ${tripId} não encontrado, usando fallback: ${firstTrip.trip_headsign}`);
-        return firstTrip.trip_headsign;
-      }
-
-      return 'Destino Desconhecido';
-
-    } catch (error) {
-      console.error(`❌ Erro ao obter headsign para trip ${tripId}:`, error);
-      return 'Destino Desconhecido';
+    const schedule = await this.getRouteSchedule(routeId, serviceId, directionId);
+    if (!schedule?.schedule) {
+      console.warn(`⚠️ Sem schedule para ${routeId} (${serviceId}, dir ${directionId})`);
+      return 'Destino desconhecido';
     }
+
+    const trip = schedule.schedule.find(t => t.trip_id === tripId);
+    if (trip?.trip_headsign) return trip.trip_headsign;
+
+    // Fallback: primeiro trip da lista
+    const first = schedule.schedule[0];
+    if (first?.trip_headsign) {
+      console.warn(`⚠️ Trip ${tripId} não encontrado, usando fallback: ${first.trip_headsign}`);
+      return first.trip_headsign;
+    }
+
+    return 'Destino desconhecido';
   }
 
   /**
-   * Obtém schedule completo de uma rota (com cache)
-   * @param {string} routeId - ID da rota
-   * @param {string} serviceId - ID do serviço
-   * @param {string|number} directionId - Direção
-   * @returns {Promise<Object>} Schedule da rota
+   * Obtém schedule completo de uma rota (com cache).
    */
   async getRouteSchedule(routeId, serviceId, directionId) {
     const cacheKey = `${routeId}_${serviceId}_${directionId}`;
-    const cached = this.routeSchedulesCache.get(cacheKey);
-    const now = Date.now();
+    const cached   = this.routeSchedulesCache.get(cacheKey);
+    const now      = Date.now();
 
-    // Verificar cache
-    if (cached && (now - cached.timestamp) < this.cacheTTL) {
-      return cached.data;
-    }
+    if (cached && (now - cached.timestamp) < this.cacheTTL) return cached.data;
 
     try {
       const data = await apiService.fetchRouteSchedule(routeId, serviceId, directionId);
-
-      if (data) {
-        this.routeSchedulesCache.set(cacheKey, { data, timestamp: now });
-      }
-
+      if (data) this.routeSchedulesCache.set(cacheKey, { data, timestamp: now });
       return data;
-
     } catch (error) {
       console.error(`❌ Erro ao obter schedule de ${routeId}:`, error);
-
-      if (cached) {
-        console.warn('⚠️ A usar cache expirado como fallback');
-        return cached.data;
-      }
-
-      return null;
+      return cached?.data ?? null;
     }
   }
 
-  /**
-   * Limpar cache
-   */
   clearCache() {
     this.cachedServiceDate = null;
-    this.cachedServiceId = null;
+    this.cachedServiceId   = null;
     this.routeSchedulesCache.clear();
   }
 }
