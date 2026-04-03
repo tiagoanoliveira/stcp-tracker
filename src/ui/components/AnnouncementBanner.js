@@ -12,16 +12,7 @@
  *
  *   AnnouncementBanner.hide()          — fecha o banner
  *   AnnouncementBanner.isVisible()     — true se visível
- *
- * Exemplo:
- *   import { AnnouncementBanner } from '../ui/components/AnnouncementBanner.js';
- *   AnnouncementBanner.show(
- *     '\u26a0\ufe0f Informação em tempo real temporáriamente indisponível.',
- *     { type: 'warning', id: 'rt-unavailable' }
- *   );
  */
-
-const DISMISSED_KEY = 'ab_dismissed'; // prefixo de sessionStorage
 
 export class AnnouncementBanner {
   static _el = null;
@@ -38,7 +29,6 @@ export class AnnouncementBanner {
       id          = null,
     } = options;
 
-    // Se já foi dispensado nesta sessão, não mostra de novo
     if (id && AnnouncementBanner._dismissed.has(id)) return;
 
     AnnouncementBanner._ensureStyles();
@@ -51,6 +41,7 @@ export class AnnouncementBanner {
     el.classList.add('ab-exit');
     el.addEventListener('animationend', () => el.remove(), { once: true });
     AnnouncementBanner._el = null;
+    window.removeEventListener('resize', AnnouncementBanner._reposition);
   }
 
   static isVisible() {
@@ -62,7 +53,6 @@ export class AnnouncementBanner {
   // ---------------------------------------------------------------------------
 
   static _render(message, { type, dismissible, id }) {
-    // Remover banner anterior sem animação
     AnnouncementBanner._el?.remove();
 
     const el = document.createElement('div');
@@ -99,9 +89,11 @@ export class AnnouncementBanner {
     document.body.appendChild(el);
     AnnouncementBanner._el = el;
 
-    // Posição dinâmica: abaixo do #filter-row
-    AnnouncementBanner._reposition();
-    window.addEventListener('resize', AnnouncementBanner._reposition, { passive: true });
+    // Aguarda um frame para o elemento estar no DOM antes de posicionar
+    requestAnimationFrame(() => {
+      AnnouncementBanner._reposition();
+      window.addEventListener('resize', AnnouncementBanner._reposition, { passive: true });
+    });
   }
 
   static _reposition() {
@@ -110,13 +102,20 @@ export class AnnouncementBanner {
 
     const filterRow = document.getElementById('filter-row');
     if (filterRow) {
-      const rect   = filterRow.getBoundingClientRect();
-      el.style.top = `${rect.bottom + 10}px`;
+      const rect = filterRow.getBoundingClientRect();
+      // Alinha exatamente com o filter-row: mesma posição left, mesma largura
+      el.style.left      = `${rect.left}px`;
+      el.style.width     = `${rect.width}px`;
+      el.style.transform = 'none';   // cancela o translateX(-50%) do CSS base
+      el.style.top       = `${rect.bottom + 8}px`;
     } else {
-      // Fallback: abaixo do header
+      // Fallback centrado
       const header = document.querySelector('.header-overlay, .search-overlay, header');
       const bottom = header ? header.getBoundingClientRect().bottom : 70;
-      el.style.top = `${bottom + 10}px`;
+      el.style.top       = `${bottom + 8}px`;
+      el.style.left      = '50%';
+      el.style.width     = '';
+      el.style.transform = 'translateX(-50%)';
     }
   }
 

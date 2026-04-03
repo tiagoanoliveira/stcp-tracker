@@ -1,7 +1,6 @@
 /* ============================================================
    announcement.css — Banner de aviso flutuante
    Posicionado abaixo do #filter-row via JS (_reposition()).
-   Mesma estética glassmorphism da barra de filtros.
    ============================================================ */
 
 /* Base */
@@ -9,25 +8,28 @@
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 1010;           /* acima do filter-row (1000) */
+  z-index: 1010;
 
   display: flex;
   align-items: center;
   gap: 8px;
 
-  padding: 7px 14px 7px 12px;
-  max-width: min(560px, 92vw);
+  padding: 8px 16px 8px 14px;
 
-  border-radius: 28px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+  /* largura controlada pelo JS via el.style.width / el.style.left */
+  max-width: 92vw;
+  width: max-content;
+  box-sizing: border-box;
+
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 
   font-size: 13px;
   font-weight: 500;
   line-height: 1.4;
-  white-space: nowrap;
+  white-space: normal;
+  color: #1a1a1a;
 
   animation: ab-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -50,34 +52,31 @@
 
 /* ---- Tipos ---- */
 
-/* Warning (■ laranja/âmbar) */
+/* Warning */
 .ab-warning {
-  background-color: rgba(220, 120, 10, 0.18);
-  color: #5a3200;
+  background-color: rgba(230, 140, 20, 0.88);
+  color: #1a1a1a;
 }
-
 .ab-warning .ab-icon svg {
-  stroke: #c06800;
+  stroke: #7a3d00;
 }
 
-/* Info (azul) */
+/* Info */
 .ab-info {
-  background-color: rgba(20, 100, 200, 0.15);
-  color: #0a2d60;
+  background-color: rgba(20, 100, 220, 0.88);
+  color: #ffffff;
 }
-
 .ab-info .ab-icon svg {
-  stroke: #1460c0;
+  stroke: #ffffff;
 }
 
-/* Error (vermelho) */
+/* Error */
 .ab-error {
-  background-color: rgba(200, 30, 30, 0.15);
-  color: #5a0a0a;
+  background-color: rgba(200, 30, 30, 0.90);
+  color: #ffffff;
 }
-
 .ab-error .ab-icon svg {
-  stroke: #b01010;
+  stroke: #ffffff;
 }
 
 /* ---- Elementos internos ---- */
@@ -86,6 +85,8 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  align-self: flex-start;
+  margin-top: 1px;
 }
 
 .ab-icon svg {
@@ -95,8 +96,6 @@
 
 .ab-message {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .ab-close {
@@ -110,16 +109,17 @@
   background: none;
   border: none;
   cursor: pointer;
-  opacity: 0.55;
+  opacity: 0.65;
   transition: opacity 150ms, background 150ms;
   padding: 0;
-  margin-left: 2px;
+  margin-left: 4px;
+  align-self: flex-start;
   color: inherit;
 }
 
 .ab-close:hover {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.12);
 }
 
 .ab-close svg {
@@ -131,40 +131,30 @@
 /* ---- Dark mode ---- */
 @media (prefers-color-scheme: dark) {
   .ab-warning {
-    background-color: rgba(220, 140, 20, 0.22);
-    color: #ffd580;
+    background-color: rgba(210, 120, 10, 0.92);
+    color: #1a1a1a;
   }
-  .ab-warning .ab-icon svg { stroke: #ffc040; }
+  .ab-warning .ab-icon svg { stroke: #5a2800; }
 
   .ab-info {
-    background-color: rgba(60, 140, 255, 0.20);
-    color: #a8d0ff;
+    background-color: rgba(30, 110, 230, 0.92);
+    color: #ffffff;
   }
-  .ab-info .ab-icon svg { stroke: #70b8ff; }
+  .ab-info .ab-icon svg { stroke: #ffffff; }
 
   .ab-error {
-    background-color: rgba(255, 60, 60, 0.20);
-    color: #ffb0b0;
+    background-color: rgba(200, 30, 30, 0.92);
+    color: #ffffff;
   }
-  .ab-error .ab-icon svg { stroke: #ff7070; }
+  .ab-error .ab-icon svg { stroke: #ffffff; }
 
-  .ab-close:hover { background: rgba(255, 255, 255, 0.12); }
+  .ab-close:hover { background: rgba(0, 0, 0, 0.18); }
 }
 
 /* ---- Responsivo ---- */
-@media (max-width: 768px) {
-  .ab {
-    font-size: 12px;
-    padding: 6px 12px 6px 10px;
-    max-width: 94vw;
-  }
-}
-
 @media (max-width: 480px) {
   .ab {
-    font-size: 11.5px;
-    padding: 5px 10px;
-    max-width: 96vw;
-    white-space: normal;  /* permite quebrar linha em ecrãs muito pequenos */
+    font-size: 12px;
+    padding: 7px 12px;
   }
 }
