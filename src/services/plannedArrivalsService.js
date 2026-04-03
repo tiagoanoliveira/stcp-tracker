@@ -28,32 +28,34 @@ class PlannedArrivalsService {
 
       // 2. Buscar rotas que servem esta paragem
       const routes = await this.getStopRoutes(stopId);
-      
+
       if (routes.length === 0) {
         return this.formatArrivals(realtimeArrivals, true);
       }
 
-      // 3. Buscar schedules de cada rota
+      // 3. Obter o service_id ativo hoje (agora é async - consulta a API STCP)
+      const currentServiceId = await scheduleService.getServiceIdAtual(stopId);
+
+      // 4. Buscar schedules de cada rota
       const scheduledArrivals = [];
-      const currentServiceId = scheduleService.getServiceIdAtual();
 
       for (const route of routes) {
         const scheduleData = await this.getStopSchedule(stopId, route.route_id, currentServiceId);
-        
+
         if (scheduleData && scheduleData.schedule) {
           // Extrair próximas chegadas do schedule
           const upcomingTrips = this.extractUpcomingTrips(scheduleData.schedule, maxMinutes, route);
           scheduledArrivals.push(...upcomingTrips);
         }
       }
-      // 4. Combinar e remover duplicados
+      // 5. Combinar e remover duplicados
       const combined = this.combineArrivals(
         this.formatArrivals(realtimeArrivals, true),
         this.formatArrivals(scheduledArrivals, false)
       );
 
       return combined;
-      
+
     } catch (error) {
       console.error(`❌ Erro ao obter chegadas para ${stopId}:`, error);
       return [];
@@ -66,19 +68,19 @@ class PlannedArrivalsService {
   async getStopRoutes(stopId) {
     const cached = this.routesCache.get(stopId);
     const now = Date.now();
-    
+
     // Verificar se cache é válido
     if (cached && (now - cached.timestamp) < this.cacheTTL) {
       return cached.data;
     }
-    
+
     // Buscar da API
     const result = await apiService.fetchStopRoutes(stopId);
     const routes = result?.display_routes || [];
-    
+
     // Guardar em cache
     this.routesCache.set(stopId, { data: routes, timestamp: now });
-    
+
     return routes;
   }
 
@@ -89,20 +91,20 @@ class PlannedArrivalsService {
     const cacheKey = `${stopId}_${routeId}_${serviceId}`;
     const cached = this.schedulesCache.get(cacheKey);
     const now = Date.now();
-    
+
     // Verificar se cache é válido
     if (cached && (now - cached.timestamp) < this.cacheTTL) {
       return cached.data;
     }
-    
+
     // Buscar da API
     const data = await apiService.fetchStopSchedule(stopId, routeId, serviceId);
-    
+
     // Guardar em cache
     if (data) {
       this.schedulesCache.set(cacheKey, { data, timestamp: now });
     }
-    
+
     return data;
   }
 
@@ -119,30 +121,30 @@ class PlannedArrivalsService {
     const currentMinute = now.getMinutes();
     const currentTotalMinutes = currentHour * 60 + currentMinute;
     const maxTotalMinutes = currentTotalMinutes + maxMinutes;
-    
+
     const upcomingTrips = [];
-    
+
     // Determinar intervalo de horas a verificar
     // Se estamos perto da meia-noite (23h-24h), precisamos verificar horários 24h+
     const startHour = currentHour;
     let endHour = Math.min(23, Math.floor(maxTotalMinutes / 60));
-    
+
     // Se maxTotalMinutes ultrapassa a meia-noite (>= 1440), verificar horários 24h+
     const checkAfterMidnight = maxTotalMinutes >= 1440;
     const afterMidnightEndHour = checkAfterMidnight ? Math.floor((maxTotalMinutes - 1440) / 60) + 24 : 0;
-    
+
     // Processar horas normais (0-23)
     for (let hour = startHour; hour <= endHour; hour++) {
       this.processHourTrips(schedule, hour, currentTotalMinutes, maxTotalMinutes, route, upcomingTrips);
     }
-    
+
     // Processar horas após meia-noite (24, 25, 26, etc.) se necessário
     if (checkAfterMidnight) {
       for (let hour = 24; hour <= afterMidnightEndHour; hour++) {
         this.processHourTrips(schedule, hour, currentTotalMinutes, maxTotalMinutes, route, upcomingTrips);
       }
     }
-    
+
     return upcomingTrips;
   }
 
@@ -152,22 +154,22 @@ class PlannedArrivalsService {
   processHourTrips(schedule, hour, currentTotalMinutes, maxTotalMinutes, route, upcomingTrips) {
     const hourKey = hour.toString();
     const trips = schedule[hourKey];
-    
+
     if (!trips || trips.length === 0) {
       return;
     }
 
     for (const trip of trips) {
       const tripMinute = parseInt(trip.minute);
-      
+
       // Calcular minutos totais desde meia-noite
       // Para horas >= 24, representa horários do dia seguinte
       const tripTotalMinutes = hour * 60 + tripMinute;
-      
+
       // Ajustar comparação se a viagem for depois da meia-noite (hora >= 24)
       let adjustedTripMinutes = tripTotalMinutes;
       let adjustedCurrentMinutes = currentTotalMinutes;
-      
+
       if (hour >= 24) {
         // Viagem é no "dia seguinte" (após 24h)
         // Se hora atual é >= 23h, ajustar para considerar continuidade
@@ -185,10 +187,10 @@ class PlannedArrivalsService {
       // Usar < ao invés de <= para excluir exatamente maxMinutes
       if (adjustedTripMinutes >= adjustedCurrentMinutes && adjustedTripMinutes < maxTotalMinutes) {
         const minutesUntilArrival = adjustedTripMinutes - adjustedCurrentMinutes;
-        
+
         // Formatar hora de exibição (converter 24h+ para 0h+)
         const displayHour = hour >= 24 ? hour - 24 : hour;
-        
+
         upcomingTrips.push({
           route_short_name: route.route_short_name,
           route_color: route.route_color,
@@ -228,29 +230,29 @@ class PlannedArrivalsService {
    */
   combineArrivals(realtimeArrivals, scheduledArrivals) {
     const combined = [...realtimeArrivals];
-    
+
     for (const scheduled of scheduledArrivals) {
       // Verificar se já existe uma chegada em tempo real semelhante
       const isDuplicate = realtimeArrivals.some(realtime => {
         const sameRoute = realtime.route_short_name === scheduled.route_short_name;
-        const sameHeadsign = this.normalizeHeadsign(realtime.trip_headsign) === 
+        const sameHeadsign = this.normalizeHeadsign(realtime.trip_headsign) ===
                              this.normalizeHeadsign(scheduled.trip_headsign);
-        
+
         // Ajustar tempo real para hora programada: arrival_minutes - delay_minutes
         // Se o autocarro está atrasado 5min e chega em 10min, deveria ter chegado em 5min (10-5)
         const realtimeScheduledTime = realtime.arrival_minutes - realtime.delay_minutes;
         const timeDiff = Math.abs(realtimeScheduledTime - scheduled.arrival_minutes);
         const closeInTime = timeDiff <= 5; // ±5 minutos
-        
+
         return sameRoute && sameHeadsign && closeInTime;
       });
-      
+
       // Se não for duplicado, adicionar
       if (!isDuplicate) {
         combined.push(scheduled);
       }
     }
-    
+
     // Ordenar por tempo de chegada
     return combined.sort((a, b) => a.arrival_minutes - b.arrival_minutes);
   }
