@@ -9,14 +9,16 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Gera um array de horários para uma rota custom.
- * @param {object} config - route operating_hours, frequency, travel_time, stops
- * @returns {object} - mapa { stop_id: { schedule: { hour: [{minute, trip_id}] }, routes: [...] } }
+ * Gera um mapa de horários para uma rota custom, por paragem.
+ * - Usa a mesma grelha de frequências em ambos os sentidos.
+ * - Para cada paragem gera viagens no sentido origem → destino e destino → origem.
+ * @param {object} config - route (number, name, operating_hours, frequency, travel_time, stops)
+ * @returns {object} - mapa { stop_id: { schedule: { hour: [{minute, trip_id, headsign}] }, routes, display_routes } }
  */
 function generateSchedule(config) {
   const {
-    route_number,
-    route_name,
+    number:        route_number,
+    name:          route_name,
     color,
     text_color,
     operating_hours,
@@ -25,49 +27,72 @@ function generateSchedule(config) {
     stops,
   } = config;
 
-  // 1. Gerar todos os horários de partida da 1ª paragem
-  const departures = []; // [{ totalMinutes }]
+  // 1. Gerar todos os horários de partida em cada extremo (Boavista e Praça do Império)
+  const departures = [];
   const startTotal = operating_hours.start_hour * 60 + operating_hours.start_minute;
   const endTotal   = operating_hours.end_hour   * 60 + operating_hours.end_minute;
 
   let cursor = startTotal;
   while (cursor <= endTotal) {
     departures.push(cursor);
-    // frequência em vigor neste minuto
-    const hour = Math.floor(cursor / 60);
+    const hour   = Math.floor(cursor / 60);
     const inRush = frequency.rush_periods.some(p => hour >= p.start && hour < p.end);
     cursor += inRush ? frequency.rush_hour : frequency.normal;
   }
 
   const minutesPerStop = Math.round(travel_time / (stops.length - 1));
+  const firstStopName  = stops[0].stop_name;
+  const lastStopName   = stops[stops.length - 1].stop_name;
 
-  // 2. Para cada paragem calcular horários
+  // 2. Inicializar estrutura de horários por paragem
   const stopSchedules = {};
-  stops.forEach((stop, idx) => {
-    const schedule = {};
+  stops.forEach(stop => {
     const routes = [{
       route_id:         route_number,
+      number:           route_number,
       route_short_name: route_number,
       route_long_name:  route_name,
       route_color:      color,
       route_text_color: text_color,
     }];
+    stopSchedules[stop.stop_id] = { schedule: {}, routes, display_routes: routes };
+  });
 
-    departures.forEach((depTotal, tripIdx) => {
+  // 3. Viagens no sentido origem → destino (Boavista → Praça do Império)
+  departures.forEach((depTotal, tripIdx) => {
+    stops.forEach((stop, idx) => {
       const arrTotal  = depTotal + idx * minutesPerStop;
       const arrHour   = Math.floor(arrTotal / 60);
       const arrMinute = arrTotal % 60;
-      const tripId    = `${route_number}_trip_${String(tripIdx).padStart(4, '0')}`;
-
-      if (!schedule[arrHour]) schedule[arrHour] = [];
-      schedule[arrHour].push({
-        minute:    String(arrMinute).padStart(2, '0'),
-        trip_id:   tripId,
-        headsign:  stops[stops.length - 1].stop_name,
+      const tripId    = `${route_number}_F_${String(tripIdx).padStart(4, '0')}`;
+      const entry     = stopSchedules[stop.stop_id];
+      if (!entry.schedule[arrHour]) entry.schedule[arrHour] = [];
+      entry.schedule[arrHour].push({
+        minute:   String(arrMinute).padStart(2, '0'),
+        trip_id:  tripId,
+        headsign: lastStopName,
       });
     });
+  });
 
-    stopSchedules[stop.stop_id] = { schedule, routes, display_routes: routes };
+  // 4. Viagens no sentido destino → origem (Praça do Império → Boavista)
+  //    Assume-se grelha idêntica de partidas em ambos os extremos.
+  departures.forEach((depTotal, tripIdx) => {
+    stops.forEach((stop, idx) => {
+      // No sentido inverso, a distância até à paragem é calculada a partir do fim
+      const distanceFromEnd = (stops.length - 1 - idx) * minutesPerStop;
+      const arrTotal        = depTotal + distanceFromEnd;
+      const arrHour         = Math.floor(arrTotal / 60);
+      const arrMinute       = arrTotal % 60;
+      const tripId          = `${route_number}_B_${String(tripIdx).padStart(4, '0')}`;
+      const entry           = stopSchedules[stop.stop_id];
+      if (!entry.schedule[arrHour]) entry.schedule[arrHour] = [];
+      entry.schedule[arrHour].push({
+        minute:   String(arrMinute).padStart(2, '0'),
+        trip_id:  tripId,
+        headsign: firstStopName,
+      });
+    });
   });
 
   return stopSchedules;
@@ -135,7 +160,14 @@ export const CUSTOM_STOPS_MAP = new Map(
     latitude:  s.latitude,
     longitude: s.longitude,
     zone_id:   s.zone_id,
-    routes:    [{ id: MB1_ROUTE.id, number: MB1_ROUTE.number, name: MB1_ROUTE.name, color: MB1_ROUTE.color, text_color: MB1_ROUTE.text_color }],
+    routes:    [{
+      id:              MB1_ROUTE.id,
+      number:          MB1_ROUTE.number,
+      route_short_name:MB1_ROUTE.number,
+      name:            MB1_ROUTE.name,
+      color:           MB1_ROUTE.color,
+      text_color:      MB1_ROUTE.text_color,
+    }],
     distance:  null,
     _custom:   true,
   }])

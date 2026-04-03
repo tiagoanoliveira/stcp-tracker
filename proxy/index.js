@@ -1,5 +1,5 @@
 // Cloudflare Worker - CORS Proxy para STCP API
-// v4.3 - Suporte a rotas custom (MB1 Metrobus) injectadas na lista de rotas
+// v4.4 - Suporte a rotas custom (MB1 Metrobus) injectadas na lista de rotas e info de paragens custom
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -121,6 +121,9 @@ const MB1_STOPS = {
   ],
 };
 
+// Map auxiliar de stops MB1 por ID para endpoints de info
+const MB1_STOPS_MAP = new Map(MB1_STOPS.stops.map(s => [s.stop_id, s]));
+
 async function handleRequest(request) {
   const url = new URL(request.url);
   const pathParts = url.pathname.slice(1).split('/').filter(p => p);
@@ -129,7 +132,7 @@ async function handleRequest(request) {
     return new Response(
       JSON.stringify({
         message: 'STCP CORS Proxy',
-        version: '4.3',
+        version: '4.4',
         endpoints: {
           stop_endpoints:     ['realtime', 'routes', 'schedule', 'info', 'services'],
           location_endpoints: ['nearby'],
@@ -182,7 +185,7 @@ async function handleRequest(request) {
 
       if (!routeId) return errorResponse('Uso: /route/{ROUTE_ID}/{schedule|shape|stops}', 400);
 
-      // --- 2a. Schedule (não existe para rotas custom — o schedule é gerado no frontend)
+      // --- 2a. Schedule (não existe para rotas custom — o horário é gerido no frontend)
       if (sub === 'schedule') {
         if (CUSTOM_ROUTE_IDS.has(routeId)) {
           return errorResponse(`A rota ${routeId} é uma rota custom; o horário é gerido localmente pelo cliente.`, 404);
@@ -305,6 +308,20 @@ async function handleRequest(request) {
 
     // --- 5b. Info da paragem
     if (endpoint === 'info') {
+      // Paragens custom (ex: MB1_04) — devolve info sintética
+      if (MB1_STOPS_MAP.has(stopId)) {
+        const s = MB1_STOPS_MAP.get(stopId);
+        return jsonResponse({
+          stop_id:   s.stop_id,
+          stop_name: s.stop_name,
+          stop_code: s.stop_code,
+          latitude:  s.latitude,
+          longitude: s.longitude,
+          zone_id:   s.zone_id || null,
+          routes:    CUSTOM_ROUTES.filter(r => r.id === 'MB1'),
+        }, 'stop_info', 'public, max-age=86400');
+      }
+
       const rawResponse = await proxyRawRequest(`https://stcp.pt/api/stops/${stopId}`, 'stop_info');
       if (!rawResponse.ok)
         return errorResponse(`Erro ao obter informação da paragem ${stopId}`, rawResponse.status);
@@ -356,7 +373,7 @@ function jsonResponse(data, endpoint, cacheControl) {
       ...corsHeaders,
       'Content-Type': 'application/json',
       'Cache-Control': cacheControl,
-      'X-Proxy-Version': '4.3',
+      'X-Proxy-Version': '4.4',
       'X-Endpoint': endpoint,
     },
   });
@@ -365,7 +382,7 @@ function jsonResponse(data, endpoint, cacheControl) {
 async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
   const response = await fetch(stcpApiUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.3)', 'Accept': 'application/json' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.4)', 'Accept': 'application/json' },
   });
   const data = await response.text();
   return new Response(data, {
@@ -374,7 +391,7 @@ async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
       ...corsHeaders,
       'Content-Type': 'application/json',
       'Cache-Control': cacheControl,
-      'X-Proxy-Version': '4.3',
+      'X-Proxy-Version': '4.4',
       'X-Endpoint': endpoint
     }
   });
@@ -383,7 +400,7 @@ async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
 async function proxyRawRequest(stcpApiUrl) {
   return await fetch(stcpApiUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.3)', 'Accept': 'application/json' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.4)', 'Accept': 'application/json' },
   });
 }
 
