@@ -2,13 +2,12 @@
  * Vehicle Service - Lógica centralizada de processamento de dados de autocarros
  *
  * LAZY HEADSIGN: processBusData / processBusDataBatch não resolvem o destino.
- * Esse campo fica null até ao primeiro clique no marker, altura em que
- * resolveHeadsign() é chamado e o popup é actualizado.
+ * Esse campo fica null até ao primeiro clique no marker.
  *
- * TRIP MATCHING: A STCP usa o formato:
+ * TRIP MATCHING: O trip_id tem o formato:
  *   {linha}_{dir}_{seq}|{nr_viagem}|{dia}|{turno}|{servico}
- * O 2º segmento (nr_viagem) pode diferir entre FIWARE e API STCP.
- * O matching compara apenas o 1º segmento (prefixo) + turno + servico.
+ * O nr_viagem (2º segmento) pode diferir entre FIWARE e API STCP.
+ * O matching delega em scheduleService._tripMatchKey que ignora esse segmento.
  */
 
 import { scheduleService } from './scheduleService.js';
@@ -28,20 +27,13 @@ class VehicleService {
   extractTripId(bus)     { return this.extractAnnotation(bus, 'stcp:nr_viagem:'); }
 
   /**
-   * Chave de matching que ignora o nr_viagem (2º segmento).
-   * Exemplo: "600_0_2|218|D6|T7|N16" -> "600_0_2|T7|N16"
+   * Compara dois trip_ids ignorando o nr_viagem (2º segmento).
+   * Delega a lógica de chave em scheduleService._tripMatchKey.
    */
-  _tripMatchKey(tripId) {
-    if (!tripId) return null;
-    const parts = tripId.split('|');
-    if (parts.length < 5) return tripId;
-    return `${parts[0]}|${parts[3]}|${parts[4]}`;
-  }
-
   tripIdsMatch(vehicleTripId, arrivalTripId) {
     if (!vehicleTripId || !arrivalTripId) return false;
     if (vehicleTripId === arrivalTripId) return true;
-    return this._tripMatchKey(vehicleTripId) === this._tripMatchKey(arrivalTripId);
+    return scheduleService._tripMatchKey(vehicleTripId) === scheduleService._tripMatchKey(arrivalTripId);
   }
 
   matchVehicleToTrip(vehicles, tripId) {
@@ -78,9 +70,9 @@ class VehicleService {
   }
 
   /**
-   * Resolve o headsign de um autocarro ao clicar no marker.
-   * Obtém o serviceId do cache do scheduleService (já aquecido em loadScheduleData)
-   * e passa-o directamente para getHeadsignForTrip.
+   * Resolve o headsign ao clicar no marker.
+   * O serviceId é obtido do cache (aquecido em loadScheduleData)
+   * e passado directamente a getHeadsignForTrip.
    */
   async resolveHeadsign(bus) {
     if (!bus.tripId || !bus.line || bus.direction == null) return 'Destino desconhecido';

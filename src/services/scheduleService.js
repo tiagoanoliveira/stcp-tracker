@@ -5,9 +5,14 @@
 
 import { apiService } from '../core/apiService.js';
 
+// Paragem usada para consultar o service_id ativo.
+// O serviço (horário de dia útil, sábado, etc.) é igual para toda a rede
+// numa dada data, por isso qualquer paragem válida serve.
+const SERVICE_PROBE_STOP = 'CMO';
+
 class ScheduleService {
   constructor() {
-    this.routeSchedulesCache = new Map(); // "route_serviceId_dir" -> { data, timestamp }
+    this.routeSchedulesCache = new Map(); // "routeId_serviceId_dir" -> { data, timestamp }
     this.cacheTTL = 30 * 60 * 1000; // 30 minutos
 
     this.cachedServiceId   = null;
@@ -17,23 +22,20 @@ class ScheduleService {
 
   /**
    * Chamado pelo BusMapApp na inicialização.
-   * Pré-aquece o cache do service_id ativo para que resolveHeadsign
-   * e plannedArrivalsService o encontrem já pronto.
-   * @param {string} [stopId] - Paragem usada para consultar o serviço (default: BOLH1).
-   *   Se possível, passe uma paragem real do contexto atual.
+   * Pré-aquece o cache do service_id para que todas as chamadas
+   * subsequentes o encontrem já resolvido.
    */
-  async loadScheduleData(stopId = 'BOLH1') {
-    await this.getServiceIdAtual(stopId);
+  async loadScheduleData() {
+    await this.getServiceIdAtual();
   }
 
   /**
-   * Devolve o service_id ativo hoje.
-   * Consulta o proxy /{stopId}/services?date=YYYY-MM-DD e guarda em cache pelo dia.
+   * Devolve o service_id ativo hoje (ex: "DOMINGOS|FERIADOS").
+   * Consulta o proxy /CMO/services?date=YYYY-MM-DD e guarda em cache pelo dia.
    * Fallback para lógica por dia da semana se a API falhar.
-   * @param {string} [stopId]
    * @returns {Promise<string>}
    */
-  async getServiceIdAtual(stopId = 'BOLH1') {
+  async getServiceIdAtual() {
     const dateNow = new Date();
     const dateKey = dateNow.toISOString().slice(0, 10); // YYYY-MM-DD
 
@@ -45,7 +47,7 @@ class ScheduleService {
 
     this._serviceIdPromise = (async () => {
       try {
-        const data = await apiService.fetchStopServices(stopId, dateKey);
+        const data = await apiService.fetchStopServices(SERVICE_PROBE_STOP, dateKey);
         if (data?.active_service_id) {
           this.cachedServiceDate = dateKey;
           this.cachedServiceId   = data.active_service_id;
@@ -72,12 +74,27 @@ class ScheduleService {
   }
 
   /**
+   * Chave de matching que ignora o nr_viagem (2º segmento do trip_id).
+   * Formato: {linha}_{dir}_{seq}|{nr_viagem}|{dia}|{turno}|{servico}
+   * Chave:   {linha}_{dir}_{seq}|{dia}|{turno}|{servico}
+   * Se o trip_id não tiver pipes suficientes, devolve o próprio valor.
+   */
+  _tripMatchKey(tripId) {
+    if (!tripId) return null;
+    const parts = tripId.split('|');
+    if (parts.length < 5) return tripId;
+    // prefixo | dia | turno | servico  (descarta parts[1] = nr_viagem)
+    return `${parts[0]}|${parts[2]}|${parts[3]}|${parts[4]}`;
+  }
+
+  /**
    * Devolve o headsign (destino) de um trip_id.
-   * O serviceId deve ser passado pelo chamador (já resolvido via getServiceIdAtual).
-   * @param {string} tripId
-   * @param {string} routeId
+   * Compara os trip_ids ignorando o nr_viagem para tolerar diferenças
+   * entre o valor do FIWARE e o valor nos schedules da API STCP.
+   * @param {string} tripId     - trip_id do autocarro (ex: "204_0_2|218|D6|T8|N15")
+   * @param {string} routeId    - número da linha (ex: "204")
    * @param {string|number} directionId
-   * @param {string} serviceId - service_id ativo (ex: "DOMINGOS|FERIADOS")
+   * @param {string} serviceId  - service_id ativo (ex: "DOMINGOS|FERIADOS")
    * @returns {Promise<string>}
    */
   async getHeadsignForTrip(tripId, routeId, directionId, serviceId) {
@@ -92,13 +109,19 @@ class ScheduleService {
       return 'Destino desconhecido';
     }
 
-    const trip = schedule.schedule.find(t => t.trip_id === tripId);
+    const searchKey = this._tripMatchKey(tripId);
+
+    // Procura exata primeiro; se falhar, compara por chave sem nr_viagem
+    const trip = schedule.schedule.find(t =>
+      t.trip_id === tripId || this._tripMatchKey(t.trip_id) === searchKey
+    );
+
     if (trip?.trip_headsign) return trip.trip_headsign;
 
     // Fallback: primeiro trip da lista
     const first = schedule.schedule[0];
     if (first?.trip_headsign) {
-      console.warn(`⚠️ Trip ${tripId} não encontrado, usando fallback: ${first.trip_headsign}`);
+      console.warn(`⚠️ Trip ${tripId} não encontrado no schedule, usando fallback: ${first.trip_headsign}`);
       return first.trip_headsign;
     }
 
@@ -106,7 +129,7 @@ class ScheduleService {
   }
 
   /**
-   * Obtém schedule completo de uma rota (com cache).
+   * Obtém schedule completo de uma rota (com cache 30 min).
    */
   async getRouteSchedule(routeId, serviceId, directionId) {
     const cacheKey = `${routeId}_${serviceId}_${directionId}`;
