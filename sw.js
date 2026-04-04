@@ -3,7 +3,7 @@
  * Cache estratégico para funcionamento offline
  */
 
-const CACHE_NAME = 'stcp-live-v6.5';
+const CACHE_NAME = 'stcp-live-v6.6';
 
 // Ficheiros essenciais para cachear
 const urlsToCache = [
