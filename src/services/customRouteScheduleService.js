@@ -1,18 +1,22 @@
 /**
  * customRouteScheduleService.js
  * Fornece chegadas planeadas para paragens de rotas custom (ex: MB1),
- * com a mesma interface que o plannedArrivalsService usa internamente.
+ * usando a grelha correta (dia útil / sábado / feriado) determinada em
+ * runtime através do scheduleService — exactamente como as paragens STCP.
  */
 
 import {
   isCustomStop,
-  getCustomStopSchedule,
+  getScheduleForService,
+  serviceIdToType,
   CUSTOM_STOPS_MAP,
 } from '../data/customRoutes.js';
+import { scheduleService } from './scheduleService.js';
 
 class CustomRouteScheduleService {
   /**
    * Indica se um stopId tem dados de rota custom.
+   * Síncrono para retrocompatibilidade.
    * @param {string} stopId
    * @returns {boolean}
    */
@@ -22,30 +26,37 @@ class CustomRouteScheduleService {
 
   /**
    * Devolve as próximas chegadas planeadas para uma paragem custom.
-   * Formato compatível com plannedArrivalsService.formatArrivals().
+   * Consulta o scheduleService para saber o service_id activo hoje e
+   * usa a grelha de horários correspondente (weekday / saturday / holiday).
+   *
    * @param {string} stopId
    * @param {number} maxMinutes - janela de tempo a mostrar
-   * @returns {Array}
+   * @returns {Promise<Array>}
    */
-  getNextArrivals(stopId, maxMinutes = 60) {
-    const entry = getCustomStopSchedule(stopId);
+  async getNextArrivals(stopId, maxMinutes = 60) {
+    // 1. Determinar o tipo de dia usando o mesmo mecanismo das paragens STCP
+    const serviceId   = await scheduleService.getServiceIdAtual(stopId);
+    const serviceType = serviceIdToType(serviceId);
+
+    // 2. Obter o schedule pré-computado para este tipo de dia
+    const entry = getScheduleForService(stopId, serviceType);
     if (!entry) return [];
 
     const route = entry.display_routes?.[0];
     if (!route) return [];
 
-    const now             = new Date();
-    const currentTotal    = now.getHours() * 60 + now.getMinutes();
-    const maxTotal        = currentTotal + maxMinutes;
-    const arrivals        = [];
+    const now          = new Date();
+    const currentTotal = now.getHours() * 60 + now.getMinutes();
+    const maxTotal     = currentTotal + maxMinutes;
+    const arrivals     = [];
 
     for (let h = now.getHours(); h <= Math.min(30, Math.floor(maxTotal / 60)); h++) {
       const trips = entry.schedule[h];
       if (!trips) continue;
 
       for (const trip of trips) {
-        const tripTotal    = h * 60 + parseInt(trip.minute, 10);
-        const diffMinutes  = tripTotal - currentTotal;
+        const tripTotal   = h * 60 + parseInt(trip.minute, 10);
+        const diffMinutes = tripTotal - currentTotal;
 
         if (diffMinutes >= 0 && tripTotal < maxTotal) {
           arrivals.push({
@@ -69,12 +80,12 @@ class CustomRouteScheduleService {
 
   /**
    * Devolve as rotas associadas a uma paragem custom.
-   * Formato compatível com apiService.fetchStopRoutes().
+   * Usa o schedule de dia útil (apenas para listar rotas — independente do dia).
    * @param {string} stopId
    * @returns {{ display_routes: Array }}
    */
   getStopRoutes(stopId) {
-    const entry = getCustomStopSchedule(stopId);
+    const entry = getScheduleForService(stopId, 'weekday');
     if (!entry) return { display_routes: [] };
     return { display_routes: entry.display_routes || [] };
   }

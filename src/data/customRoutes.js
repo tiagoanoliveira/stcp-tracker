@@ -5,20 +5,47 @@
  */
 
 // ---------------------------------------------------------------------------
+// Mapeamento de service_id STCP -> serviceType interno
+// ---------------------------------------------------------------------------
+
+/**
+ * Mapeia o active_service_id devolvido pelo endpoint /stops/{id}/services
+ * para um dos três tipos de grelha de horários da MB1.
+ * Qualquer service_id que contenha 'SABADO' ou 'SÁBADO' (case-insensitive)
+ * é tratado como sábado; 'DOMINGO' ou 'FERIADO' como feriado;
+ * tudo o resto (incluindo períodos não escolares) como dia útil.
+ * @param {string} serviceId
+ * @returns {'weekday'|'saturday'|'holiday'}
+ */
+export function serviceIdToType(serviceId) {
+  if (!serviceId) return 'weekday';
+  const s = serviceId.toUpperCase();
+  if (s.includes('DOMINGO') || s.includes('FERIADO')) return 'holiday';
+  if (s.includes('SABADO')  || s.includes('SÁBADO'))  return 'saturday';
+  return 'weekday';
+}
+
+// ---------------------------------------------------------------------------
 // Gerador de horários para rotas com frequência fixa e períodos de ponta
 // ---------------------------------------------------------------------------
 
 /**
- * Gera um mapa de horários para uma rota custom, por paragem.
- * - Usa a mesma grelha de frequências em ambos os sentidos.
- * - Para cada paragem gera viagens no sentido origem → destino e destino → origem.
- * @param {object} config - route (number, name, operating_hours, frequency, travel_time, stops)
- * @returns {object} - mapa { stop_id: { schedule: { hour: [{minute, trip_id, headsign}] }, routes, display_routes } }
+ * Gera um mapa de horários para uma rota custom, por paragem,
+ * para um dado serviceType ('weekday' | 'saturday' | 'holiday').
+ *
+ * Frequências MB1:
+ *   - weekday  : 10 min entre 8h00-10h00 e 16h30-19h30; 15 min nos restantes
+ *   - saturday : 15 min constantes entre 6h30-22h
+ *   - holiday  : 15 min constantes entre 6h30-22h
+ *
+ * @param {object} config       - route config (ver MB1_ROUTE)
+ * @param {string} serviceType  - 'weekday' | 'saturday' | 'holiday'
+ * @returns {object} mapa { stop_id: { schedule, routes, display_routes } }
  */
-function generateSchedule(config) {
+function generateSchedule(config, serviceType = 'weekday') {
   const {
-    number:        route_number,
-    name:          route_name,
+    number:          route_number,
+    name:            route_name,
     color,
     text_color,
     operating_hours,
@@ -27,7 +54,10 @@ function generateSchedule(config) {
     stops,
   } = config;
 
-  // 1. Gerar todos os horários de partida em cada extremo (Boavista e Praça do Império)
+  // Seleccionar os períodos de ponta conforme serviceType
+  const rushPeriods = serviceType === 'weekday' ? frequency.rush_periods : [];
+
+  // 1. Gerar todos os horários de partida nos dois extremos
   const departures = [];
   const startTotal = operating_hours.start_hour * 60 + operating_hours.start_minute;
   const endTotal   = operating_hours.end_hour   * 60 + operating_hours.end_minute;
@@ -35,8 +65,12 @@ function generateSchedule(config) {
   let cursor = startTotal;
   while (cursor <= endTotal) {
     departures.push(cursor);
-    const hour   = Math.floor(cursor / 60);
-    const inRush = frequency.rush_periods.some(p => hour >= p.start && hour < p.end);
+    // Verifica se o minuto ACTUAL está dentro de algum período de ponta
+    const inRush = rushPeriods.some(p => {
+      const pStart = p.start_hour * 60 + (p.start_minute || 0);
+      const pEnd   = p.end_hour   * 60 + (p.end_minute   || 0);
+      return cursor >= pStart && cursor < pEnd;
+    });
     cursor += inRush ? frequency.rush_hour : frequency.normal;
   }
 
@@ -64,7 +98,7 @@ function generateSchedule(config) {
       const arrTotal  = depTotal + idx * minutesPerStop;
       const arrHour   = Math.floor(arrTotal / 60);
       const arrMinute = arrTotal % 60;
-      const tripId    = `${route_number}_F_${String(tripIdx).padStart(4, '0')}`;
+      const tripId    = `${route_number}_F_${serviceType.charAt(0).toUpperCase()}_${String(tripIdx).padStart(4, '0')}`;
       const entry     = stopSchedules[stop.stop_id];
       if (!entry.schedule[arrHour]) entry.schedule[arrHour] = [];
       entry.schedule[arrHour].push({
@@ -76,15 +110,13 @@ function generateSchedule(config) {
   });
 
   // 4. Viagens no sentido destino → origem (Praça do Império → Boavista)
-  //    Assume-se grelha idêntica de partidas em ambos os extremos.
   departures.forEach((depTotal, tripIdx) => {
     stops.forEach((stop, idx) => {
-      // No sentido inverso, a distância até à paragem é calculada a partir do fim
       const distanceFromEnd = (stops.length - 1 - idx) * minutesPerStop;
       const arrTotal        = depTotal + distanceFromEnd;
       const arrHour         = Math.floor(arrTotal / 60);
       const arrMinute       = arrTotal % 60;
-      const tripId          = `${route_number}_B_${String(tripIdx).padStart(4, '0')}`;
+      const tripId          = `${route_number}_B_${serviceType.charAt(0).toUpperCase()}_${String(tripIdx).padStart(4, '0')}`;
       const entry           = stopSchedules[stop.stop_id];
       if (!entry.schedule[arrHour]) entry.schedule[arrHour] = [];
       entry.schedule[arrHour].push({
@@ -111,22 +143,23 @@ export const MB1_ROUTE = {
   type:         'metrobus',
   operating_hours: { start_hour: 6, start_minute: 30, end_hour: 22, end_minute: 0 },
   frequency: {
-    normal:       15,
-    rush_hour:    10,
+    normal:    15,
+    rush_hour: 10,
+    // Períodos de ponta APENAS em dias úteis (ignorados ao sábado/feriado)
     rush_periods: [
-      { start: 7,  end: 10 },
-      { start: 17, end: 20 },
+      { start_hour: 8,  start_minute: 0,  end_hour: 10, end_minute: 0  },
+      { start_hour: 16, start_minute: 30, end_hour: 19, end_minute: 30 },
     ],
   },
   travel_time: 12,
   stops: [
-    { stop_id: 'MB1_01', stop_code: 'MB1_01', stop_name: 'Boavista',          latitude: 41.158239, longitude: -8.630995, stop_sequence: 1, zone_id: '1' },
-    { stop_id: 'MB1_02', stop_code: 'MB1_02', stop_name: 'Guerra Junqueiro',  latitude: 41.159209, longitude: -8.636708, stop_sequence: 2, zone_id: '1' },
-    { stop_id: 'MB1_03', stop_code: 'MB1_03', stop_name: 'Bessa',             latitude: 41.160582, longitude: -8.645091, stop_sequence: 3, zone_id: '1' },
-    { stop_id: 'MB1_04', stop_code: 'MB1_04', stop_name: 'Pinheiro Manso',    latitude: 41.161878, longitude: -8.653037, stop_sequence: 4, zone_id: '2' },
-    { stop_id: 'MB1_05', stop_code: 'MB1_05', stop_name: 'Serralves',         latitude: 41.160617, longitude: -8.658885, stop_sequence: 5, zone_id: '2' },
-    { stop_id: 'MB1_06', stop_code: 'MB1_06', stop_name: 'João De Barros',    latitude: 41.158491, longitude: -8.664280, stop_sequence: 6, zone_id: '2' },
-    { stop_id: 'MB1_07', stop_code: 'MB1_07', stop_name: 'Praça do Império',  latitude: 41.155539, longitude: -8.671809, stop_sequence: 7, zone_id: '2' },
+    { stop_id: 'MB1_01', stop_code: 'MB1_01', stop_name: 'Boavista',         latitude: 41.158239, longitude: -8.630995, stop_sequence: 1, zone_id: '1' },
+    { stop_id: 'MB1_02', stop_code: 'MB1_02', stop_name: 'Guerra Junqueiro', latitude: 41.159209, longitude: -8.636708, stop_sequence: 2, zone_id: '1' },
+    { stop_id: 'MB1_03', stop_code: 'MB1_03', stop_name: 'Bessa',            latitude: 41.160582, longitude: -8.645091, stop_sequence: 3, zone_id: '1' },
+    { stop_id: 'MB1_04', stop_code: 'MB1_04', stop_name: 'Pinheiro Manso',   latitude: 41.161878, longitude: -8.653037, stop_sequence: 4, zone_id: '2' },
+    { stop_id: 'MB1_05', stop_code: 'MB1_05', stop_name: 'Serralves',        latitude: 41.160617, longitude: -8.658885, stop_sequence: 5, zone_id: '2' },
+    { stop_id: 'MB1_06', stop_code: 'MB1_06', stop_name: 'João De Barros',   latitude: 41.158491, longitude: -8.664280, stop_sequence: 6, zone_id: '2' },
+    { stop_id: 'MB1_07', stop_code: 'MB1_07', stop_name: 'Praça do Império', latitude: 41.155539, longitude: -8.671809, stop_sequence: 7, zone_id: '2' },
   ],
   coordinates: [
     { lat: 41.158239, lng: -8.630995, sequence: 1 },
@@ -139,11 +172,15 @@ export const MB1_ROUTE = {
   ],
 };
 
-// Pré-computado uma vez ao carregar o módulo
-export const MB1_STOP_SCHEDULES = generateSchedule(MB1_ROUTE);
+// Pré-computar os três tipos de grelha uma só vez ao carregar o módulo
+const MB1_SCHEDULES = {
+  weekday:  generateSchedule(MB1_ROUTE, 'weekday'),
+  saturday: generateSchedule(MB1_ROUTE, 'saturday'),
+  holiday:  generateSchedule(MB1_ROUTE, 'holiday'),
+};
 
 // ---------------------------------------------------------------------------
-// Exports agregados (para facilitar adicionar novas rotas no futuro)
+// Exports agregados
 // ---------------------------------------------------------------------------
 
 /** Lista de rotas custom no formato do endpoint /routes/list */
@@ -160,16 +197,16 @@ export const CUSTOM_STOPS_MAP = new Map(
     latitude:  s.latitude,
     longitude: s.longitude,
     zone_id:   s.zone_id,
-    routes:    [{
-      id:              MB1_ROUTE.id,
-      number:          MB1_ROUTE.number,
-      route_short_name:MB1_ROUTE.number,
-      name:            MB1_ROUTE.name,
-      color:           MB1_ROUTE.color,
-      text_color:      MB1_ROUTE.text_color,
+    routes: [{
+      id:               MB1_ROUTE.id,
+      number:           MB1_ROUTE.number,
+      route_short_name: MB1_ROUTE.number,
+      name:             MB1_ROUTE.name,
+      color:            MB1_ROUTE.color,
+      text_color:       MB1_ROUTE.text_color,
     }],
-    distance:  null,
-    _custom:   true,
+    distance: null,
+    _custom:  true,
   }])
 );
 
@@ -183,21 +220,21 @@ export function isCustomStop(stopId) {
 }
 
 /**
- * Retorna os dados de schedule de uma paragem custom (formato compatível com
- * o que o proxy devolve para paragens STCP normais).
+ * Retorna os dados de schedule de uma paragem custom para um dado serviceType.
  * @param {string} stopId
+ * @param {'weekday'|'saturday'|'holiday'} serviceType
  * @returns {{ schedule: object, display_routes: Array } | null}
  */
-export function getCustomStopSchedule(stopId) {
-  const entry = MB1_STOP_SCHEDULES[stopId];
-  if (!entry) return null;
-  return entry;
+export function getScheduleForService(stopId, serviceType = 'weekday') {
+  const type  = ['weekday', 'saturday', 'holiday'].includes(serviceType) ? serviceType : 'weekday';
+  const entry = MB1_SCHEDULES[type]?.[stopId];
+  return entry ?? null;
 }
 
 /**
- * Retorna os dados de shape da rota custom (mesmo formato que /route/{id}/shape).
+ * Retorna os dados de shape da rota custom.
  * @param {string} routeId
- * @returns {{ success: boolean, route_id: string, direction_id: number, coordinates: Array } | null}
+ * @returns {object|null}
  */
 export function getCustomRouteShape(routeId) {
   if (routeId === 'MB1') {
@@ -212,9 +249,9 @@ export function getCustomRouteShape(routeId) {
 }
 
 /**
- * Retorna as paragens da rota custom (mesmo formato que /route/{id}/stops).
+ * Retorna as paragens da rota custom.
  * @param {string} routeId
- * @returns {{ success: boolean, route_id: string, direction_id: number, stops: Array } | null}
+ * @returns {object|null}
  */
 export function getCustomRouteStops(routeId) {
   if (routeId === 'MB1') {
