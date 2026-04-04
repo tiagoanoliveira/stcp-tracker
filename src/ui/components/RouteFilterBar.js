@@ -9,13 +9,15 @@
  *  onFilterChange(cb)       cb(Set<string>, routeObjects[]) — routeObjects inclui direction (0|1)
  *
  * Visibilidade temporal:
- *  Linhas diurnas  (sem 'M' no número): visiveis 05:30–01:30
- *  Linhas nocturnas (com 'M' no número): visiveis 00:30–06:30
+ *  Linhas diurnas  (sem 'M' no sufixo): visíveis 05:30–01:30
+ *  Linhas nocturnas (sufixo 'M'):        visíveis 00:30–06:30
  */
 
 const CIRCULAR_LINES = new Set(['300', '301', '302', '303']);
 
-/** Devolve true se a linha é nocturna (número contém 'M', case-insensitive) */
+/** Devolve true se a linha é nocturna (número TERMINA em 'M', case-insensitive).
+ *  Ex: "3M" → true, "MB1" → false, "200M" → true
+ */
 function isNightLine(number) {
   return /M$/i.test(String(number));
 }

@@ -2,8 +2,9 @@
  * NextArrivals - Componente de UI para mostrar próximas chegadas numa paragem.
  * Inclui chips de filtro por linha; ao alterar o filtro dispara onFilterChange.
  * Os chips de linhas diurnas/nocturnas são ocultados fora do seu horário:
- *   - Linhas diurnas (sem 'M'): ocultadas entre 01:30 e 05:30
- *   - Linhas nocturnas (com 'M'): visíveis entre 00:30 e 06:30
+ *   - Linhas diurnas (sem sufixo 'M'): ocultadas entre 01:30 e 05:30
+ *   - Linhas nocturnas (sufixo 'M', ex: 3M, 200M): visíveis entre 00:30 e 06:30
+ *   Nota: linhas como MB1 começam com M mas não são nocturnas.
  */
 
 import { vehicleService } from '../../services/vehicleService.js';
@@ -13,8 +14,11 @@ import { LoadingSpinner } from './LoadingSpinner.js';
 // Helpers de visibilidade temporal (espelham a lógica do RouteFilterBar)
 // ---------------------------------------------------------------------------
 
+/** Devolve true se a linha é nocturna (número TERMINA em 'M', case-insensitive).
+ *  Ex: "3M" → true, "200M" → true, "MB1" → false
+ */
 function isNightLine(number) {
-  return /M/i.test(String(number));
+  return /M$/i.test(String(number));
 }
 
 function getLineVisibility(date) {
