@@ -68,7 +68,7 @@ export class StopsMapApp {
 
       if (!REALTIME_BUSES_ENABLED) {
         AnnouncementBanner.show(
-          'Localização em tempo real dos autocarros temporariamente indisponível. Motivo: Ausência de dados por parte da STCP. Por favor consulte os horários previstos em cada paragem.',
+          'Localização dos autocarros temporariamente indisponível. Motivo: Ausência de dados por parte da STCP.',
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }

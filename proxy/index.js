@@ -1,5 +1,5 @@
 // Cloudflare Worker - CORS Proxy para STCP API
-// v4.2 - Adicionado endpoint /{stopId}/services?date={date}
+// v4.4 - Suporte a rotas custom (MB1 Metrobus) injectadas na lista de rotas e info de paragens custom
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -78,11 +78,51 @@ const STCP_ROUTES = [
   { id: '7M',   number: '7M',  name: 'Aliados - Valongo',                             color: '#000000', text_color: '#FFFFFF' },
   { id: '8M',   number: '8M',  name: 'Aliados - S. Pedro da Cova',                    color: '#000000', text_color: '#FFFFFF' },
   { id: '9M',   number: '9M',  name: 'Aliados - Gondomar (via TIC)',                  color: '#000000', text_color: '#FFFFFF' },
-  { id: '10M',   number: '10M',  name: 'Aliados - Vila D Este',                       color: '#000000', text_color: '#FFFFFF' },
-  { id: '11M',   number: '11M',  name: 'Hospital S. João - Coimbrões (via Aliados)',  color: '#000000', text_color: '#FFFFFF' },
-  { id: '12M',   number: '12M',  name: 'Aliados - Sto. Ovídio',                       color: '#000000', text_color: '#FFFFFF' },
-  { id: '13M',   number: '13M',  name: 'Aliados - Matosinhos (Mercado)',              color: '#000000', text_color: '#FFFFFF' },
+  { id: '10M',  number: '10M', name: 'Aliados - Vila D Este',                         color: '#000000', text_color: '#FFFFFF' },
+  { id: '11M',  number: '11M', name: 'Hospital S. João - Coimbrões (via Aliados)',    color: '#000000', text_color: '#FFFFFF' },
+  { id: '12M',  number: '12M', name: 'Aliados - Sto. Ovídio',                         color: '#000000', text_color: '#FFFFFF' },
+  { id: '13M',  number: '13M', name: 'Aliados - Matosinhos (Mercado)',                color: '#000000', text_color: '#FFFFFF' },
 ];
+
+// ---------------------------------------------------------------------------
+// Rotas custom (não disponíveis na API STCP) — dados estáticos geridos aqui.
+// ---------------------------------------------------------------------------
+const CUSTOM_ROUTES = [
+  { id: 'MB1', number: 'MB1', name: 'Boavista - Praça do Império', color: '#00a7b0', text_color: '#FFFFFF' },
+];
+
+const CUSTOM_ROUTE_IDS = new Set(CUSTOM_ROUTES.map(r => r.id));
+
+// Shape da MB1 (coordenadas da polyline)
+const MB1_SHAPE = {
+  success: true, route_id: 'MB1', direction_id: 0,
+  coordinates: [
+    { lat: 41.158239, lng: -8.630995, sequence: 1 },
+    { lat: 41.159209, lng: -8.636708, sequence: 2 },
+    { lat: 41.160582, lng: -8.645091, sequence: 3 },
+    { lat: 41.161924, lng: -8.653029, sequence: 4 },
+    { lat: 41.162323, lng: -8.655446, sequence: 5 },
+    { lat: 41.160858, lng: -8.658241, sequence: 6 },
+    { lat: 41.155539, lng: -8.671809, sequence: 7 },
+  ],
+};
+
+// Paragens da MB1
+const MB1_STOPS = {
+  success: true, route_id: 'MB1', direction_id: 0,
+  stops: [
+    { stop_id: 'MB1_01', stop_code: 'MB1_01', stop_name: 'Boavista',         latitude: 41.158239, longitude: -8.630995, stop_sequence: 1, zone_id: '1' },
+    { stop_id: 'MB1_02', stop_code: 'MB1_02', stop_name: 'Guerra Junqueiro', latitude: 41.159209, longitude: -8.636708, stop_sequence: 2, zone_id: '1' },
+    { stop_id: 'MB1_03', stop_code: 'MB1_03', stop_name: 'Bessa',            latitude: 41.160582, longitude: -8.645091, stop_sequence: 3, zone_id: '1' },
+    { stop_id: 'MB1_04', stop_code: 'MB1_04', stop_name: 'Pinheiro Manso',   latitude: 41.161878, longitude: -8.653037, stop_sequence: 4, zone_id: '2' },
+    { stop_id: 'MB1_05', stop_code: 'MB1_05', stop_name: 'Serralves',        latitude: 41.160617, longitude: -8.658885, stop_sequence: 5, zone_id: '2' },
+    { stop_id: 'MB1_06', stop_code: 'MB1_06', stop_name: 'João De Barros',   latitude: 41.158491, longitude: -8.664280, stop_sequence: 6, zone_id: '2' },
+    { stop_id: 'MB1_07', stop_code: 'MB1_07', stop_name: 'Praça do Império', latitude: 41.155539, longitude: -8.671809, stop_sequence: 7, zone_id: '2' },
+  ],
+};
+
+// Map auxiliar de stops MB1 por ID para endpoints de info
+const MB1_STOPS_MAP = new Map(MB1_STOPS.stops.map(s => [s.stop_id, s]));
 
 async function handleRequest(request) {
   const url = new URL(request.url);
@@ -92,7 +132,7 @@ async function handleRequest(request) {
     return new Response(
       JSON.stringify({
         message: 'STCP CORS Proxy',
-        version: '4.2',
+        version: '4.4',
         endpoints: {
           stop_endpoints:     ['realtime', 'routes', 'schedule', 'info', 'services'],
           location_endpoints: ['nearby'],
@@ -145,8 +185,11 @@ async function handleRequest(request) {
 
       if (!routeId) return errorResponse('Uso: /route/{ROUTE_ID}/{schedule|shape|stops}', 400);
 
-      // --- 2a. Schedule
+      // --- 2a. Schedule (não existe para rotas custom — o horário é gerido no frontend)
       if (sub === 'schedule') {
+        if (CUSTOM_ROUTE_IDS.has(routeId)) {
+          return errorResponse(`A rota ${routeId} é uma rota custom; o horário é gerido localmente pelo cliente.`, 404);
+        }
         return await proxyRequest(
           `https://stcp.pt/api/route/${routeId}/schedule${url.search}`,
           'route_schedule', 'public, max-age=1800'
@@ -155,6 +198,9 @@ async function handleRequest(request) {
 
       // --- 2b. Shape
       if (sub === 'shape') {
+        if (routeId === 'MB1') {
+          return jsonResponse(MB1_SHAPE, 'route_shape', 'public, max-age=86400');
+        }
         const directionId = url.searchParams.get('direction_id') ?? '0';
         const raw = await proxyRawRequest(
           `https://stcp.pt/api/route/${routeId}/shape?direction_id=${directionId}`,
@@ -165,25 +211,19 @@ async function handleRequest(request) {
         const coords = (d.coordinates || [])
           .sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
           .map(c => ({ lat: c.lat, lng: c.lng, sequence: c.sequence }));
-        return new Response(JSON.stringify({
+        return jsonResponse({
           success: true,
           route_id: String(routeId),
           direction_id: Number(directionId),
           coordinates: coords
-        }), {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=3600',
-            'X-Proxy-Version': '4.2',
-            'X-Endpoint': 'route_shape'
-          }
-        });
+        }, 'route_shape', 'public, max-age=3600');
       }
 
       // --- 2c. Stops da rota
       if (sub === 'stops') {
+        if (routeId === 'MB1') {
+          return jsonResponse(MB1_STOPS, 'route_stops', 'public, max-age=86400');
+        }
         const directionId = url.searchParams.get('direction_id') ?? '0';
         const raw = await proxyRawRequest(
           `https://stcp.pt/api/route/${routeId}/stops/direction?direction_id=${directionId}`,
@@ -202,42 +242,25 @@ async function handleRequest(request) {
             stop_sequence: s.stop_sequence,
             zone_id:       s.zone_id || null
           }));
-        return new Response(JSON.stringify({
+        return jsonResponse({
           success: true,
           route_id: String(routeId),
           direction_id: Number(directionId),
           stops
-        }), {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=3600',
-            'X-Proxy-Version': '4.2',
-            'X-Endpoint': 'route_stops'
-          }
-        });
+        }, 'route_stops', 'public, max-age=3600');
       }
 
       return errorResponse(`Sub-endpoint inválido: ${sub}. Use: schedule, shape ou stops`, 400);
     }
 
     // -----------------------------------------------------------------------
-    // 3. Routes list: /routes/list  →  lista estática, sem chamada externa
+    // 3. Routes list: /routes/list  →  lista estática + custom, sem chamada externa
     // -----------------------------------------------------------------------
     if (firstSegment === 'routes' && pathParts[1] === 'list') {
-      return new Response(
-        JSON.stringify({ success: true, routes: STCP_ROUTES, source: 'static' }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=86400',
-            'X-Proxy-Version': '4.2',
-            'X-Endpoint': 'routes_list'
-          }
-        }
+      const allRoutes = [...STCP_ROUTES, ...CUSTOM_ROUTES];
+      return jsonResponse(
+        { success: true, routes: allRoutes, source: 'static' },
+        'routes_list', 'public, max-age=86400'
       );
     }
 
@@ -264,16 +287,7 @@ async function handleRequest(request) {
         zone_id:   s.zone_id || null,
         routes:    (s.routes || []).map(r => ({ id: r.id, number: r.number, name: r.name }))
       }));
-      return new Response(JSON.stringify({ stops }), {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=300',
-          'X-Proxy-Version': '4.2',
-          'X-Endpoint': 'search'
-        }
-      });
+      return jsonResponse({ stops }, 'search', 'public, max-age=300');
     }
 
     // -----------------------------------------------------------------------
@@ -283,7 +297,6 @@ async function handleRequest(request) {
     const endpoint = pathParts[1] || 'realtime';
 
     // --- 5a. Serviços ativos de uma paragem para uma data
-    // GET /{stopId}/services?date=YYYY-MM-DD
     if (endpoint === 'services') {
       const date = url.searchParams.get('date');
       if (!date) return errorResponse('Parâmetro "date" é obrigatório. Uso: /{stopId}/services?date=YYYY-MM-DD', 400);
@@ -295,11 +308,25 @@ async function handleRequest(request) {
 
     // --- 5b. Info da paragem
     if (endpoint === 'info') {
+      // Paragens custom (ex: MB1_04) — devolve info sintética
+      if (MB1_STOPS_MAP.has(stopId)) {
+        const s = MB1_STOPS_MAP.get(stopId);
+        return jsonResponse({
+          stop_id:   s.stop_id,
+          stop_name: s.stop_name,
+          stop_code: s.stop_code,
+          latitude:  s.latitude,
+          longitude: s.longitude,
+          zone_id:   s.zone_id || null,
+          routes:    CUSTOM_ROUTES.filter(r => r.id === 'MB1'),
+        }, 'stop_info', 'public, max-age=86400');
+      }
+
       const rawResponse = await proxyRawRequest(`https://stcp.pt/api/stops/${stopId}`, 'stop_info');
       if (!rawResponse.ok)
         return errorResponse(`Erro ao obter informação da paragem ${stopId}`, rawResponse.status);
       const d = await rawResponse.json();
-      return new Response(JSON.stringify({
+      return jsonResponse({
         stop_id:   d.stop_id,
         stop_name: d.stop_name,
         stop_code: d.stop_code,
@@ -313,16 +340,7 @@ async function handleRequest(request) {
           color:      r.color,
           text_color: r.text_color
         }))
-      }), {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=1800',
-          'X-Proxy-Version': '4.2',
-          'X-Endpoint': 'stop_info'
-        }
-      });
+      }, 'stop_info', 'public, max-age=1800');
     }
 
     const validStopEndpoints = ['realtime', 'routes', 'schedule'];
@@ -344,10 +362,27 @@ async function handleRequest(request) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function jsonResponse(data, endpoint, cacheControl) {
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json',
+      'Cache-Control': cacheControl,
+      'X-Proxy-Version': '4.4',
+      'X-Endpoint': endpoint,
+    },
+  });
+}
+
 async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
   const response = await fetch(stcpApiUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.2)', 'Accept': 'application/json' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.4)', 'Accept': 'application/json' },
   });
   const data = await response.text();
   return new Response(data, {
@@ -356,16 +391,16 @@ async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
       ...corsHeaders,
       'Content-Type': 'application/json',
       'Cache-Control': cacheControl,
-      'X-Proxy-Version': '4.2',
+      'X-Proxy-Version': '4.4',
       'X-Endpoint': endpoint
     }
   });
 }
 
-async function proxyRawRequest(stcpApiUrl, endpoint) {
+async function proxyRawRequest(stcpApiUrl) {
   return await fetch(stcpApiUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.2)', 'Accept': 'application/json' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.4)', 'Accept': 'application/json' },
   });
 }
 

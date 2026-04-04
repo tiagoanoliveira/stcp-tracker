@@ -1,10 +1,12 @@
 /**
  * Planned Arrivals Service - Combina chegadas em tempo real com horários programados
- * Usa: apiService, scheduleService
+ * Suporta paragens STCP normais E paragens de rotas custom (ex: MB1).
+ * Usa: apiService, scheduleService, customRouteScheduleService
  */
 
-import { apiService }      from '../core/apiService.js';
-import { scheduleService } from './scheduleService.js';
+import { apiService }                  from '../core/apiService.js';
+import { scheduleService }             from './scheduleService.js';
+import { customRouteScheduleService }  from './customRouteScheduleService.js';
 
 class PlannedArrivalsService {
   constructor() {
@@ -15,20 +17,26 @@ class PlannedArrivalsService {
 
   /**
    * Obtém próximas chegadas combinando tempo real + programadas.
+   * Para paragens custom, usa exclusivamente os dados locais.
    * @param {string} stopId
    * @param {number} maxMinutes
    * @returns {Promise<Array>}
    */
   async getNextArrivals(stopId, maxMinutes = 60) {
     try {
+      // Paragem de rota custom → sem chamada de rede, dados locais gerados
+      if (customRouteScheduleService.handlesStop(stopId)) {
+        return customRouteScheduleService.getNextArrivals(stopId, maxMinutes);
+      }
+
+      // Paragem STCP normal (caminho existente)
       const realtimeData     = await apiService.fetchStopRealtime(stopId);
       const realtimeArrivals = realtimeData?.arrivals || [];
 
       const routes = await this.getStopRoutes(stopId);
       if (routes.length === 0) return this.formatArrivals(realtimeArrivals, true);
 
-      // service_id ativo (sem parâmetro: usa paragem fixa interna do scheduleService)
-      const currentServiceId = await scheduleService.getServiceIdAtual();
+      const currentServiceId = await scheduleService.getServiceIdAtual(stopId);
 
       const scheduledArrivals = [];
       for (const route of routes) {
@@ -49,6 +57,11 @@ class PlannedArrivalsService {
   }
 
   async getStopRoutes(stopId) {
+    // Paragem custom: retorna rotas locais sem cache de rede
+    if (customRouteScheduleService.handlesStop(stopId)) {
+      return customRouteScheduleService.getStopRoutes(stopId).display_routes || [];
+    }
+
     const cached = this.routesCache.get(stopId);
     const now    = Date.now();
     if (cached && (now - cached.timestamp) < this.cacheTTL) return cached.data;
