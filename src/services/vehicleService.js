@@ -27,6 +27,31 @@ class VehicleService {
   extractTripId(bus)     { return this.extractAnnotation(bus, 'stcp:nr_viagem:'); }
 
   /**
+   * Extrai a localização geográfica de um veículo.
+   * Aceita tanto o objecto FIWARE bruto (location.value.coordinates)
+   * como o objecto já processado por processBusData (latitude/longitude).
+   * Devolve { lat, lon } ou null se não houver coordenadas válidas.
+   */
+  extractVehicleLocation(vehicle) {
+    if (!vehicle) return null;
+
+    // Objecto já processado por processBusData
+    if (Number.isFinite(vehicle.latitude) && Number.isFinite(vehicle.longitude)) {
+      return { lat: vehicle.latitude, lon: vehicle.longitude };
+    }
+
+    // Objecto FIWARE bruto
+    const coords = vehicle.location?.value?.coordinates;
+    if (Array.isArray(coords) && coords.length >= 2) {
+      const lon = coords[0];
+      const lat = coords[1];
+      if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+    }
+
+    return null;
+  }
+
+  /**
    * Compara dois trip_ids ignorando o nr_viagem (2º segmento).
    * Delega a lógica de chave em scheduleService._tripMatchKey.
    */
