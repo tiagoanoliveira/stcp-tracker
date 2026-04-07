@@ -12,4 +12,4 @@
  *           Útil quando a API de localização em tempo real está a devolver
  *           dados desatualizados ou incorretos.
  */
-export const REALTIME_BUSES_ENABLED = TRUE;
+export const REALTIME_BUSES_ENABLED = true;
