@@ -9,6 +9,7 @@ import { vehicleService }         from '../services/vehicleService.js';
 import { plannedArrivalsService } from '../services/plannedArrivalsService.js';
 import { scheduleService }        from '../services/scheduleService.js';
 import { routeService }           from '../services/routeService.js';
+import { routeFilterState }       from '../services/routeFilterState.js';
 import { MapManager }             from '../map/MapManager.js';
 import { StopMarkerManager }      from '../map/markers/StopMarkerManager.js';
 import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
@@ -57,6 +58,7 @@ export class StopsMapApp {
     this.isLoadingStops    = false;
     this.loadStopsDebounce = null;
 
+    // Mantidos por compatibilidade interna — fonte de verdade é routeFilterState
     this._globalSelectedRoutes    = new Set();
     this._globalSelectedRouteObjs = [];
     this._lineFilterMode          = false;
@@ -134,9 +136,9 @@ export class StopsMapApp {
       this.tutorialModal.showIfFirstVisit();
 
     } catch (error) {
-      console.error('\u274C Erro na inicializa\u00e7\u00e3o:', error);
+      console.error('\u274C Erro na inicialização:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();
-      this.showError('Erro ao inicializar aplica\u00e7\u00e3o');
+      this.showError('Erro ao inicializar aplicação');
     }
   }
 
@@ -260,9 +262,9 @@ export class StopsMapApp {
   }
 
   async _handleGlobalRouteFilterChange(selected, routeObjs) {
-    if (this.nextArrivals?.isVisible && !this._deepLinkInProgress) return;
-
-    this._globalSelectedRoutes    = selected;
+    // Actualizar singleton partilhado — sem guard que bloqueie quando painel está aberto
+    routeFilterState.set(selected, routeObjs);
+    this._globalSelectedRoutes    = new Set(selected);
     this._globalSelectedRouteObjs = routeObjs;
 
     if (selected.size === 0) {
@@ -270,7 +272,14 @@ export class StopsMapApp {
       this.lineOverlayManager.clearAll();
       this.stopMarkerManager.clearAllMarkers();
       this._setGlobalFilterBarDisabled(false);
-      await this.loadNearbyStops();
+
+      // Se o painel estiver aberto, re-renderizar chegadas sem filtro
+      if (this.nextArrivals?.isVisible) {
+        this.nextArrivals._renderArrivals();
+        this.busMarkerManager.filterByRoutes(new Set());
+      } else {
+        await this.loadNearbyStops();
+      }
       return;
     }
 
@@ -284,6 +293,13 @@ export class StopsMapApp {
     const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
     this.lineOverlayManager.setRoutes(overlayData);
 
+    // Se o painel estiver aberto, aplicar filtro global nos marcadores e chegadas
+    if (this.nextArrivals?.isVisible) {
+      this.nextArrivals._renderArrivals();
+      this.busMarkerManager.filterByRoutes(selected, routeFilterState.dirMap);
+      return;
+    }
+
     const allStops = [];
     overlayData.forEach(r => (r.stops?.stops || []).forEach(s => allStops.push(s)));
     const uniqueStops = Array.from(new Map(allStops.map(s => [s.stop_id, s])).values());
@@ -291,7 +307,7 @@ export class StopsMapApp {
     if (uniqueStops.length > 0) {
       this.stopMarkerManager.updateStopMarkers(uniqueStops, false, stop => this.handleStopClick(stop));
     }
-    if (!this.nextArrivals?.isVisible) this.lineOverlayManager.fitBounds();
+    this.lineOverlayManager.fitBounds();
   }
 
   _setGlobalFilterBarDisabled(disabled) {
@@ -383,7 +399,7 @@ export class StopsMapApp {
     } catch (error) {
       console.error('\u274C Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
-      this.showError('Erro ao carregar informa\u00e7\u00f5es da paragem');
+      this.showError('Erro ao carregar informações da paragem');
     }
   }
 
@@ -403,38 +419,58 @@ export class StopsMapApp {
       if (!processedBus) continue;
       busesToShow.push(processedBus);
       busPositions.push([processedBus.latitude, processedBus.longitude]);
-      const routeNum = String(arrival.route_short_name || arrival.route_number || arrival.route_id || processedBus.line || '');
+      const routeNum = String(
+        arrival.route_short_name || arrival.route_number ||
+        arrival.route_id || processedBus.displayLine || processedBus.line || ''
+      );
       this.busMarkerManager.setRouteForMarker(processedBus.id, routeNum);
     }
     if (busesToShow.length === 0) { this.busMarkerManager.clearAllMarkers(); this.currentBusPositions = []; return; }
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this.currentBusPositions = busPositions;
-    const activeFilter = this.nextArrivals?.selectedRoutes;
-    if (activeFilter && activeFilter.size > 0) {
-      const visiblePositions = this.busMarkerManager.filterByRoutes(activeFilter);
-      if (centerMap && !this.busMapCentered && visiblePositions.length > 0) {
-        this.busMapCentered = true;
-        setTimeout(() => this._recenterOnPositions(visiblePositions), 150);
-      }
-    } else if (centerMap && !this.busMapCentered) {
+
+    // Determinar filtro efectivo: chip do painel > filtro global > nenhum
+    const panelFilter  = this.nextArrivals?.selectedRoutes;
+    const activeFilter = (panelFilter?.size > 0)
+      ? panelFilter
+      : (routeFilterState.hasActive() ? routeFilterState.selectedRoutes : null);
+
+    let visiblePositions = busPositions;
+    if (activeFilter) {
+      visiblePositions = this.busMarkerManager.filterByRoutes(activeFilter, routeFilterState.dirMap);
+    }
+
+    if (centerMap && !this.busMapCentered) {
       this.busMapCentered = true;
-      setTimeout(() => this.recenterOnBuses(), 150);
+      const positionsForCenter = visiblePositions.length > 0 ? visiblePositions : busPositions;
+      setTimeout(() => this._recenterOnPositions(positionsForCenter), 150);
     }
   }
 
   async handleArrivalFilterChange(selectedRoutes) {
-    const visiblePositions = this.busMarkerManager.filterByRoutes(selectedRoutes);
-    if (selectedRoutes.size === 0) {
+    // Combinar: chip do painel > filtro global
+    const effectiveFilter = selectedRoutes.size > 0
+      ? selectedRoutes
+      : routeFilterState.selectedRoutes;
+
+    const visiblePositions = this.busMarkerManager.filterByRoutes(
+      effectiveFilter, routeFilterState.dirMap
+    );
+
+    if (selectedRoutes.size === 0 && !routeFilterState.hasActive()) {
       this.lineOverlayManager.clearAll();
     } else {
+      const sourceRoutes = selectedRoutes.size > 0 ? selectedRoutes : routeFilterState.selectedRoutes;
       const routeObjs = (this.nextArrivals?.availableRoutes || [])
-        .filter(r => selectedRoutes.has(r.number))
+        .filter(r => sourceRoutes.has(r.number))
         .map(r => ({ routeId: String(r.id || r.number), direction: 0, color: r.color || '#187EC2', text_color: r.text_color || '#FFFFFF' }));
-      const overlayData = await routeService.fetchMultipleRoutesOverlay(routeObjs);
-      this.lineOverlayManager.setRoutes(overlayData);
+      if (routeObjs.length > 0) {
+        const overlayData = await routeService.fetchMultipleRoutesOverlay(routeObjs);
+        this.lineOverlayManager.setRoutes(overlayData);
+      }
     }
     if (visiblePositions.length > 0) { this._recenterOnPositions(visiblePositions); }
-    else if (selectedRoutes.size > 0 && this.lineOverlayManager.hasActiveLayers()) { this.lineOverlayManager.fitBounds({ panelHeightRatio: 0.5 }); }
+    else if (this.lineOverlayManager.hasActiveLayers()) { this.lineOverlayManager.fitBounds({ panelHeightRatio: 0.5 }); }
   }
 
   recenterOnBuses() { this._recenterOnPositions(this.currentBusPositions); }
@@ -479,18 +515,21 @@ export class StopsMapApp {
 
     if (returnPosition) { this.suppressMapChangeUntil = Date.now() + 1800; this.mapManager.centerOn(returnPosition, 16); }
     if (wasSearchActive) { this._clearSearch(false, 700); }
-    else if (this._lineFilterMode && this._globalSelectedRoutes.size > 0) {
-      this._handleGlobalRouteFilterChange(this._globalSelectedRoutes, this._globalSelectedRouteObjs);
+    else if (this._lineFilterMode && routeFilterState.hasActive()) {
+      this._handleGlobalRouteFilterChange(
+        routeFilterState.selectedRoutes,
+        routeFilterState.selectedRouteObjs
+      );
     } else { this.stopMarkerManager.showAllMarkers(); }
   }
 
   _toggleFavourite(stopId) {
     if (!stopId) return;
     const name    = this.currentStopName || `Paragem ${stopId}`;
-    const lineNum = this._globalSelectedRoutes.size === 1 ? [...this._globalSelectedRoutes][0] : null;
-    const dir     = lineNum
-      ? (this._globalSelectedRouteObjs.find(r => String(r.number) === String(lineNum))?.direction ?? 0)
+    const lineNum = routeFilterState.selectedRoutes.size === 1
+      ? [...routeFilterState.selectedRoutes][0]
       : null;
+    const dir = lineNum ? (routeFilterState.dirMap.get(lineNum) ?? 0) : null;
     const added = favouritesManager.toggle(stopId, name, {
       line:    lineNum,
       dir:     dir,
@@ -529,6 +568,7 @@ export class StopsMapApp {
     if (this.favouritesPanel)    this.favouritesPanel.destroy();
     if (this.tutorialModal)      this.tutorialModal.destroy();
     if (this.mapManager)         this.mapManager.cleanup();
+    routeFilterState.clear();
   }
 }
 
