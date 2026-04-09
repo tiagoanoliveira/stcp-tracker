@@ -7,8 +7,9 @@
  *   Nota: linhas como MB1 começam com M mas não são nocturnas.
  */
 
-import { vehicleService } from '../../services/vehicleService.js';
-import { LoadingSpinner } from './LoadingSpinner.js';
+import { vehicleService }    from '../../services/vehicleService.js';
+import { LoadingSpinner }    from './LoadingSpinner.js';
+import { routeFilterState }  from '../../services/routeFilterState.js';
 
 // ---------------------------------------------------------------------------
 // Helpers de visibilidade temporal (espelham a lógica do RouteFilterBar)
@@ -129,10 +130,24 @@ export class NextArrivals {
   // Filtros
   // ---------------------------------------------------------------------------
 
+  /**
+   * Define as linhas disponíveis nos chips do painel.
+   * Pré-selecciona qualquer linha que já esteja activa no filtro global,
+   * para que abrir uma paragem não limpe o filtro que o utilizador definiu.
+   */
   setRoutes(routes = []) {
     this.availableRoutes = routes;
-    this.selectedRoutes = new Set();
+
+    // Pré-seleccionar linhas que coincidam com o filtro global activo
+    this.selectedRoutes = new Set(
+      routes
+        .map(r => String(r.number))
+        .filter(num => routeFilterState.selectedRoutes.has(num))
+    );
+
     this._renderFilterBar();
+    // Re-renderizar chegadas com o filtro já aplicado
+    if (this.allArrivals.length > 0) this._renderArrivals();
   }
 
   _toggleRoute(routeNumber) {
@@ -205,11 +220,26 @@ export class NextArrivals {
     }
   }
 
+  /**
+   * Devolve chegadas filtradas pela intersecção de:
+   *   1. filtro interno do painel (selectedRoutes)
+   *   2. filtro global (routeFilterState) — apenas se o painel não tiver
+   *      nenhum chip seleccionado mas o filtro global estiver activo.
+   *
+   * Regra: o chip do painel tem prioridade; se nenhum chip estiver activo
+   * mas o filtro global tiver linhas seleccionadas, usa o filtro global.
+   */
   _getFilteredArrivals() {
-    if (this.selectedRoutes.size === 0) return this.allArrivals;
+    const panelActive  = this.selectedRoutes.size > 0;
+    const globalActive = routeFilterState.hasActive();
+
+    if (!panelActive && !globalActive) return this.allArrivals;
+
+    const activeFilter = panelActive ? this.selectedRoutes : routeFilterState.selectedRoutes;
+
     return this.allArrivals.filter(arrival => {
       const num = String(arrival.route_short_name || arrival.route_number || arrival.route_id || '');
-      return this.selectedRoutes.has(num);
+      return activeFilter.has(num);
     });
   }
 
