@@ -1,5 +1,4 @@
 export const BUS_COLORS = {
-  '106': { busColor: '#FF7900', textColor: '#fff' },
   '107': { busColor: '#187ec2', textColor: '#fff' },
   '1M': { busColor: '#000000', textColor: '#fff' },
   '2M': { busColor: '#000000', textColor: '#fff' },
@@ -30,6 +29,5 @@ export const BUS_ICON_COLORS = {
 };
 
 export const CUSTOM_LINE_TEXTS = {
-  '106': 'ZF',
   '107': 'ZC'
 };
