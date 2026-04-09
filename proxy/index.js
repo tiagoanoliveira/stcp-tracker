@@ -71,7 +71,7 @@ const STCP_ROUTES = [
   { id: '905',  number: '905', name: 'Trindade - Madalena (C. Saúde)',                color: '#FF7900', text_color: '#FFFFFF' },
   { id: '906',  number: '906', name: 'Trindade - Madalena',                           color: '#FF7900', text_color: '#FFFFFF' },
   { id: '907',  number: '907', name: 'Boavista (Bom Sucesso) - Vila d Este',          color: '#FF7900', text_color: '#FFFFFF' },
-  { id: '107',  number: 'ZCA', name: 'Estádio do Dragão - Areias',                    color: '#187EC2', text_color: '#FFFFFF' }, 
+  { id: '107',  number: 'ZC',  name: 'Estádio do Dragão - Areias',                    color: '#187EC2', text_color: '#FFFFFF' }, 
   { id: '1M',   number: '1M',  name: 'Aliados - Matosinhos (Praia)',                  color: '#000000', text_color: '#FFFFFF' },
   { id: '2M',   number: '2M',  name: 'Aliados - Hospital de S. João',                 color: '#000000', text_color: '#FFFFFF' },
   { id: '3M',   number: '3M',  name: 'Aliados - Aeroporto',                           color: '#000000', text_color: '#FFFFFF' },
