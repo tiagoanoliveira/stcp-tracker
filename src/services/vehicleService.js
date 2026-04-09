@@ -8,9 +8,21 @@
  *   {linha}_{dir}_{seq}|{nr_viagem}|{dia}|{turno}|{servico}
  * O nr_viagem (2º segmento) pode diferir entre FIWARE e API STCP.
  * O matching delega em scheduleService._tripMatchKey que ignora esse segmento.
+ *
+ * LINE ALIASES: Algumas linhas são reportadas pela API com um ID numérico
+ * diferente do nome real da linha. O mapa LINE_ID_ALIASES faz essa tradução.
+ * Exemplo: a linha ZC é transmitida como '107' na localização em tempo real.
  */
 
 import { scheduleService } from './scheduleService.js';
+
+/**
+ * Mapeamento de IDs de linha da API FIWARE para nomes/números reais de linha.
+ * Usar apenas para casos em que o ID da API não corresponde ao nome real.
+ */
+const LINE_ID_ALIASES = {
+  '107': 'ZC',
+};
 
 class VehicleService {
   extractAnnotation(bus, prefix) {
@@ -25,6 +37,18 @@ class VehicleService {
   extractLineNumber(bus) { return this.extractAnnotation(bus, 'stcp:route:'); }
   extractDirection(bus)  { return this.extractAnnotation(bus, 'stcp:sentido:'); }
   extractTripId(bus)     { return this.extractAnnotation(bus, 'stcp:nr_viagem:'); }
+
+  /**
+   * Devolve o nome de linha para apresentação ao utilizador.
+   * Se existir um alias para o lineId (ex: '107' -> 'ZC'), usa-o;
+   * caso contrário devolve o próprio lineId.
+   * @param {string} lineId - ID de linha conforme devolvido pela API
+   * @returns {string}
+   */
+  getDisplayLine(lineId) {
+    if (!lineId) return lineId;
+    return LINE_ID_ALIASES[lineId] ?? lineId;
+  }
 
   /**
    * Extrai a localização geográfica de um veículo.
@@ -79,6 +103,7 @@ class VehicleService {
     return {
       id:          bus.id,
       line,
+      displayLine: this.getDisplayLine(line), // nome real da linha (ex: 'ZC' em vez de '107')
       latitude:    lat,
       longitude:   lon,
       speed:       bus.speed?.value ?? 'N/A',

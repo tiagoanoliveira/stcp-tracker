@@ -12,7 +12,7 @@ export class BusMarkerManager {
     this.map = map;
     this.markers       = {};   // busId -> L.Marker
     this._busData      = {};   // busId -> objecto processado
-    this._markerRoutes = {};   // busId -> routeNumber string
+    this._markerRoutes = {};   // busId -> displayLine string (nome real da linha)
     this._markerDirs   = {};   // busId -> direction number (0|1)
   }
 
@@ -23,6 +23,8 @@ export class BusMarkerManager {
 
   /**
    * Filtra marcadores por linha e, opcionalmente, por direção.
+   * A comparação é feita contra o displayLine do autocarro (nome real da linha,
+   * resolvendo aliases como '107' -> 'ZC'), não contra o ID interno da API.
    * @param {Set<string>}         selectedRoutes  - números de linha seleccionados
    * @param {Map<string,number>}  [routeDirMap]   - mapa linha -> direção (0|1)
    */
@@ -31,15 +33,17 @@ export class BusMarkerManager {
     const visiblePositions = [];
 
     Object.entries(this.markers).forEach(([id, marker]) => {
-      const routeNum  = this._markerRoutes[id] || '';
-      const markerDir = this._markerDirs[id];
+      // Usar displayLine para a filtragem, que já tem aliases resolvidos (ex: 'ZC')
+      const bus        = this._busData[id];
+      const displayLine = (bus?.displayLine) || this._markerRoutes[id] || '';
+      const markerDir  = this._markerDirs[id];
 
-      let visible = showAll || selectedRoutes.has(routeNum);
+      let visible = showAll || selectedRoutes.has(displayLine);
 
-      // Se há mapa de direções e o autobocarro tem direção conhecida,
+      // Se há mapa de direções e o autocarro tem direção conhecida,
       // filtrar também pela direção seleccionada para essa linha
-      if (visible && routeDirMap && routeDirMap.has(routeNum) && markerDir !== null) {
-        visible = markerDir === routeDirMap.get(routeNum);
+      if (visible && routeDirMap && routeDirMap.has(displayLine) && markerDir !== null) {
+        visible = markerDir === routeDirMap.get(displayLine);
       }
 
       if (visible) {
@@ -58,7 +62,7 @@ export class BusMarkerManager {
     busData.forEach(bus => {
       validIDs.add(bus.id);
       this._busData[bus.id] = bus;
-      const icon = iconCache.getBusIcon(bus.line);
+      const icon = iconCache.getBusIcon(bus.displayLine ?? bus.line);
       if (this.markers[bus.id]) {
         this.markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
         this.markers[bus.id].setIcon(icon);
@@ -75,7 +79,7 @@ export class BusMarkerManager {
   }
 
   _createBusMarker(bus) {
-    const icon   = iconCache.getBusIcon(bus.line);
+    const icon   = iconCache.getBusIcon(bus.displayLine ?? bus.line);
     const marker = L.marker([bus.latitude, bus.longitude], { icon }).addTo(this.map);
     marker.bindPopup(this._createLoadingPopup(bus), { maxWidth: 220 });
     marker.on('popupopen', () => this._resolvePopupHeadsign(bus.id, marker));
@@ -99,7 +103,7 @@ export class BusMarkerManager {
   _createLoadingPopup(bus) {
     return `
       <div class="bus-popup">
-        <strong>Linha ${bus.line}</strong><br>
+        <strong>Linha ${bus.displayLine ?? bus.line}</strong><br>
         Destino: <em style="color:#999">A carregar...</em><br>
         Velocidade: ${bus.speed} km/h<br>
         Veículo nº ${bus.busNumber}
@@ -109,7 +113,7 @@ export class BusMarkerManager {
   _createPopupContent(bus) {
     return `
       <div class="bus-popup">
-        <strong>Linha ${bus.line}</strong><br>
+        <strong>Linha ${bus.displayLine ?? bus.line}</strong><br>
         Destino: ${bus.destination || 'Desconhecido'}<br>
         Velocidade: ${bus.speed} km/h<br>
         Veículo nº ${bus.busNumber}
