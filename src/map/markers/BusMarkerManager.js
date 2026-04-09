@@ -34,9 +34,9 @@ export class BusMarkerManager {
 
     Object.entries(this.markers).forEach(([id, marker]) => {
       // Usar displayLine para a filtragem, que já tem aliases resolvidos (ex: 'ZC')
-      const bus        = this._busData[id];
+      const bus         = this._busData[id];
       const displayLine = (bus?.displayLine) || this._markerRoutes[id] || '';
-      const markerDir  = this._markerDirs[id];
+      const markerDir   = this._markerDirs[id];
 
       let visible = showAll || selectedRoutes.has(displayLine);
 
@@ -62,7 +62,8 @@ export class BusMarkerManager {
     busData.forEach(bus => {
       validIDs.add(bus.id);
       this._busData[bus.id] = bus;
-      const icon = iconCache.getBusIcon(bus.displayLine ?? bus.line);
+      // O ícone usa bus.line (ID da API, ex: '107') para encontrar a cor correcta em BUS_COLORS
+      const icon = iconCache.getBusIcon(bus.line);
       if (this.markers[bus.id]) {
         this.markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
         this.markers[bus.id].setIcon(icon);
@@ -79,7 +80,8 @@ export class BusMarkerManager {
   }
 
   _createBusMarker(bus) {
-    const icon   = iconCache.getBusIcon(bus.displayLine ?? bus.line);
+    // O ícone usa bus.line (ID da API, ex: '107') para encontrar a cor correcta em BUS_COLORS
+    const icon   = iconCache.getBusIcon(bus.line);
     const marker = L.marker([bus.latitude, bus.longitude], { icon }).addTo(this.map);
     marker.bindPopup(this._createLoadingPopup(bus), { maxWidth: 220 });
     marker.on('popupopen', () => this._resolvePopupHeadsign(bus.id, marker));

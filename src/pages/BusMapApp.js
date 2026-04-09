@@ -209,10 +209,18 @@ export class BusMapApp {
       }
       const processed = await vehicleService.processBusDataBatch(rawBusData);
       this._allProcessedBuses = processed;
-      processed.forEach(bus => this.busMarkerManager.setRouteForMarker(bus.id, bus.line || '', bus.direction));
+
+      // Registar rota por marker usando displayLine (nome real, ex: 'ZC'),
+      // que é o mesmo valor usado por filterByRoutes e por _selectedRoutes
+      processed.forEach(bus =>
+        this.busMarkerManager.setRouteForMarker(bus.id, bus.displayLine || bus.line || '', bus.direction)
+      );
+
+      // Filtrar os autocarros a mostrar comparando também contra displayLine
       const toShow = this._selectedRoutes.size > 0
-        ? processed.filter(b => this._selectedRoutes.has(String(b.line || '')))
+        ? processed.filter(b => this._selectedRoutes.has(String(b.displayLine || b.line || '')))
         : processed;
+
       this.busMarkerManager.updateBusMarkers(toShow);
       if (this._selectedRoutes.size > 0) this.busMarkerManager.filterByRoutes(this._selectedRoutes, this._routeDirMap);
       this.lastUpdateDisplay.update();
