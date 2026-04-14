@@ -16,6 +16,7 @@ import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
 import { LineOverlayManager }     from '../map/LineOverlayManager.js';
 import { createCenterControl }    from '../map/controls/CenterControl.js';
 import { createBusMapControl }    from '../map/controls/BusMapControl.js';
+import { createLinesControl }     from '../map/controls/LinesControl.js';
 import { createTutorialControl }  from '../map/controls/TutorialControl.js';
 import { NextArrivals }           from '../ui/components/NextArrivals.js';
 import { LoadingSpinner }         from '../ui/components/LoadingSpinner.js';
@@ -39,6 +40,7 @@ export class StopsMapApp {
     this.tutorialModal       = null;
     this.centerControl       = null;
     this.busMapControl       = null;
+    this.linesControl        = null;
     this.tutorialControl     = null;
     this.nextArrivals        = null;
     this.loadingOverlay      = null;
@@ -58,7 +60,6 @@ export class StopsMapApp {
     this.isLoadingStops    = false;
     this.loadStopsDebounce = null;
 
-    // Mantidos por compatibilidade interna — fonte de verdade é routeFilterState
     this._globalSelectedRoutes    = new Set();
     this._globalSelectedRouteObjs = [];
     this._lineFilterMode          = false;
@@ -70,7 +71,7 @@ export class StopsMapApp {
 
       if (!REALTIME_BUSES_ENABLED) {
         AnnouncementBanner.show(
-          'Localização dos autocarros temporariamente indisponível. Motivo: Ausência de dados por parte da STCP.',
+          'Localiza\u00e7\u00e3o dos autocarros temporariamente indispon\u00edvel. Motivo: Aus\u00eancia de dados por parte da STCP.',
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
@@ -86,6 +87,9 @@ export class StopsMapApp {
 
       this.busMapControl = createBusMapControl(this.mapManager.map);
       this.busMapControl.addTo(this.mapManager.map);
+
+      this.linesControl = createLinesControl(this.mapManager.map);
+      this.linesControl.addTo(this.mapManager.map);
 
       this.tutorialControl = createTutorialControl(this.mapManager.map, () => this.tutorialModal?.open());
       this.tutorialControl.addTo(this.mapManager.map);
@@ -136,9 +140,9 @@ export class StopsMapApp {
       this.tutorialModal.showIfFirstVisit();
 
     } catch (error) {
-      console.error('\u274C Erro na inicialização:', error);
+      console.error('\u274C Erro na inicializa\u00e7\u00e3o:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();
-      this.showError('Erro ao inicializar aplicação');
+      this.showError('Erro ao inicializar aplica\u00e7\u00e3o');
     }
   }
 
@@ -148,7 +152,7 @@ export class StopsMapApp {
       this.mapManager.updateUserMarker(position);
       this.mapManager.centerOn(position, 15);
     } catch (error) {
-      console.warn('\u26A0\uFE0F Não foi possível obter localização:', error.message);
+      console.warn('\u26A0\uFE0F N\u00e3o foi poss\u00edvel obter localiza\u00e7\u00e3o:', error.message);
       this.mapManager.centerOn([41.1579, -8.6291], 13);
     }
   }
@@ -216,11 +220,12 @@ export class StopsMapApp {
 
   async _handleDeepLink() {
     const params  = new URLSearchParams(window.location.search);
-    const stopId  = params.get('stop');
+    const stopId  = params.get('stop');   // may be stop_code from line-detail.html
     const lineNum = params.get('line');
     const dir     = parseInt(params.get('dir') ?? '0', 10);
     if (!stopId && !lineNum) return false;
 
+    // Apply line filter first (so the overlay is drawn before the stop opens)
     if (lineNum && this.routeFilterBar) {
       await this._waitForRoutes();
       const route = (this.routeFilterBar.routes || []).find(r => String(r.number) === String(lineNum));
@@ -234,18 +239,30 @@ export class StopsMapApp {
 
     if (stopId) {
       try {
+        // fetchStopInfo accepts both stop_id and stop_code
         const stopInfo = await apiService.fetchStopInfo(stopId);
         const stop = {
-          stop_id:   stopId,
+          // Prefer the canonical stop_id returned by the API; fall back to
+          // the URL value so marker lookup still works if the API is down.
+          stop_id:   stopInfo?.stop_id   || stopId,
           stop_name: stopInfo?.stop_name || `Paragem ${stopId}`,
           latitude:  stopInfo?.latitude  || 41.1579,
           longitude: stopInfo?.longitude || -8.6291,
           routes:    stopInfo?.routes    || []
         };
+
+        // Centre the map BEFORE rendering markers so the stop is visible
         this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
+
+        // If we are NOT in line-filter mode, load nearby stop markers so the
+        // stop marker for this stop exists in the manager before we highlight it.
+        if (!this._lineFilterMode) {
+          await this.loadNearbyStops();
+        }
+
         await this.handleStopClick(stop);
       } catch (e) {
-        console.warn('Deep-link: paragem não encontrada', stopId);
+        console.warn('Deep-link: paragem n\u00e3o encontrada', stopId, e);
       }
     }
     return true;
@@ -262,7 +279,6 @@ export class StopsMapApp {
   }
 
   async _handleGlobalRouteFilterChange(selected, routeObjs) {
-    // Actualizar singleton partilhado — sem guard que bloqueie quando painel está aberto
     routeFilterState.set(selected, routeObjs);
     this._globalSelectedRoutes    = new Set(selected);
     this._globalSelectedRouteObjs = routeObjs;
@@ -273,7 +289,6 @@ export class StopsMapApp {
       this.stopMarkerManager.clearAllMarkers();
       this._setGlobalFilterBarDisabled(false);
 
-      // Se o painel estiver aberto, re-renderizar chegadas sem filtro
       if (this.nextArrivals?.isVisible) {
         this.nextArrivals._renderArrivals();
         this.busMarkerManager.filterByRoutes(new Set());
@@ -293,7 +308,6 @@ export class StopsMapApp {
     const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
     this.lineOverlayManager.setRoutes(overlayData);
 
-    // Se o painel estiver aberto, aplicar filtro global nos marcadores e chegadas
     if (this.nextArrivals?.isVisible) {
       this.nextArrivals._renderArrivals();
       this.busMarkerManager.filterByRoutes(selected, routeFilterState.dirMap);
@@ -363,7 +377,11 @@ export class StopsMapApp {
     this.mapManager.map.closePopup();
     this._setGlobalFilterBarDisabled(true);
 
-    if (!this._lineFilterMode) this.stopMarkerManager.showOnlyMarker(stop.stop_id);
+    if (!this._lineFilterMode) {
+      this.stopMarkerManager.showOnlyMarker(stop.stop_id);
+    }
+    // Highlight the selected stop marker (orange icon)
+    this.stopMarkerManager.setSelectedStop(stop.stop_id);
 
     const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
     const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes
@@ -399,7 +417,7 @@ export class StopsMapApp {
     } catch (error) {
       console.error('\u274C Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
-      this.showError('Erro ao carregar informações da paragem');
+      this.showError('Erro ao carregar informa\u00e7\u00f5es da paragem');
     }
   }
 
@@ -429,7 +447,6 @@ export class StopsMapApp {
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this.currentBusPositions = busPositions;
 
-    // Determinar filtro efectivo: chip do painel > filtro global > nenhum
     const panelFilter  = this.nextArrivals?.selectedRoutes;
     const activeFilter = (panelFilter?.size > 0)
       ? panelFilter
@@ -448,7 +465,6 @@ export class StopsMapApp {
   }
 
   async handleArrivalFilterChange(selectedRoutes) {
-    // Combinar: chip do painel > filtro global
     const effectiveFilter = selectedRoutes.size > 0
       ? selectedRoutes
       : routeFilterState.selectedRoutes;
@@ -482,11 +498,19 @@ export class StopsMapApp {
     this.mapManager.fitBounds(positions, { paddingTopLeft: [60, 60], paddingBottomRight: [60, panelHeight + 60], maxZoom: 16, minZoom: 13 });
   }
 
+  /**
+   * Clique num autocarro nas próximas chegadas — foca no mapa.
+   * `location` vem de vehicleService.extractVehicleLocation → { lat, lon }
+   */
   handleArrivalClick(data) {
     const { vehicleId, location } = data;
     if (!location || !this.mapManager) return;
+    // extractVehicleLocation returns { lat, lon } — NOT { latitude, longitude }
+    const lat = location.lat ?? location.latitude;
+    const lon = location.lon ?? location.longitude;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
     const offsetY = Math.round(this.mapManager.map.getSize().y * 0.25);
-    this.mapManager.centerOnWithOffset([location.latitude, location.longitude], 17, offsetY);
+    this.mapManager.centerOnWithOffset([lat, lon], 17, offsetY);
     const marker = this.busMarkerManager.markers[vehicleId];
     if (marker) marker.openPopup();
   }
@@ -507,6 +531,8 @@ export class StopsMapApp {
     this.currentStopName     = null;
     this.currentStopPosition = null;
     this._setGlobalFilterBarDisabled(false);
+    // Clear stop highlight
+    this.stopMarkerManager.setSelectedStop(null);
 
     const params = new URLSearchParams(window.location.search);
     params.delete('stop');

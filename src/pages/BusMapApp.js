@@ -22,6 +22,7 @@ import { favouritesManager }      from '../services/FavouritesManager.js';
 import { TutorialModal }          from '../ui/components/TutorialModal.js';
 import { createCenterControl }    from '../map/controls/CenterControl.js';
 import { createStopsControl }     from '../map/controls/StopsControl.js';
+import { createLinesControl }     from '../map/controls/LinesControl.js';
 import { createTutorialControl }  from '../map/controls/TutorialControl.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
@@ -41,10 +42,10 @@ export class BusMapApp {
     this.lastUpdateDisplay  = new LastUpdateDisplay();
     this.centerControl      = null;
     this.stopsControl       = null;
+    this.linesControl       = null;
     this.tutorialControl    = null;
     this.loadingOverlay     = null;
 
-    // Mantidos por compatibilidade interna — fonte de verdade é routeFilterState
     this._selectedRoutes    = new Set();
     this._routeDirMap       = new Map();
     this._allProcessedBuses = [];
@@ -63,7 +64,7 @@ export class BusMapApp {
 
       if (!REALTIME_BUSES_ENABLED) {
         AnnouncementBanner.show(
-          'Localização dos autocarros temporariamente indisponível. Motivo: Ausência de dados por parte da STCP.',
+          'Localiza\u00e7\u00e3o dos autocarros temporariamente indispon\u00edvel. Motivo: Aus\u00eancia de dados por parte da STCP.',
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
@@ -74,12 +75,14 @@ export class BusMapApp {
       this.mapManager.initialize();
       await this.mapManager.waitForReady();
 
-      // Controlos do mapa (ordem = ordem visual de baixo para cima, bottomleft)
       this.centerControl = createCenterControl(this.mapManager.map, () => this.mapManager.getUserPosition());
       this.centerControl.addTo(this.mapManager.map);
 
       this.stopsControl = createStopsControl(this.mapManager.map);
       this.stopsControl.addTo(this.mapManager.map);
+
+      this.linesControl = createLinesControl(this.mapManager.map);
+      this.linesControl.addTo(this.mapManager.map);
 
       this.tutorialControl = createTutorialControl(this.mapManager.map, () => this.tutorialModal?.open());
       this.tutorialControl.addTo(this.mapManager.map);
@@ -87,7 +90,6 @@ export class BusMapApp {
       this.busMarkerManager   = new BusMarkerManager(this.mapManager.map);
       this.lineOverlayManager = new LineOverlayManager(this.mapManager.map);
 
-      // Tutorial
       this.tutorialModal = new TutorialModal({ page: 'busmap' });
       this.tutorialModal.mount();
 
@@ -98,8 +100,6 @@ export class BusMapApp {
       this.nextArrivals.onRefresh(()        => this._handleRefreshArrivals());
       this.nextArrivals.onFavouriteClick(stopId => this._toggleFavourite(stopId));
       this.nextArrivals.onIsFavourite(stopId => favouritesManager.isFavourite(stopId));
-      // O filtro interno do painel não altera o estado global — apenas re-filtra
-      // os marcadores visíveis no mapa de autocarros desta página.
       this.nextArrivals.onFilterChange(selected => this._handleArrivalFilterChange(selected));
 
       this.lineOverlayManager.onStopClick(stop => this._handleStopClick(stop));
@@ -132,20 +132,19 @@ export class BusMapApp {
 
       await this._handleDeepLink();
 
-      // Mostrar tutorial na primeira visita (após tudo carregado)
       this.tutorialModal.showIfFirstVisit();
 
     } catch (error) {
-      console.error('\u274C Erro na inicialização:', error);
+      console.error('\u274C Erro na inicializa\u00e7\u00e3o:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();
-      this.showError('Erro ao inicializar aplicação');
+      this.showError('Erro ao inicializar aplica\u00e7\u00e3o');
     }
   }
 
   setupGeolocation() {
     geolocationService.getCurrentPosition()
       .then(position => this.mapManager.updateUserMarker(position))
-      .catch(err => console.warn('\u26A0\uFE0F Localização indisponível:', err.message));
+      .catch(err => console.warn('\u26A0\uFE0F Localiza\u00e7\u00e3o indispon\u00edvel:', err.message));
   }
 
   setupEventListeners() {
@@ -180,7 +179,7 @@ export class BusMapApp {
       try {
         const stopInfo = await apiService.fetchStopInfo(stopId);
         const stop = {
-          stop_id:   stopId,
+          stop_id:   stopInfo?.stop_id   || stopId,
           stop_name: stopInfo?.stop_name || `Paragem ${stopId}`,
           latitude:  stopInfo?.latitude  || 41.1579,
           longitude: stopInfo?.longitude || -8.6291,
@@ -189,7 +188,7 @@ export class BusMapApp {
         this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
         await this._handleStopClick(stop);
       } catch (e) {
-        console.warn('Deep-link: paragem não encontrada', stopId, e);
+        console.warn('Deep-link: paragem n\u00e3o encontrada', stopId, e);
       }
     }
   }
@@ -215,7 +214,6 @@ export class BusMapApp {
       const processed = await vehicleService.processBusDataBatch(rawBusData);
       this._allProcessedBuses = processed;
 
-      // Registar rota de cada marcador usando displayLine (ex: 'ZC') se disponível
       processed.forEach(bus => {
         this.busMarkerManager.setRouteForMarker(
           bus.id,
@@ -241,7 +239,6 @@ export class BusMapApp {
   }
 
   async _handleRouteFilterChange(selected, routeObjs) {
-    // Actualizar singleton partilhado
     routeFilterState.set(selected, routeObjs);
     this._selectedRoutes = new Set(selected);
     this._routeDirMap    = new Map(routeObjs.map(r => [String(r.number), r.direction ?? 0]));
@@ -252,7 +249,6 @@ export class BusMapApp {
         this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
         this.busMarkerManager.filterByRoutes(new Set());
       }
-      // Se o painel de chegadas estiver aberto, re-renderizar sem filtro global
       if (this.nextArrivals?.isVisible) {
         this.nextArrivals._renderArrivals();
       }
@@ -263,7 +259,6 @@ export class BusMapApp {
       this.busMarkerManager.filterByRoutes(selected, this._routeDirMap);
     }
 
-    // Se o painel de chegadas estiver aberto, re-renderizar com novo filtro global
     if (this.nextArrivals?.isVisible) {
       this.nextArrivals._renderArrivals();
     }
@@ -289,17 +284,10 @@ export class BusMapApp {
     }
   }
 
-  /**
-   * Chamado quando o utilizador clica num chip do painel de chegadas.
-   * Aplica o filtro do painel sobre os marcadores do mapa (sem alterar o
-   * estado global — o filtro global mantém-se).
-   */
   _handleArrivalFilterChange(selectedInPanel) {
-    // Combinar: se o painel tem selecção, usa-a; caso contrário usa global
     const effectiveFilter = selectedInPanel.size > 0
       ? selectedInPanel
       : routeFilterState.selectedRoutes;
-
     this.busMarkerManager.filterByRoutes(effectiveFilter, routeFilterState.dirMap);
   }
 
@@ -343,7 +331,7 @@ export class BusMapApp {
     } catch (error) {
       console.error('\u274C Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
-      this.showError('Erro ao carregar informações da paragem');
+      this.showError('Erro ao carregar informa\u00e7\u00f5es da paragem');
     }
   }
 
@@ -370,7 +358,6 @@ export class BusMapApp {
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this._currentBusPositions = busPositions;
 
-    // Aplicar filtro global ao mostrar os autocarros da paragem
     const effectiveFilter = this.nextArrivals?.selectedRoutes?.size > 0
       ? this.nextArrivals.selectedRoutes
       : routeFilterState.selectedRoutes;
@@ -389,11 +376,19 @@ export class BusMapApp {
     }
   }
 
+  /**
+   * Clique num autocarro nas próximas chegadas — foca no mapa.
+   * `location` vem de vehicleService.extractVehicleLocation → { lat, lon }
+   */
   _handleArrivalClick(data) {
     const { vehicleId, location } = data;
     if (!location || !this.mapManager) return;
+    // extractVehicleLocation returns { lat, lon } — NOT { latitude, longitude }
+    const lat = location.lat ?? location.latitude;
+    const lon = location.lon ?? location.longitude;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
     const offsetY = Math.round(this.mapManager.map.getSize().y * 0.25);
-    this.mapManager.centerOnWithOffset([location.latitude, location.longitude], 17, offsetY);
+    this.mapManager.centerOnWithOffset([lat, lon], 17, offsetY);
     const marker = this.busMarkerManager.markers[vehicleId];
     if (marker) marker.openPopup();
   }
@@ -426,8 +421,8 @@ export class BusMapApp {
     const lineNum = routeFilterState.selectedRoutes.size === 1
       ? [...routeFilterState.selectedRoutes][0]
       : null;
-    const dir = lineNum ? (routeFilterState.dirMap.get(lineNum) ?? 0) : null;
-    const added   = favouritesManager.toggle(stopId, name, {
+    const dir   = lineNum ? (routeFilterState.dirMap.get(lineNum) ?? 0) : null;
+    const added = favouritesManager.toggle(stopId, name, {
       line:    lineNum,
       dir:     dir,
       baseUrl: window.location.pathname
