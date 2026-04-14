@@ -250,25 +250,24 @@
     // Classificação de cada rota numa secção
     function classifyRoute(r) {
       const n = r.number;
-      if (n === 'MB1')                  return 'metrobus';
-      if (/^\d+M$/.test(n))             return 'noturnas';   // 1M, 2M, … 13M
-      if (n === 'ZC')                   return 'especiais';
-      if (/^2\d{2}$/.test(n))           return 'linhas200';
-      if (/^3\d{2}$/.test(n))           return 'linhas300';
-      if (/^4\d{2}$/.test(n))           return 'linhas400';
-      if (/^5\d{2}$/.test(n))           return 'linhas500';
-      if (/^6\d{2}$/.test(n))           return 'linhas600';
-      if (/^7\d{2}$/.test(n))           return 'linhas700';
-      if (/^8\d{2}$/.test(n))           return 'linhas800';
-      if (/^9\d{2}$/.test(n))           return 'linhas900';
+      if (/^2\d{MB}$/.test(n))              return 'metrobus';
+      if (/^\d+M$/.test(n))                 return 'noturnas';   // 1M, 2M, … 13M
+      if (/^2\d{2}$/.test(n))               return 'linhas200';
+      if (/^3\d{2}$/.test(n))               return 'linhas300';
+      if (/^4\d{2}$/.test(n) || n === 'ZC') return 'linhas400';
+      if (/^5\d{2}$/.test(n))               return 'linhas500';
+      if (/^6\d{2}$/.test(n))               return 'linhas600';
+      if (/^7\d{2}$/.test(n))               return 'linhas700';
+      if (/^8\d{2}$/.test(n))               return 'linhas800';
+      if (/^9\d{2}$/.test(n))               return 'linhas900';
       return 'outras';
     }
 
     // Ordem e labels das secções
     const SECTION_ORDER = [
-      { key: 'linhas200',  label: 'Linhas 200' },
-      { key: 'linhas300',  label: 'Linhas 300' },
-      { key: 'linhas400',  label: 'Linhas 400' },
+      { key: 'linhas200',  label: 'Linhas 200 - Porto Ocidental' },
+      { key: 'linhas300',  label: 'Linhas 300 - Porto Centro' },
+      { key: 'linhas400',  label: 'Linhas 400 - Porto Oriental' },
       { key: 'linhas500',  label: 'Linhas 500 — Matosinhos' },
       { key: 'linhas600',  label: 'Linhas 600 — Maia / Aeroporto' },
       { key: 'linhas700',  label: 'Linhas 700 — Valongo / Ermesinde' },
