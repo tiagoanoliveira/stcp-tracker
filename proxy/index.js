@@ -52,7 +52,7 @@ const STCP_ROUTES = [
   { id: '700',  number: '700', name: 'Bolhão - Campo',                                color: '#FF0000', text_color: '#FFFFFF' },
   { id: '701',  number: '701', name: 'Bolhão - Codiceira',                            color: '#FF0000', text_color: '#FFFFFF' },
   { id: '702',  number: '702', name: 'Bolhão - Travagem',                             color: '#FF0000', text_color: '#FFFFFF' },
-  { id: '703',  number: '703', name: 'Cordoaria - Ermesinde (Estação)',               color: '#FF0000', text_color: '#FFFFFF' },
+  { id: '703',  number: '703', name: 'Cordoaria - Ermesinde (Estação, via Sonhos)',   color: '#FF0000', text_color: '#FFFFFF' },
   { id: '704',  number: '704', name: 'Boavista (Casa da Música) - Codiceira',         color: '#FF0000', text_color: '#FFFFFF' },
   { id: '705',  number: '705', name: 'Hospital de S. João - Valongo',                 color: '#FF0000', text_color: '#FFFFFF' },
   { id: '706',  number: '706', name: 'Hosp. S. João - Ermesinde (via Mte. Penedo)',   color: '#FF0000', text_color: '#FFFFFF' }, 
