@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Lista de linhas STCP no Porto">
+  <meta name="theme-color" content="#0072c6">
+  <title>Linhas STCP</title>
+
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./src/ui/styles/lines.css">
+  <link rel="shortcut icon" href="./resources/favicon.svg">
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYVRR1K1R2"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-BYVRR1K1R2');
+  </script>
+</head>
+<body>
+  <div class="lines-app">
+    <header class="lines-header">
+      <a href="/" class="lines-logo" title="Voltar ao mapa">
+        <img src="./resources/favicon.svg" alt="STCP Live Logo">
+        <span>STCP Live</span>
+      </a>
+      <h1 class="lines-title">Linhas STCP</h1>
+    </header>
+
+    <div class="lines-search-wrap">
+      <div class="lines-search-box">
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="text" id="lines-search" class="lines-search-input" placeholder="Procurar linha (número ou nome)" autocomplete="off">
+        <button id="lines-search-clear" class="lines-search-clear" title="Limpar" aria-label="Limpar pesquisa" style="display:none">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <main id="lines-list" class="lines-list" role="list" aria-label="Lista de linhas STCP"></main>
+
+    <footer class="lines-footer">
+      &copy; 2026 STCP Live Map &bull; Website feito com &#x1F90D; por <a href="https://www.tiagoanoliveira.pt/" target="_blank" rel="noopener noreferrer">Tiago Oliveira</a>
+    </footer>
+  </div>
+
+  <script type="module" src="./src/pages/LinesApp.js"></script>
+</body>
+</html>
