@@ -6,11 +6,8 @@
   <meta name="description" content="Detalhe de linha STCP">
   <meta name="theme-color" content="#0072c6">
   <title>Linha STCP</title>
-
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./src/ui/styles/lines.css">
   <link rel="shortcut icon" href="./resources/favicon.svg">
-
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYVRR1K1R2"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -18,59 +15,407 @@
     gtag('js', new Date());
     gtag('config', 'G-BYVRR1K1R2');
   </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; min-height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f2f4f7;
+      color: #1a1a2e;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      max-width: 680px;
+      margin: 0 auto;
+      background: #f2f4f7;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      padding: 0 8px 0 4px;
+      height: 52px;
+      background: #fff;
+      border-bottom: 1px solid #e5e8ee;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      gap: 4px;
+    }
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      text-decoration: none;
+      color: #0072c6;
+      font-size: 15px;
+      font-weight: 500;
+      padding: 8px 10px 8px 6px;
+      border-radius: 8px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background .15s;
+    }
+    .back-btn:hover { background: #eef5fb; }
+    .back-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+    /* ── Hero card ── */
+    .hero {
+      background: var(--rc, #187EC2);
+      padding: 16px 16px 18px;
+    }
+    .hero-top {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .hero-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 58px;
+      height: 38px;
+      background: rgba(255,255,255,.2);
+      border: 2px solid rgba(255,255,255,.38);
+      border-radius: 10px;
+      font-size: 20px;
+      font-weight: 800;
+      color: #fff;
+      padding: 0 10px;
+      flex-shrink: 0;
+      letter-spacing: .01em;
+    }
+    .hero-name {
+      font-size: 17px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.25;
+      flex: 1;
+      min-width: 0;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .hero-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.17);
+      border: 1.5px solid rgba(255,255,255,.38);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .15s, border-color .15s;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .hero-btn:hover {
+      background: rgba(255,255,255,.3);
+      border-color: rgba(255,255,255,.6);
+    }
+    .hero-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    /* ── States ── */
+    .state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 56px 20px;
+      font-size: 14px;
+      color: #9ba4b4;
+      text-align: center;
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #e5e8ee;
+      border-top-color: #0072c6;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .err-icon { width: 36px; height: 36px; color: #e05c5c; }
+    .err-msg { color: #c0392b; font-size: 14px; max-width: 280px; }
+
+    /* ── Stops timeline ── */
+    .stops {
+      list-style: none;
+      padding: 8px 0 8px 0;
+      background: #fff;
+      margin-top: 2px;
+    }
+    .stop {
+      display: flex;
+      align-items: stretch;
+      min-height: 56px;
+      position: relative;
+    }
+
+    /* left timeline column */
+    .tl {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 44px;
+      flex-shrink: 0;
+      padding-top: 20px;
+      position: relative;
+    }
+    .dot {
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      border: 2.5px solid #fff;
+      background: var(--rc, #187EC2);
+      box-shadow: 0 0 0 2px var(--rc, #187EC2);
+      flex-shrink: 0;
+      z-index: 1;
+    }
+    .dot-lg {
+      width: 17px; height: 17px;
+      border: 3px solid #fff;
+      box-shadow: 0 0 0 2.5px var(--rc, #187EC2);
+    }
+    .line {
+      flex: 1;
+      width: 3px;
+      background: var(--rc, #187EC2);
+      opacity: .28;
+      margin-top: 3px;
+      border-radius: 2px;
+    }
+
+    /* right content */
+    .stop-link {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      padding: 12px 16px 12px 4px;
+      text-decoration: none;
+      color: inherit;
+      border-radius: 8px;
+      margin: 2px 8px 2px 0;
+      transition: background .13s;
+      min-width: 0;
+    }
+    .stop-link:hover { background: #f4f7ff; }
+    .stop-link:active { background: #e8f0fb; }
+
+    .stop-name {
+      font-size: 15px;
+      font-weight: 500;
+      color: #1a1a2e;
+      line-height: 1.2;
+    }
+    .stop-first .stop-name,
+    .stop-last  .stop-name {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .stop-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stop-code {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #9ba4b4;
+      background: #f2f4f7;
+      padding: 1px 6px;
+      border-radius: 5px;
+      letter-spacing: .03em;
+    }
+    .stop-zone {
+      font-size: 11.5px;
+      color: #b0b8c8;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      padding: 24px 16px 16px;
+      font-size: 13px;
+      color: #9ba4b4;
+    }
+    .footer a { color: #0072c6; text-decoration: none; font-weight: 500; }
+    .footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 480px) {
+      .hero { padding: 14px 12px 16px; }
+      .hero-badge { font-size: 17px; min-width: 50px; height: 34px; }
+      .hero-name { font-size: 15px; }
+      .stop-name { font-size: 14px; }
+      .tl { width: 36px; }
+    }
+  </style>
 </head>
 <body>
-  <div class="lines-app">
-    <header class="lines-header" id="line-detail-header">
-      <a href="/lines" class="lines-back-btn" title="Todas as linhas">
+  <div class="app">
+    <header class="header">
+      <a href="lines.html" class="back-btn" id="back-btn">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="15 18 9 12 15 6"/>
         </svg>
-        <span>Todas as linhas</span>
+        Todas as linhas
       </a>
-      <h1 class="lines-title" id="detail-page-title">Linha</h1>
     </header>
 
-    <div class="line-detail-hero" id="line-detail-hero">
-      <div class="line-detail-badge" id="line-detail-badge"></div>
-      <div class="line-detail-info">
-        <div class="line-detail-name" id="line-detail-name"></div>
-        <div class="line-detail-actions">
-          <button class="line-detail-action-btn" id="btn-invert" title="Inverter sentido">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7 16V4m0 0L3 8m4-4 4 4"/><path d="M17 8v12m0 0 4-4m-4 4-4-4"/>
-            </svg>
-            Inverter sentido
-          </button>
-          <a class="line-detail-action-btn" id="btn-map" href="#">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="3 7 9 4 15 7 21 4 21 17 15 20 9 17 3 20"/><line x1="9" y1="4" x2="9" y2="17"/><line x1="15" y1="7" x2="15" y2="20"/>
-            </svg>
-            Ver no Mapa
-          </a>
-        </div>
+    <div class="hero" id="hero">
+      <div class="hero-top">
+        <span class="hero-badge" id="hero-badge">…</span>
+        <span class="hero-name" id="hero-name"></span>
+      </div>
+      <div class="hero-actions">
+        <button class="hero-btn" id="btn-invert">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 16V4m0 0L3 8m4-4 4 4"/><path d="M17 8v12m0 0 4-4m-4 4-4-4"/>
+          </svg>
+          Inverter sentido
+        </button>
+        <a class="hero-btn" id="btn-map" href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="3 7 9 4 15 7 21 4 21 17 15 20 9 17 3 20"/><line x1="9" y1="4" x2="9" y2="17"/><line x1="15" y1="7" x2="15" y2="20"/>
+          </svg>
+          Ver no Mapa
+        </a>
       </div>
     </div>
 
-    <div id="line-detail-loading" class="lines-loading">
-      <div class="lines-spinner"></div>
+    <div id="state-loading" class="state">
+      <div class="spinner"></div>
       <span>A carregar paragens&hellip;</span>
     </div>
-
-    <div id="line-detail-error" class="lines-error" style="display:none">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/>
+    <div id="state-error" class="state" style="display:none">
+      <svg class="err-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16.5" stroke-width="2.5" stroke-linecap="round"/>
       </svg>
-      <span id="line-detail-error-msg">Erro ao carregar paragens.</span>
+      <span class="err-msg" id="err-msg">Erro ao carregar paragens.</span>
     </div>
 
-    <ol id="line-stops-list" class="line-stops-list" aria-label="Paragens da linha" style="display:none"></ol>
+    <ul id="stops" class="stops" style="display:none" aria-label="Paragens da linha"></ul>
 
-    <footer class="lines-footer">
-      &copy; 2026 STCP Live Map &bull; Website feito com &#x1F90D; por <a href="https://www.tiagoanoliveira.pt/" target="_blank" rel="noopener noreferrer">Tiago Oliveira</a>
+    <footer class="footer">
+      &copy; 2026 STCP Live Map &bull; Website feito com &#x1F90D; por
+      <a href="https://www.tiagoanoliveira.pt/" target="_blank" rel="noopener noreferrer">Tiago Oliveira</a>
     </footer>
   </div>
 
-  <script type="module" src="./src/pages/LineDetailApp.js"></script>
+  <script>
+    const PROXY = 'https://stcp-worker.tiagoanoliveira.pt';
+    const params      = new URLSearchParams(location.search);
+    const routeId     = params.get('id')     || '';
+    const routeNumber = params.get('number') || routeId;
+
+    const heroEl      = document.getElementById('hero');
+    const badgeEl     = document.getElementById('hero-badge');
+    const nameEl      = document.getElementById('hero-name');
+    const stateLoad   = document.getElementById('state-loading');
+    const stateErr    = document.getElementById('state-error');
+    const errMsgEl    = document.getElementById('err-msg');
+    const stopsEl     = document.getElementById('stops');
+    const btnInvert   = document.getElementById('btn-invert');
+    const btnMap      = document.getElementById('btn-map');
+
+    let direction = 0;
+    let route     = { id: routeId, number: routeNumber, name: '', color: '#187EC2', text_color: '#FFFFFF' };
+
+    function applyHero() {
+      const bg = route.color || '#187EC2';
+      const fg = route.text_color || '#FFFFFF';
+      document.title = `Linha ${route.number} — STCP Live`;
+      heroEl.style.setProperty('--rc', bg);
+      badgeEl.textContent = route.number;
+      nameEl.textContent  = route.name || route.number;
+      btnMap.href = `stopsmap.html?route=${encodeURIComponent(routeId)}`;
+      // propagate colour to dots/lines via CSS var on :root
+      document.documentElement.style.setProperty('--rc', bg);
+    }
+
+    async function init() {
+      if (!routeId) { showError('Linha não encontrada.'); return; }
+      try {
+        const res  = await fetch(`${PROXY}/routes/list`);
+        const data = await res.json();
+        const found = (data.routes || []).find(r => r.id === routeId);
+        if (found) route = found;
+      } catch(_) {}
+      applyHero();
+      loadStops();
+    }
+
+    async function loadStops() {
+      stateLoad.style.display = 'flex';
+      stateErr.style.display  = 'none';
+      stopsEl.style.display   = 'none';
+
+      try {
+        const res  = await fetch(`${PROXY}/route/${routeId}/stops?direction_id=${direction}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const stops = data.stops || [];
+        if (!stops.length) throw new Error('Sem paragens');
+        renderStops(stops);
+      } catch(e) {
+        showError(`Não foi possível carregar as paragens da linha ${routeNumber}.`);
+      }
+    }
+
+    function renderStops(stops) {
+      stateLoad.style.display = 'none';
+      stopsEl.style.display   = 'block';
+      const bg = route.color || '#187EC2';
+      const last = stops.length - 1;
+
+      stopsEl.innerHTML = stops.map((s, i) => {
+        const isFirst = i === 0;
+        const isLast  = i === last;
+        const code    = s.stop_code || s.stop_id || '';
+        const zone    = s.zone_id ? `Zona ${s.zone_id}` : '';
+        const mapUrl  = `stopsmap.html?stop=${encodeURIComponent(code)}&route=${encodeURIComponent(routeId)}`;
+
+        return `
+          <li class="stop${isFirst ? ' stop-first' : ''}${isLast ? ' stop-last' : ''}">
+            <div class="tl" style="--rc:${bg}">
+              <div class="dot${isFirst || isLast ? ' dot-lg' : ''}" style="background:${bg};box-shadow:0 0 0 2.5px ${bg};border:${isFirst||isLast?'3':'2.5'}px solid #fff"></div>
+              ${!isLast ? `<div class="line" style="background:${bg}"></div>` : ''}
+            </div>
+            <a class="stop-link" href="${mapUrl}" title="Ver ${s.stop_name} no mapa">
+              <span class="stop-name">${s.stop_name}</span>
+              <span class="stop-meta">
+                ${code ? `<span class="stop-code">${code}</span>` : ''}
+                ${zone ? `<span class="stop-zone">${zone}</span>` : ''}
+              </span>
+            </a>
+          </li>`;
+      }).join('');
+    }
+
+    function showError(msg) {
+      stateLoad.style.display = 'none';
+      errMsgEl.textContent    = msg;
+      stateErr.style.display  = 'flex';
+    }
+
+    btnInvert.addEventListener('click', () => {
+      direction = direction === 0 ? 1 : 0;
+      loadStops();
+    });
+
+    init();
+  </script>
 </body>
 </html>
