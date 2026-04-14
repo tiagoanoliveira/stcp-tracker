@@ -152,27 +152,37 @@
     /* ── Stops timeline ── */
     .stops {
       list-style: none;
-      padding: 8px 0 8px 0;
+      padding: 0;
       background: #fff;
       margin-top: 2px;
     }
+
+    /*
+     * Each stop row: the left column (.tl) is a flex column that holds
+     * the dot plus a vertical bar that fills all remaining height.
+     * The bar must stretch to the BOTTOM of the row so it connects
+     * seamlessly with the dot in the next row.
+     */
     .stop {
       display: flex;
-      align-items: stretch;
-      min-height: 56px;
+      align-items: stretch;   /* tl and stop-link share the same height */
       position: relative;
     }
 
-    /* left timeline column */
+    /* Left timeline column */
     .tl {
       display: flex;
       flex-direction: column;
       align-items: center;
-      width: 44px;
+      width: 48px;
       flex-shrink: 0;
-      padding-top: 20px;
-      position: relative;
     }
+
+    /* Spacer above the dot — same height as the top-padding on stop-link */
+    .tl-top    { height: 18px; flex-shrink: 0; }
+    /* Spacer below the dot — fills the rest to connect with the next row */
+    .tl-bottom { flex: 1; display: flex; flex-direction: column; align-items: center; }
+
     .dot {
       width: 13px; height: 13px;
       border-radius: 50%;
@@ -184,64 +194,76 @@
     }
     .dot-lg {
       width: 17px; height: 17px;
-      border: 3px solid #fff;
+      border-width: 3px;
       box-shadow: 0 0 0 2.5px var(--rc, #187EC2);
     }
-    .line {
+
+    /* The vertical bar sits below the dot and fills the tl-bottom */
+    .tl-line {
       flex: 1;
       width: 3px;
       background: var(--rc, #187EC2);
-      opacity: .28;
-      margin-top: 3px;
+      opacity: .3;
+      margin-top: 2px;
       border-radius: 2px;
+      min-height: 8px;
     }
 
-    /* right content */
+    /* Right content */
     .stop-link {
       flex: 1;
       display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 4px;
-      padding: 12px 16px 12px 4px;
+      align-items: center;
+      gap: 0;
+      padding: 14px 16px 14px 0;
       text-decoration: none;
       color: inherit;
       border-radius: 8px;
-      margin: 2px 8px 2px 0;
+      margin: 0 8px 0 0;
       transition: background .13s;
       min-width: 0;
+      min-height: 52px;
     }
-    .stop-link:hover { background: #f4f7ff; }
+    .stop-link:hover  { background: #f4f7ff; }
     .stop-link:active { background: #e8f0fb; }
 
+    /* Stop name — grows to fill available width */
     .stop-name {
-      font-size: 15px;
+      font-size: 14.5px;
       font-weight: 500;
       color: #1a1a2e;
       line-height: 1.2;
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .stop-first .stop-name,
     .stop-last  .stop-name {
-      font-size: 15px;
       font-weight: 700;
     }
-    .stop-meta {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+
+    /* Code pill — right of the name */
     .stop-code {
-      font-size: 11.5px;
+      font-size: 11px;
       font-weight: 600;
-      color: #9ba4b4;
-      background: #f2f4f7;
-      padding: 1px 6px;
+      color: #7a8499;
+      background: #f0f2f6;
+      padding: 2px 7px;
       border-radius: 5px;
       letter-spacing: .03em;
+      flex-shrink: 0;
+      margin-left: 8px;
     }
+
+    /* Zone — pushed to the far right */
     .stop-zone {
-      font-size: 11.5px;
+      font-size: 11px;
       color: #b0b8c8;
+      flex-shrink: 0;
+      margin-left: 6px;
+      white-space: nowrap;
     }
 
     /* ── Footer ── */
@@ -258,8 +280,8 @@
       .hero { padding: 14px 12px 16px; }
       .hero-badge { font-size: 17px; min-width: 50px; height: 34px; }
       .hero-name { font-size: 15px; }
-      .stop-name { font-size: 14px; }
-      .tl { width: 36px; }
+      .stop-name { font-size: 13.5px; }
+      .tl { width: 40px; }
     }
   </style>
 </head>
@@ -276,7 +298,7 @@
 
     <div class="hero" id="hero">
       <div class="hero-top">
-        <span class="hero-badge" id="hero-badge">…</span>
+        <span class="hero-badge" id="hero-badge">&hellip;</span>
         <span class="hero-name" id="hero-name"></span>
       </div>
       <div class="hero-actions">
@@ -286,12 +308,13 @@
           </svg>
           Inverter sentido
         </button>
-        <a class="hero-btn" id="btn-map" href="#">
+        <!-- Ver no Mapa: opens index.html (bus map) with the line filter pre-selected -->
+        <button class="hero-btn" id="btn-map">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="3 7 9 4 15 7 21 4 21 17 15 20 9 17 3 20"/><line x1="9" y1="4" x2="9" y2="17"/><line x1="15" y1="7" x2="15" y2="20"/>
           </svg>
           Ver no Mapa
-        </a>
+        </button>
       </div>
     </div>
 
@@ -320,33 +343,41 @@
     const routeId     = params.get('id')     || '';
     const routeNumber = params.get('number') || routeId;
 
-    const heroEl      = document.getElementById('hero');
-    const badgeEl     = document.getElementById('hero-badge');
-    const nameEl      = document.getElementById('hero-name');
-    const stateLoad   = document.getElementById('state-loading');
-    const stateErr    = document.getElementById('state-error');
-    const errMsgEl    = document.getElementById('err-msg');
-    const stopsEl     = document.getElementById('stops');
-    const btnInvert   = document.getElementById('btn-invert');
-    const btnMap      = document.getElementById('btn-map');
+    const heroEl    = document.getElementById('hero');
+    const badgeEl   = document.getElementById('hero-badge');
+    const nameEl    = document.getElementById('hero-name');
+    const stateLoad = document.getElementById('state-loading');
+    const stateErr  = document.getElementById('state-error');
+    const errMsgEl  = document.getElementById('err-msg');
+    const stopsEl   = document.getElementById('stops');
+    const btnInvert = document.getElementById('btn-invert');
+    const btnMap    = document.getElementById('btn-map');
 
     let direction = 0;
     let route     = { id: routeId, number: routeNumber, name: '', color: '#187EC2', text_color: '#FFFFFF' };
 
     function applyHero() {
       const bg = route.color || '#187EC2';
-      const fg = route.text_color || '#FFFFFF';
-      document.title = `Linha ${route.number} — STCP Live`;
+      document.title = `Linha ${route.number} \u2014 STCP Live`;
       heroEl.style.setProperty('--rc', bg);
+      document.documentElement.style.setProperty('--rc', bg);
       badgeEl.textContent = route.number;
       nameEl.textContent  = route.name || route.number;
-      btnMap.href = `stopsmap.html?route=${encodeURIComponent(routeId)}`;
-      // propagate colour to dots/lines via CSS var on :root
-      document.documentElement.style.setProperty('--rc', bg);
     }
 
+    /* ------------------------------------------------------------------ */
+    /* "Ver no Mapa" — opens index.html (bus map) with line filter active  */
+    /* ------------------------------------------------------------------ */
+    btnMap.addEventListener('click', () => {
+      // index.html is the BusMapApp; it reads ?line= on load
+      const url = `index.html?line=${encodeURIComponent(routeNumber)}&dir=${direction}`;
+      window.location.href = url;
+    });
+
+    /* ------------------------------------------------------------------ */
+
     async function init() {
-      if (!routeId) { showError('Linha não encontrada.'); return; }
+      if (!routeId) { showError('Linha n\u00e3o encontrada.'); return; }
       try {
         const res  = await fetch(`${PROXY}/routes/list`);
         const data = await res.json();
@@ -370,14 +401,14 @@
         if (!stops.length) throw new Error('Sem paragens');
         renderStops(stops);
       } catch(e) {
-        showError(`Não foi possível carregar as paragens da linha ${routeNumber}.`);
+        showError(`N\u00e3o foi poss\u00edvel carregar as paragens da linha ${routeNumber}.`);
       }
     }
 
     function renderStops(stops) {
       stateLoad.style.display = 'none';
       stopsEl.style.display   = 'block';
-      const bg = route.color || '#187EC2';
+      const bg   = route.color || '#187EC2';
       const last = stops.length - 1;
 
       stopsEl.innerHTML = stops.map((s, i) => {
@@ -385,20 +416,35 @@
         const isLast  = i === last;
         const code    = s.stop_code || s.stop_id || '';
         const zone    = s.zone_id ? `Zona ${s.zone_id}` : '';
-        const mapUrl  = `stopsmap.html?stop=${encodeURIComponent(code)}&route=${encodeURIComponent(routeId)}`;
+        /*
+         * Deep-link into stopsmap:
+         *   ?stop=<stop_code>  — opens the arrivals panel for this stop
+         *   ?line=<routeNumber> — pre-selects the line filter
+         *   ?dir=<direction>   — direction hint for the overlay
+         *
+         * We pass stop_code (not stop_id) because StopsMapApp._handleDeepLink
+         * now reads the stop info via apiService.fetchStopInfo which accepts
+         * stop_code as well, and the URL must match what the StopMarkerManager
+         * uses as key (stop_id returned from the API for that code).
+         */
+        const mapUrl = `stopsmap.html?stop=${encodeURIComponent(code)}&line=${encodeURIComponent(routeNumber)}&dir=${direction}`;
+
+        const dotClass = `dot${isFirst || isLast ? ' dot-lg' : ''}`;
+        const dotStyle = `background:${bg};box-shadow:0 0 0 2.5px ${bg};border:${isFirst||isLast?'3':'2.5'}px solid #fff`;
 
         return `
           <li class="stop${isFirst ? ' stop-first' : ''}${isLast ? ' stop-last' : ''}">
             <div class="tl" style="--rc:${bg}">
-              <div class="dot${isFirst || isLast ? ' dot-lg' : ''}" style="background:${bg};box-shadow:0 0 0 2.5px ${bg};border:${isFirst||isLast?'3':'2.5'}px solid #fff"></div>
-              ${!isLast ? `<div class="line" style="background:${bg}"></div>` : ''}
+              <div class="tl-top"></div>
+              <div class="${dotClass}" style="${dotStyle}"></div>
+              <div class="tl-bottom">
+                ${!isLast ? `<div class="tl-line" style="background:${bg}"></div>` : ''}
+              </div>
             </div>
             <a class="stop-link" href="${mapUrl}" title="Ver ${s.stop_name} no mapa">
               <span class="stop-name">${s.stop_name}</span>
-              <span class="stop-meta">
-                ${code ? `<span class="stop-code">${code}</span>` : ''}
-                ${zone ? `<span class="stop-zone">${zone}</span>` : ''}
-              </span>
+              ${code ? `<span class="stop-code">${code}</span>` : ''}
+              ${zone ? `<span class="stop-zone">${zone}</span>` : ''}
             </a>
           </li>`;
       }).join('');
