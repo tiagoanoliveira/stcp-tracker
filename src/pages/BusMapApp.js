@@ -22,6 +22,7 @@ import { favouritesManager }      from '../services/FavouritesManager.js';
 import { TutorialModal }          from '../ui/components/TutorialModal.js';
 import { createCenterControl }    from '../map/controls/CenterControl.js';
 import { createStopsControl }     from '../map/controls/StopsControl.js';
+import { createLinesControl }     from '../map/controls/LinesControl.js';
 import { createTutorialControl }  from '../map/controls/TutorialControl.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
@@ -41,6 +42,7 @@ export class BusMapApp {
     this.lastUpdateDisplay  = new LastUpdateDisplay();
     this.centerControl      = null;
     this.stopsControl       = null;
+    this.linesControl       = null;
     this.tutorialControl    = null;
     this.loadingOverlay     = null;
 
@@ -80,6 +82,9 @@ export class BusMapApp {
 
       this.stopsControl = createStopsControl(this.mapManager.map);
       this.stopsControl.addTo(this.mapManager.map);
+
+      this.linesControl = createLinesControl(this.mapManager.map);
+      this.linesControl.addTo(this.mapManager.map);
 
       this.tutorialControl = createTutorialControl(this.mapManager.map, () => this.tutorialModal?.open());
       this.tutorialControl.addTo(this.mapManager.map);
@@ -215,7 +220,6 @@ export class BusMapApp {
       const processed = await vehicleService.processBusDataBatch(rawBusData);
       this._allProcessedBuses = processed;
 
-      // Registar rota de cada marcador usando displayLine (ex: 'ZC') se disponível
       processed.forEach(bus => {
         this.busMarkerManager.setRouteForMarker(
           bus.id,
@@ -241,7 +245,6 @@ export class BusMapApp {
   }
 
   async _handleRouteFilterChange(selected, routeObjs) {
-    // Actualizar singleton partilhado
     routeFilterState.set(selected, routeObjs);
     this._selectedRoutes = new Set(selected);
     this._routeDirMap    = new Map(routeObjs.map(r => [String(r.number), r.direction ?? 0]));
@@ -252,7 +255,6 @@ export class BusMapApp {
         this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
         this.busMarkerManager.filterByRoutes(new Set());
       }
-      // Se o painel de chegadas estiver aberto, re-renderizar sem filtro global
       if (this.nextArrivals?.isVisible) {
         this.nextArrivals._renderArrivals();
       }
@@ -263,7 +265,6 @@ export class BusMapApp {
       this.busMarkerManager.filterByRoutes(selected, this._routeDirMap);
     }
 
-    // Se o painel de chegadas estiver aberto, re-renderizar com novo filtro global
     if (this.nextArrivals?.isVisible) {
       this.nextArrivals._renderArrivals();
     }
@@ -289,17 +290,10 @@ export class BusMapApp {
     }
   }
 
-  /**
-   * Chamado quando o utilizador clica num chip do painel de chegadas.
-   * Aplica o filtro do painel sobre os marcadores do mapa (sem alterar o
-   * estado global — o filtro global mantém-se).
-   */
   _handleArrivalFilterChange(selectedInPanel) {
-    // Combinar: se o painel tem selecção, usa-a; caso contrário usa global
     const effectiveFilter = selectedInPanel.size > 0
       ? selectedInPanel
       : routeFilterState.selectedRoutes;
-
     this.busMarkerManager.filterByRoutes(effectiveFilter, routeFilterState.dirMap);
   }
 
@@ -370,7 +364,6 @@ export class BusMapApp {
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this._currentBusPositions = busPositions;
 
-    // Aplicar filtro global ao mostrar os autocarros da paragem
     const effectiveFilter = this.nextArrivals?.selectedRoutes?.size > 0
       ? this.nextArrivals.selectedRoutes
       : routeFilterState.selectedRoutes;
@@ -426,8 +419,8 @@ export class BusMapApp {
     const lineNum = routeFilterState.selectedRoutes.size === 1
       ? [...routeFilterState.selectedRoutes][0]
       : null;
-    const dir = lineNum ? (routeFilterState.dirMap.get(lineNum) ?? 0) : null;
-    const added   = favouritesManager.toggle(stopId, name, {
+    const dir   = lineNum ? (routeFilterState.dirMap.get(lineNum) ?? 0) : null;
+    const added = favouritesManager.toggle(stopId, name, {
       line:    lineNum,
       dir:     dir,
       baseUrl: window.location.pathname

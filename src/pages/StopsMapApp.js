@@ -16,6 +16,7 @@ import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
 import { LineOverlayManager }     from '../map/LineOverlayManager.js';
 import { createCenterControl }    from '../map/controls/CenterControl.js';
 import { createBusMapControl }    from '../map/controls/BusMapControl.js';
+import { createLinesControl }     from '../map/controls/LinesControl.js';
 import { createTutorialControl }  from '../map/controls/TutorialControl.js';
 import { NextArrivals }           from '../ui/components/NextArrivals.js';
 import { LoadingSpinner }         from '../ui/components/LoadingSpinner.js';
@@ -39,6 +40,7 @@ export class StopsMapApp {
     this.tutorialModal       = null;
     this.centerControl       = null;
     this.busMapControl       = null;
+    this.linesControl        = null;
     this.tutorialControl     = null;
     this.nextArrivals        = null;
     this.loadingOverlay      = null;
@@ -58,7 +60,6 @@ export class StopsMapApp {
     this.isLoadingStops    = false;
     this.loadStopsDebounce = null;
 
-    // Mantidos por compatibilidade interna — fonte de verdade é routeFilterState
     this._globalSelectedRoutes    = new Set();
     this._globalSelectedRouteObjs = [];
     this._lineFilterMode          = false;
@@ -86,6 +87,9 @@ export class StopsMapApp {
 
       this.busMapControl = createBusMapControl(this.mapManager.map);
       this.busMapControl.addTo(this.mapManager.map);
+
+      this.linesControl = createLinesControl(this.mapManager.map);
+      this.linesControl.addTo(this.mapManager.map);
 
       this.tutorialControl = createTutorialControl(this.mapManager.map, () => this.tutorialModal?.open());
       this.tutorialControl.addTo(this.mapManager.map);
@@ -262,7 +266,6 @@ export class StopsMapApp {
   }
 
   async _handleGlobalRouteFilterChange(selected, routeObjs) {
-    // Actualizar singleton partilhado — sem guard que bloqueie quando painel está aberto
     routeFilterState.set(selected, routeObjs);
     this._globalSelectedRoutes    = new Set(selected);
     this._globalSelectedRouteObjs = routeObjs;
@@ -273,7 +276,6 @@ export class StopsMapApp {
       this.stopMarkerManager.clearAllMarkers();
       this._setGlobalFilterBarDisabled(false);
 
-      // Se o painel estiver aberto, re-renderizar chegadas sem filtro
       if (this.nextArrivals?.isVisible) {
         this.nextArrivals._renderArrivals();
         this.busMarkerManager.filterByRoutes(new Set());
@@ -293,7 +295,6 @@ export class StopsMapApp {
     const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
     this.lineOverlayManager.setRoutes(overlayData);
 
-    // Se o painel estiver aberto, aplicar filtro global nos marcadores e chegadas
     if (this.nextArrivals?.isVisible) {
       this.nextArrivals._renderArrivals();
       this.busMarkerManager.filterByRoutes(selected, routeFilterState.dirMap);
@@ -429,7 +430,6 @@ export class StopsMapApp {
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this.currentBusPositions = busPositions;
 
-    // Determinar filtro efectivo: chip do painel > filtro global > nenhum
     const panelFilter  = this.nextArrivals?.selectedRoutes;
     const activeFilter = (panelFilter?.size > 0)
       ? panelFilter
@@ -448,7 +448,6 @@ export class StopsMapApp {
   }
 
   async handleArrivalFilterChange(selectedRoutes) {
-    // Combinar: chip do painel > filtro global
     const effectiveFilter = selectedRoutes.size > 0
       ? selectedRoutes
       : routeFilterState.selectedRoutes;
