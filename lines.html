@@ -250,7 +250,7 @@
     // Classificação de cada rota numa secção
     function classifyRoute(r) {
       const n = r.number;
-      if (/^2\d{MB}$/.test(n))              return 'metrobus';
+      if (n === 'MB1')                      return 'metrobus';
       if (/^\d+M$/.test(n))                 return 'noturnas';   // 1M, 2M, … 13M
       if (/^2\d{2}$/.test(n))               return 'linhas200';
       if (/^3\d{2}$/.test(n))               return 'linhas300';
