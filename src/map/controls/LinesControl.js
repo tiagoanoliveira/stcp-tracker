@@ -21,11 +21,12 @@ export function createLinesControl(map, linesUrl = 'lines') {
           <!-- paragem superior esquerda -->
           <circle cx="10" cy="10" r="5" fill="currentColor" stroke="none"/>
           <!-- paragem central direita -->
-          <circle cx="38" cy="24" r="5" fill="none"/>
+          <circle cx="38" cy="18" r="5" fill="currentColor" stroke="none"/>
           <!-- paragem inferior esquerda -->
-          <circle cx="10" cy="38" r="5" fill="none"/>
+          <circle cx="20" cy="25" r="5" fill="currentColor" stroke="none"/>
+          <circle cx="38" cy="38" r="5" fill="currentColor" stroke="none"/>
           <!-- traço: cima esquerda → direita curva → baixo esquerda -->
-          <path d="M10 10 C10 10 38 10 38 18 C38 26 10 22 10 30 C10 38 38 38 38 38" fill="none"/>
+          <path d="M10 10 C30 10 38 10 38 18 C38 26 10 22 10 30 C0 38 38 38 38 38" fill="none"/>
         </svg>
       `;
 
