@@ -38,7 +38,7 @@
       display: flex;
       align-items: center;
       padding: 0 8px 0 4px;
-      height: 52px;
+      height: 50px;
       background: #fff;
       border-bottom: 1px solid #e5e8ee;
       position: sticky;
@@ -61,29 +61,29 @@
       transition: background .15s;
     }
     .back-btn:hover { background: #eef5fb; }
-    .back-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
+    .back-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
 
     /* ── Hero card ── */
     .hero {
       background: var(--rc, #187EC2);
-      padding: 16px 16px 18px;
+      padding: 14px 16px 16px;
     }
     .hero-top {
       display: flex;
       align-items: center;
       gap: 14px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
     .hero-badge {
       display: flex;
       align-items: center;
       justify-content: center;
-      min-width: 58px;
-      height: 38px;
+      min-width: 54px;
+      height: 36px;
       background: rgba(255,255,255,.2);
       border: 2px solid rgba(255,255,255,.38);
       border-radius: 10px;
-      font-size: 20px;
+      font-size: 19px;
       font-weight: 800;
       color: #fff;
       padding: 0 10px;
@@ -91,7 +91,7 @@
       letter-spacing: .01em;
     }
     .hero-name {
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 700;
       color: #fff;
       line-height: 1.25;
@@ -107,7 +107,7 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 7px 16px;
+      padding: 6px 14px;
       border-radius: 20px;
       background: rgba(255,255,255,.17);
       border: 1.5px solid rgba(255,255,255,.38);
@@ -139,24 +139,21 @@
       text-align: center;
     }
     .spinner {
-      width: 32px; height: 32px;
+      width: 28px; height: 28px;
       border: 3px solid #e5e8ee;
       border-top-color: #0072c6;
       border-radius: 50%;
       animation: spin .7s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .err-icon { width: 36px; height: 36px; color: #e05c5c; }
+    .err-icon { width: 34px; height: 34px; color: #e05c5c; }
     .err-msg { color: #c0392b; font-size: 14px; max-width: 280px; }
 
     /* ────────────────────────────────────────────────
        TIMELINE
-       Estratégia: a coluna .tl tem largura fixa e usa
-       position:relative. O traço vertical é um ::before
-       absoluto que vai do topo ao fundo da li.stop.
-       O dot é position:absolute centrado horizontalmente.
-       O conteúdo (.stop-link) tem padding-left que
-       afasta o texto da coluna .tl.
+       Traço vertical via ::before absoluto na .tl.
+       Dot centrado com position:absolute.
+       Primeira paragem: ícone autocarro no dot.
     ──────────────────────────────────────────────── */
     .stops {
       list-style: none;
@@ -165,7 +162,6 @@
       margin-top: 2px;
     }
 
-    /* Largura da coluna de timeline */
     :root { --tl-w: 48px; }
 
     .stop {
@@ -174,7 +170,7 @@
       position: relative;
     }
 
-    /* Coluna esquerda — contém o traço + dot */
+    /* Coluna esquerda */
     .tl {
       position: relative;
       width: var(--tl-w);
@@ -183,13 +179,7 @@
       justify-content: center;
     }
 
-    /*
-     * Traço vertical: cobre toda a altura da .stop.
-     * Na primeira paragem começa a meio (50%).
-     * Na última paragem termina a meio (50%).
-     * Nas do meio vai de 0% a 100%.
-     * Usamos top/bottom dinâmicos via classes.
-     */
+    /* Traço vertical */
     .tl::before {
       content: '';
       position: absolute;
@@ -197,33 +187,53 @@
       transform: translateX(-50%);
       width: 2px;
       background: var(--line-color, #187EC2);
-      opacity: .35;
+      opacity: .3;
       top: 0;
       bottom: 0;
     }
-    /* primeira paragem: traço começa no centro do dot */
     .stop-first .tl::before { top: 50%; }
-    /* última paragem: traço termina no centro do dot */
     .stop-last  .tl::before { bottom: 50%; }
 
-    /* Dot — centrado sobre o traço */
+    /* Dot padrão */
     .dot {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 12px;
-      height: 12px;
+      width: 11px;
+      height: 11px;
       border-radius: 50%;
       background: #fff;
       border: 2.5px solid var(--line-color, #187EC2);
       z-index: 1;
-      flex-shrink: 0;
     }
     .dot-lg {
-      width: 16px;
-      height: 16px;
-      border-width: 3px;
+      width: 15px;
+      height: 15px;
+      border-width: 2.5px;
+    }
+
+    /* Ícone autocarro — substitui o dot na 1ª paragem */
+    .bus-icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--line-color, #187EC2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      flex-shrink: 0;
+    }
+    .bus-icon svg {
+      width: 15px;
+      height: 15px;
+      color: #fff;
+      display: block;
     }
 
     /* Conteúdo da paragem */
@@ -231,20 +241,20 @@
       flex: 1;
       display: flex;
       align-items: center;
-      padding: 14px 16px 14px 4px;
+      padding: 13px 14px 13px 4px;
       text-decoration: none;
       color: inherit;
       border-radius: 8px;
       margin: 0 8px 0 0;
       transition: background .13s;
       min-width: 0;
-      min-height: 52px;
+      min-height: 50px;
     }
     .stop-link:hover  { background: #f4f7ff; }
     .stop-link:active { background: #e8f0fb; }
 
     .stop-name {
-      font-size: 14.5px;
+      font-size: 14px;
       font-weight: 500;
       color: #1a1a2e;
       line-height: 1.2;
@@ -264,7 +274,7 @@
       font-weight: 600;
       color: #7a8499;
       background: #f0f2f6;
-      padding: 2px 7px;
+      padding: 2px 6px;
       border-radius: 5px;
       letter-spacing: .03em;
       flex-shrink: 0;
@@ -282,18 +292,18 @@
     /* ── Footer ── */
     .footer {
       text-align: center;
-      padding: 24px 16px 16px;
-      font-size: 13px;
+      padding: 20px 16px 14px;
+      font-size: 12px;
       color: #9ba4b4;
     }
     .footer a { color: #0072c6; text-decoration: none; font-weight: 500; }
     .footer a:hover { text-decoration: underline; }
 
     @media (max-width: 480px) {
-      .hero { padding: 14px 12px 16px; }
-      .hero-badge { font-size: 17px; min-width: 50px; height: 34px; }
-      .hero-name { font-size: 15px; }
-      .stop-name { font-size: 13.5px; }
+      .hero { padding: 12px 12px 14px; }
+      .hero-badge { font-size: 17px; min-width: 48px; height: 32px; }
+      .hero-name { font-size: 14.5px; }
+      .stop-name { font-size: 13px; }
       :root { --tl-w: 40px; }
     }
   </style>
@@ -365,6 +375,15 @@
     const btnInvert = document.getElementById('btn-invert');
     const btnMap    = document.getElementById('btn-map');
 
+    // SVG ícone autocarro (inline, para a 1ª paragem)
+    const BUS_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="5" width="18" height="13" rx="2"/>
+      <path d="M3 10h18"/>
+      <path d="M8 18v2M16 18v2"/>
+      <circle cx="8" cy="14.5" r="1"/>
+      <circle cx="16" cy="14.5" r="1"/>
+    </svg>`;
+
     let direction = 0;
     let route     = { id: routeId, number: routeNumber, name: '', color: '#187EC2', text_color: '#FFFFFF' };
 
@@ -378,8 +397,7 @@
     }
 
     btnMap.addEventListener('click', () => {
-      const url = `index.html?line=${encodeURIComponent(routeNumber)}&dir=${direction}`;
-      window.location.href = url;
+      window.location.href = `index.html?line=${encodeURIComponent(routeNumber)}&dir=${direction}`;
     });
 
     async function init() {
@@ -424,18 +442,22 @@
         const zone    = s.zone_id ? `Zona ${s.zone_id}` : '';
         const mapUrl  = `stopsmap.html?stop=${encodeURIComponent(code)}&line=${encodeURIComponent(routeNumber)}&dir=${direction}`;
 
-        const stopClass = [
-          'stop',
-          isFirst ? 'stop-first' : '',
-          isLast  ? 'stop-last'  : '',
-        ].filter(Boolean).join(' ');
+        const stopClass = ['stop', isFirst ? 'stop-first' : '', isLast ? 'stop-last' : ''].filter(Boolean).join(' ');
 
-        const dotClass = `dot${isFirst || isLast ? ' dot-lg' : ''}`;
+        // 1ª paragem: círculo com ícone autocarro; última: dot maior; restantes: dot normal
+        let dotHtml;
+        if (isFirst) {
+          dotHtml = `<div class="bus-icon" style="background:${bg}">${BUS_SVG}</div>`;
+        } else if (isLast) {
+          dotHtml = `<div class="dot dot-lg" style="border-color:${bg}"></div>`;
+        } else {
+          dotHtml = `<div class="dot" style="border-color:${bg}"></div>`;
+        }
 
         return `
           <li class="${stopClass}">
             <div class="tl" style="--line-color:${bg}">
-              <div class="${dotClass}" style="border-color:${bg}"></div>
+              ${dotHtml}
             </div>
             <a class="stop-link" href="${mapUrl}" title="Ver ${s.stop_name} no mapa">
               <span class="stop-name">${s.stop_name}</span>

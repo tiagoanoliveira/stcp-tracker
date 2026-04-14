@@ -39,7 +39,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 16px;
-      height: 56px;
+      height: 50px;
       background: #fff;
       border-bottom: 1px solid #e5e8ee;
       position: sticky;
@@ -49,16 +49,16 @@
     .header-logo {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
       text-decoration: none;
       color: #0072c6;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 13.5px;
       flex-shrink: 0;
     }
-    .header-logo img { height: 26px; width: auto; }
+    .header-logo img { height: 24px; width: auto; }
     .header-title {
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 700;
       color: #1a1a2e;
       position: absolute;
@@ -66,12 +66,11 @@
       transform: translateX(-50%);
       white-space: nowrap;
     }
-    /* spacer so title stays centered */
     .header-spacer { width: 80px; flex-shrink: 0; }
 
     /* ── Search ── */
     .search-wrap {
-      padding: 12px 16px;
+      padding: 8px 12px;
       background: #fff;
       border-bottom: 1px solid #e5e8ee;
     }
@@ -80,10 +79,10 @@
       align-items: center;
       background: #f2f4f7;
       border: 1.5px solid #e2e5ec;
-      border-radius: 10px;
-      padding: 0 12px;
-      gap: 8px;
-      height: 44px;
+      border-radius: 9px;
+      padding: 0 10px;
+      gap: 7px;
+      height: 36px;
       transition: border-color .15s, box-shadow .15s;
     }
     .search-box:focus-within {
@@ -91,33 +90,43 @@
       box-shadow: 0 0 0 3px rgba(0,114,198,.1);
       background: #fff;
     }
-    .search-icon { width: 17px; height: 17px; color: #9ba4b4; flex-shrink: 0; }
+    .search-icon { width: 15px; height: 15px; color: #9ba4b4; flex-shrink: 0; }
     .search-input {
       flex: 1; border: none; background: transparent;
-      font-size: 15px; color: #1a1a2e; outline: none; min-width: 0;
+      font-size: 14px; color: #1a1a2e; outline: none; min-width: 0;
     }
     .search-input::placeholder { color: #9ba4b4; }
     .search-clear {
       display: none; align-items: center; justify-content: center;
-      width: 24px; height: 24px; border: none; background: none;
+      width: 22px; height: 22px; border: none; background: none;
       cursor: pointer; color: #9ba4b4; flex-shrink: 0;
       border-radius: 50%; transition: background .15s, color .15s;
     }
     .search-clear:hover { background: #e5e8ee; color: #333; }
-    .search-clear svg { width: 13px; height: 13px; }
+    .search-clear svg { width: 12px; height: 12px; }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #9ba4b4;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 10px 14px 4px;
+      background: #f2f4f7;
+    }
 
     /* ── List ── */
     .lines-list {
       flex: 1;
       list-style: none;
-      margin-top: 8px;
     }
     .line-item {
       display: flex;
       align-items: center;
-      gap: 14px;
-      padding: 0 16px;
-      height: 62px;
+      gap: 11px;
+      padding: 0 14px;
+      height: 50px;
       text-decoration: none;
       color: inherit;
       background: #fff;
@@ -126,25 +135,25 @@
       cursor: pointer;
     }
     .line-item:first-child { border-top: 1px solid #f0f2f6; }
-    .line-item:hover { background: #f5f8ff; }
+    .line-item:hover  { background: #f5f8ff; }
     .line-item:active { background: #eaf1fb; }
 
     .badge {
       display: flex;
       align-items: center;
       justify-content: center;
-      min-width: 54px;
-      height: 32px;
-      border-radius: 8px;
-      font-size: 15px;
+      min-width: 48px;
+      height: 28px;
+      border-radius: 7px;
+      font-size: 13.5px;
       font-weight: 700;
-      padding: 0 8px;
+      padding: 0 7px;
       flex-shrink: 0;
       letter-spacing: .01em;
     }
     .line-name {
       flex: 1;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 400;
       color: #1a1a2e;
       min-width: 0;
@@ -152,7 +161,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .arrow { width: 16px; height: 16px; color: #c8cdd8; flex-shrink: 0; }
+    .arrow { width: 14px; height: 14px; color: #c8cdd8; flex-shrink: 0; }
 
     .empty {
       text-align: center;
@@ -170,7 +179,7 @@
       color: #9ba4b4; font-size: 14px;
     }
     .spinner {
-      width: 32px; height: 32px;
+      width: 28px; height: 28px;
       border: 3px solid #e5e8ee;
       border-top-color: #0072c6;
       border-radius: 50%;
@@ -181,18 +190,18 @@
     /* ── Footer ── */
     .footer {
       text-align: center;
-      padding: 24px 16px 16px;
-      font-size: 13px;
+      padding: 20px 16px 14px;
+      font-size: 12px;
       color: #9ba4b4;
     }
     .footer a { color: #0072c6; text-decoration: none; font-weight: 500; }
     .footer a:hover { text-decoration: underline; }
 
     @media (max-width: 480px) {
-      .header-title { font-size: 16px; }
-      .line-item { padding: 0 12px; gap: 10px; }
-      .badge { min-width: 46px; height: 28px; font-size: 13px; }
-      .line-name { font-size: 14px; }
+      .header-title { font-size: 15px; }
+      .line-item { padding: 0 12px; gap: 9px; height: 46px; }
+      .badge { min-width: 44px; height: 26px; font-size: 13px; }
+      .line-name { font-size: 13.5px; }
     }
   </style>
 </head>
@@ -233,17 +242,49 @@
 
   <script>
     const PROXY = 'https://stcp-worker.tiagoanoliveira.pt';
-    const listEl  = document.getElementById('list');
+    const listEl   = document.getElementById('list');
     const searchEl = document.getElementById('search');
     const clearEl  = document.getElementById('search-clear');
     let allRoutes = [];
+
+    // Grupos por prefixo para section labels
+    const GROUPS = [
+      { prefix: '2', label: 'Linhas 200' },
+      { prefix: '3', label: 'Linhas 300' },
+      { prefix: '4', label: 'Linhas 400' },
+      { prefix: '5', label: 'Linhas 500 — Matosinhos' },
+      { prefix: '6', label: 'Linhas 600 — Maia / Aeroporto' },
+      { prefix: '7', label: 'Linhas 700 — Valongo / Ermesinde' },
+      { prefix: '8', label: 'Linhas 800 — Gondomar' },
+      { prefix: '9', label: 'Linhas 900 — Gaia' },
+    ];
+
+    function groupRoutes(routes) {
+      const grouped = [];
+      let lastGroup = null;
+      routes.forEach(r => {
+        const g = GROUPS.find(g => r.number.startsWith(g.prefix));
+        const label = g ? g.label : null;
+        if (label && label !== lastGroup) {
+          grouped.push({ type: 'label', text: label });
+          lastGroup = label;
+        }
+        grouped.push({ type: 'route', route: r });
+      });
+      return grouped;
+    }
 
     function renderList(routes) {
       if (!routes.length) {
         listEl.innerHTML = '<li class="empty">Nenhuma linha encontrada.</li>';
         return;
       }
-      listEl.innerHTML = routes.map(r => {
+      const items = groupRoutes(routes);
+      listEl.innerHTML = items.map(item => {
+        if (item.type === 'label') {
+          return `<li class="section-label" role="presentation">${item.text}</li>`;
+        }
+        const r = item.route;
         const bg = r.color || '#187EC2';
         const fg = r.text_color || '#FFFFFF';
         return `
