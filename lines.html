@@ -247,29 +247,53 @@
     const clearEl  = document.getElementById('search-clear');
     let allRoutes = [];
 
-    // Grupos por prefixo para section labels
-    const GROUPS = [
-      { prefix: '2', label: 'Linhas 200' },
-      { prefix: '3', label: 'Linhas 300' },
-      { prefix: '4', label: 'Linhas 400' },
-      { prefix: '5', label: 'Linhas 500 — Matosinhos' },
-      { prefix: '6', label: 'Linhas 600 — Maia / Aeroporto' },
-      { prefix: '7', label: 'Linhas 700 — Valongo / Ermesinde' },
-      { prefix: '8', label: 'Linhas 800 — Gondomar' },
-      { prefix: '9', label: 'Linhas 900 — Gaia' },
+    // Classificação de cada rota numa secção
+    function classifyRoute(r) {
+      const n = r.number;
+      if (n === 'MB1')                      return 'metrobus';
+      if (/^\d+M$/.test(n))                 return 'noturnas';   // 1M, 2M, … 13M
+      if (/^2\d{2}$/.test(n))               return 'linhas200';
+      if (/^3\d{2}$/.test(n))               return 'linhas300';
+      if (/^4\d{2}$/.test(n) || n === 'ZC') return 'linhas400';
+      if (/^5\d{2}$/.test(n))               return 'linhas500';
+      if (/^6\d{2}$/.test(n))               return 'linhas600';
+      if (/^7\d{2}$/.test(n))               return 'linhas700';
+      if (/^8\d{2}$/.test(n))               return 'linhas800';
+      if (/^9\d{2}$/.test(n))               return 'linhas900';
+      return 'outras';
+    }
+
+    // Ordem e labels das secções
+    const SECTION_ORDER = [
+      { key: 'linhas200',  label: 'Linhas 200 - Porto Ocidental' },
+      { key: 'linhas300',  label: 'Linhas 300 - Porto Centro' },
+      { key: 'linhas400',  label: 'Linhas 400 - Porto Oriental' },
+      { key: 'linhas500',  label: 'Linhas 500 — Matosinhos' },
+      { key: 'linhas600',  label: 'Linhas 600 — Maia / Aeroporto' },
+      { key: 'linhas700',  label: 'Linhas 700 — Valongo / Ermesinde' },
+      { key: 'linhas800',  label: 'Linhas 800 — Gondomar' },
+      { key: 'linhas900',  label: 'Linhas 900 — Gaia' },
+      { key: 'noturnas',   label: '🌙 Linhas Noturnas' },
+      { key: 'metrobus',   label: '🚌 Metrobus' },
+      { key: 'especiais',  label: 'Especiais' },
+      { key: 'outras',     label: 'Outras' },
     ];
 
     function groupRoutes(routes) {
-      const grouped = [];
-      let lastGroup = null;
+      // Agrupar por secção mantendo a ordem original dentro de cada grupo
+      const buckets = {};
+      SECTION_ORDER.forEach(s => { buckets[s.key] = []; });
       routes.forEach(r => {
-        const g = GROUPS.find(g => r.number.startsWith(g.prefix));
-        const label = g ? g.label : null;
-        if (label && label !== lastGroup) {
-          grouped.push({ type: 'label', text: label });
-          lastGroup = label;
-        }
-        grouped.push({ type: 'route', route: r });
+        const key = classifyRoute(r);
+        if (!buckets[key]) buckets[key] = [];
+        buckets[key].push(r);
+      });
+
+      const grouped = [];
+      SECTION_ORDER.forEach(({ key, label }) => {
+        if (!buckets[key] || !buckets[key].length) return;
+        grouped.push({ type: 'label', text: label });
+        buckets[key].forEach(r => grouped.push({ type: 'route', route: r }));
       });
       return grouped;
     }
