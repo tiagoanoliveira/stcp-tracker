@@ -9,14 +9,32 @@
  *       type        {'warning'|'info'|'error'}  Tipo visual  (default: 'warning')
  *       dismissible {boolean}                   Botão fechar  (default: true)
  *       id          {string}                    ID único para não repetir após fechar
+ *                                               (persiste em localStorage)
  *
  *   AnnouncementBanner.hide()          — fecha o banner
  *   AnnouncementBanner.isVisible()     — true se visível
  */
 
+const _LS_KEY = 'ab_dismissed';
+
+function _loadDismissed() {
+  try {
+    const raw = localStorage.getItem(_LS_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function _saveDismissed(set) {
+  try {
+    localStorage.setItem(_LS_KEY, JSON.stringify([...set]));
+  } catch (_) { /* sem acesso a localStorage — ignora */ }
+}
+
 export class AnnouncementBanner {
   static _el = null;
-  static _dismissed = new Set();
+  static _dismissed = _loadDismissed();
 
   // ---------------------------------------------------------------------------
   // Pública
@@ -81,7 +99,10 @@ export class AnnouncementBanner {
 
     if (dismissible) {
       el.querySelector('.ab-close').addEventListener('click', () => {
-        if (id) AnnouncementBanner._dismissed.add(id);
+        if (id) {
+          AnnouncementBanner._dismissed.add(id);
+          _saveDismissed(AnnouncementBanner._dismissed);
+        }
         AnnouncementBanner.hide();
       });
     }
