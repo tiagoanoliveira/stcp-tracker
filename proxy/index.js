@@ -23,7 +23,7 @@ const STCP_ROUTES = [
   { id: '207',  number: '207', name: 'Campanhã - Mercado da Foz',                     color: '#187EC2', text_color: '#FFFFFF' },
   { id: '208',  number: '208', name: 'Aliados - Aldoar',                              color: '#187EC2', text_color: '#FFFFFF' },
   { id: '209',  number: '209', name: 'Pasteleira - Prelada',                          color: '#187EC2', text_color: '#FFFFFF' },
-  { id: '301',  number: '300', name: 'Circular Hospital S. João - Aliados',           color: '#187EC2', text_color: '#FFFFFF' },
+  { id: '300',  number: '300', name: 'Circular Hospital S. João - Aliados',           color: '#187EC2', text_color: '#FFFFFF' },
   { id: '301',  number: '301', name: 'Circular Hospital S. João - Sá da Bandeira',    color: '#187EC2', text_color: '#FFFFFF' },
   { id: '302',  number: '302', name: 'Circular Aliados - Damião de Gois',             color: '#187EC2', text_color: '#FFFFFF' },
   { id: '303',  number: '303', name: 'Circular Praça da liberdade - Constituição',    color: '#187EC2', text_color: '#FFFFFF' },
