@@ -72,7 +72,7 @@ export class BusMapApp {
       // Aviso temporário — Queima das Fitas
       AnnouncementBanner.show(
         'Altera\u00e7\u00f5es de servi\u00e7o em vigor no \u00e2mbito da Queima das Fitas. <a href="https://stcp.pt/uploads/alteracoes-de-servico/IFP%20GCRI%20157.25_200-201-202-207-208-304-etc.pdf" target="_blank" rel="noopener noreferrer" style="color:inherit;font-weight:700;text-decoration:underline;">Consulta aqui mais detalhes</a>',
-        { type: 'warning', id: 'queima-fitas-2025', dismissible: true }
+        { type: 'warning', id: 'queima-fitas-2025', dismissible: false }
       );
 
       await scheduleService.loadScheduleData();
