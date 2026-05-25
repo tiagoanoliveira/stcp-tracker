@@ -3,10 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Mapa em tempo real dos autocarros STCP no Porto">
+
+  <!-- SEO primário -->
+  <title>STCP Live – Mapa de Autocarros Porto em Tempo Real</title>
+  <meta name="description" content="Vê a localização em tempo real dos autocarros STCP no Porto. Mapa interativo com todas as linhas e paragens. Rastreamento ao vivo dos autocarros do Porto.">
+  <meta name="keywords" content="autocarros porto tempo real, STCP tempo real, autocarros STCP, mapa autocarros porto, rastreamento autocarros, bus tracker porto, porto bus real time, STCP live, transportes porto">
+  <meta name="author" content="Tiago Oliveira">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://stcp.tiagoanoliveira.pt/">
+
+  <!-- Open Graph (Facebook, WhatsApp, LinkedIn) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="STCP Live">
+  <meta property="og:title" content="STCP Live – Autocarros Porto em Tempo Real">
+  <meta property="og:description" content="Vê a localização em tempo real dos autocarros STCP no Porto. Mapa interativo com todas as linhas e paragens.">
+  <meta property="og:url" content="https://stcp.tiagoanoliveira.pt/">
+  <meta property="og:image" content="https://stcp.tiagoanoliveira.pt/resources/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="pt_PT">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="STCP Live – Autocarros Porto em Tempo Real">
+  <meta name="twitter:description" content="Vê a localização em tempo real dos autocarros STCP no Porto. Mapa interativo com todas as linhas e paragens.">
+  <meta name="twitter:image" content="https://stcp.tiagoanoliveira.pt/resources/og-image.png">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "STCP Live – Mapa de Autocarros Porto em Tempo Real",
+    "url": "https://stcp.tiagoanoliveira.pt/",
+    "description": "Mapa interativo em tempo real com a localização dos autocarros STCP no Porto. Consulta todas as linhas, paragens e próximas chegadas.",
+    "applicationCategory": "TravelApplication",
+    "operatingSystem": "Web",
+    "browserRequirements": "Requires a modern browser with JavaScript enabled",
+    "inLanguage": "pt-PT",
+    "isAccessibleForFree": true,
+    "author": {
+      "@type": "Person",
+      "name": "Tiago Oliveira",
+      "url": "https://www.tiagoanoliveira.pt/"
+    },
+    "about": {
+      "@type": "City",
+      "name": "Porto",
+      "addressCountry": "PT"
+    },
+    "keywords": "autocarros porto, STCP, transportes porto, mapa autocarros, tempo real, bus tracker"
+  }
+  </script>
+
   <meta name="theme-color" content="#0072c6">
-  <title>STCP Tracker - Mapa de Autocarros</title>
-  
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="./src/ui/styles/busmap.css">

@@ -3,10 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Mapa de paragens STCP no Porto">
+
+  <!-- SEO primário -->
+  <title>Paragens STCP Porto – Mapa de Paragens de Autocarro</title>
+  <meta name="description" content="Mapa interativo com todas as paragens STCP no Porto. Consulta próximas chegadas, horários e linhas de autocarro em tempo real.">
+  <meta name="keywords" content="paragens STCP porto, paragens autocarro porto, horários STCP, próximas chegadas autocarro, mapa paragens porto, bus stops porto">
+  <meta name="author" content="Tiago Oliveira">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://stcp.tiagoanoliveira.pt/stopsmap.html">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="STCP Live">
+  <meta property="og:title" content="Paragens STCP Porto – Próximas Chegadas em Tempo Real">
+  <meta property="og:description" content="Mapa interativo com todas as paragens STCP no Porto. Consulta próximas chegadas e horários de autocarro em tempo real.">
+  <meta property="og:url" content="https://stcp.tiagoanoliveira.pt/stopsmap.html">
+  <meta property="og:image" content="https://stcp.tiagoanoliveira.pt/resources/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="pt_PT">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Paragens STCP Porto – Próximas Chegadas em Tempo Real">
+  <meta name="twitter:description" content="Mapa interativo com todas as paragens STCP no Porto. Consulta próximas chegadas e horários de autocarro em tempo real.">
+  <meta name="twitter:image" content="https://stcp.tiagoanoliveira.pt/resources/og-image.png">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Paragens STCP Porto – Mapa Interativo",
+    "url": "https://stcp.tiagoanoliveira.pt/stopsmap.html",
+    "description": "Mapa interativo com todas as paragens STCP no Porto. Consulta próximas chegadas, horários e linhas de autocarro em tempo real.",
+    "applicationCategory": "TravelApplication",
+    "operatingSystem": "Web",
+    "inLanguage": "pt-PT",
+    "isAccessibleForFree": true,
+    "author": {
+      "@type": "Person",
+      "name": "Tiago Oliveira",
+      "url": "https://www.tiagoanoliveira.pt/"
+    },
+    "about": {
+      "@type": "City",
+      "name": "Porto",
+      "addressCountry": "PT"
+    }
+  }
+  </script>
+
   <meta name="theme-color" content="#0072c6">
-  <title>STCP Tracker - Mapa de Paragens</title>
-  
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="./src/ui/styles/busmap.css">
