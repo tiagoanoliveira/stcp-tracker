@@ -60,7 +60,7 @@ export class BusMapApp {
 
   async initialize() {
     try {
-      this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de autocarros...');
+      this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de autocarros... Está lento? Não é só para ti (culpa da STCP que está com falhas há vários dias!)');
 
       if (!REALTIME_BUSES_ENABLED) {
         AnnouncementBanner.show(
@@ -128,7 +128,7 @@ export class BusMapApp {
       this.lastUpdateDisplay.initialize();
 
       if (REALTIME_BUSES_ENABLED) {
-        this.loadingOverlay.update('A carregar autocarros...');
+        this.loadingOverlay.update('A carregar autocarros... Está lento? Não é só para ti (culpa da STCP que está com falhas há vários dias!)');
         await this.fetchAndUpdateBuses();
         this.startAutoRefresh();
       }
