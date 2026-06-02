@@ -34,9 +34,36 @@ class VehicleService {
     return null;
   }
 
-  extractLineNumber(bus) { return this.extractAnnotation(bus, 'stcp:route:'); }
-  extractDirection(bus)  { return this.extractAnnotation(bus, 'stcp:sentido:'); }
-  extractTripId(bus)     { return this.extractAnnotation(bus, 'stcp:nr_viagem:'); }
+  /**
+   * Número/ID de linha
+   *  - Novo formato (worker /vehicles):   bus.routeId
+   *  - Formato FIWARE bruto (Broker):    annotation "stcp:route:"
+   */
+  extractLineNumber(bus) {
+    if (bus.routeId) return String(bus.routeId);
+    return this.extractAnnotation(bus, 'stcp:route:');
+  }
+
+  /**
+   * Direcção (0/1)
+   *  - Novo formato:   bus.directionId
+   *  - FIWARE bruto:   annotation "stcp:sentido:"
+   */
+  extractDirection(bus) {
+    if (bus.directionId != null) return Number(bus.directionId);
+    const val = this.extractAnnotation(bus, 'stcp:sentido:');
+    return val != null ? Number(val) : null;
+  }
+
+  /**
+   * trip_id
+   *  - Novo formato:   bus.tripId
+   *  - FIWARE bruto:   annotation "stcp:nr_viagem:"
+   */
+  extractTripId(bus) {
+    if (bus.tripId) return bus.tripId;
+    return this.extractAnnotation(bus, 'stcp:nr_viagem:');
+  }
 
   /**
    * Devolve o nome de linha para apresentação ao utilizador.
@@ -52,8 +79,10 @@ class VehicleService {
 
   /**
    * Extrai a localização geográfica de um veículo.
-   * Aceita tanto o objecto FIWARE bruto (location.value.coordinates)
-   * como o objecto já processado por processBusData (latitude/longitude).
+   * Aceita:
+   *  - objecto processado por processBusData (latitude/longitude)
+   *  - objecto normalizado do worker (/vehicles): lat/lng
+   *  - objecto FIWARE bruto: location.value.coordinates
    * Devolve { lat, lon } ou null se não houver coordenadas válidas.
    */
   extractVehicleLocation(vehicle) {
@@ -62,6 +91,11 @@ class VehicleService {
     // Objecto já processado por processBusData
     if (Number.isFinite(vehicle.latitude) && Number.isFinite(vehicle.longitude)) {
       return { lat: vehicle.latitude, lon: vehicle.longitude };
+    }
+
+    // Objecto normalizado do worker (/vehicles)
+    if (Number.isFinite(vehicle.lat) && Number.isFinite(vehicle.lng)) {
+      return { lat: vehicle.lat, lon: vehicle.lng };
     }
 
     // Objecto FIWARE bruto
@@ -90,7 +124,37 @@ class VehicleService {
     return vehicles.find(v => this.tripIdsMatch(this.extractTripId(v), tripId)) || null;
   }
 
+  /**
+   * Normaliza um veículo de qualquer origem para o formato interno usado no mapa.
+   *
+   * Suporta:
+   *  - Formato normalizado do worker (/vehicles): { id, routeId, directionId, lat, lng, speed, tripId }
+   *  - Formato FIWARE bruto: annotations + location.value.coordinates
+   */
   processBusData(bus) {
+    // Formato normalizado do worker (/vehicles)
+    if (Number.isFinite(bus.lat) && Number.isFinite(bus.lng)) {
+      const line      = this.extractLineNumber(bus);
+      const direction = this.extractDirection(bus);
+      const tripId    = this.extractTripId(bus);
+
+      if (!line || direction == null) return null;
+
+      return {
+        id:          String(bus.id),
+        line,
+        displayLine: this.getDisplayLine(line), // nome real da linha (ex: 'ZC' em vez de '107')
+        latitude:    bus.lat,
+        longitude:   bus.lng,
+        speed:       Number.isFinite(bus.speed) ? bus.speed : 'N/A',
+        busNumber:   bus.id ?? 'N/A',
+        destination: null, // resolvido lazy ao clicar
+        direction,
+        tripId
+      };
+    }
+
+    // Formato FIWARE bruto
     const line      = this.extractLineNumber(bus);
     const direction = this.extractDirection(bus);
     const tripId    = this.extractTripId(bus);
@@ -103,12 +167,12 @@ class VehicleService {
     return {
       id:          bus.id,
       line,
-      displayLine: this.getDisplayLine(line), // nome real da linha (ex: 'ZC' em vez de '107')
+      displayLine: this.getDisplayLine(line),
       latitude:    lat,
       longitude:   lon,
       speed:       bus.speed?.value ?? 'N/A',
       busNumber:   bus.fleetVehicleId?.value ?? 'N/A',
-      destination: null, // resolvido lazy ao clicar
+      destination: null,
       direction,
       tripId
     };

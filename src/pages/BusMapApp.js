@@ -56,6 +56,11 @@ export class BusMapApp {
     this._currentStopPosition     = null;
     this._currentBusPositions     = [];
     this._busMapCentered          = false;
+
+    // Controlo de fonte de veículos e fallback
+    this._vehiclesSource        = 'primary'; // 'primary' (stcp.live) ou 'fallback' (FIWARE via worker)
+    this._primaryEmptySince     = null;
+    this._fallbackPromptVisible = false;
   }
 
   async initialize() {
@@ -64,14 +69,14 @@ export class BusMapApp {
 
       if (!REALTIME_BUSES_ENABLED) {
         AnnouncementBanner.show(
-          'Localiza\u00e7\u00e3o dos autocarros temporariamente indispon\u00edvel. Motivo: Aus\u00eancia de dados por parte da STCP.',
+          'Localização dos autocarros temporariamente indisponível. Motivo: Ausência de dados por parte da STCP.',
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
       /*
       // Aviso temporário — Queima das Fitas
       AnnouncementBanner.show(
-        'Altera\u00e7\u00f5es de servi\u00e7o em vigor no \u00e2mbito da Queima das Fitas. <a href="https://stcp.pt/uploads/alteracoes-de-servico/IFP%20GCRI%20157.25_200-201-202-207-208-304-etc.pdf" target="_blank" rel="noopener noreferrer" style="color:inherit;font-weight:700;text-decoration:underline;">Consulta aqui mais detalhes</a>',
+        'Alterações de serviço em vigor no âmbito da Queima das Fitas. <a href="https://stcp.pt/uploads/alteracoes-de-servico/IFP%20GCRI%20157.25_200-201-202-207-208-304-etc.pdf" target="_blank" rel="noopener noreferrer" style="color:inherit;font-weight:700;text-decoration:underline;">Consulta aqui mais detalhes</a>',
         { type: 'warning', id: 'queima-fitas-2025', dismissible: false }
       );
       */
@@ -127,6 +132,9 @@ export class BusMapApp {
       this.setupEventListeners();
       this.lastUpdateDisplay.initialize();
 
+      // Garante que o apiService começa em modo primário (stcp.live)
+      apiService.setVehiclesSource(this._vehiclesSource);
+
       if (REALTIME_BUSES_ENABLED) {
         this.loadingOverlay.update('A carregar autocarros... Está lento? Não é só para ti (culpa da STCP que está com falhas há vários dias!)');
         await this.fetchAndUpdateBuses();
@@ -141,16 +149,16 @@ export class BusMapApp {
       this.tutorialModal.showIfFirstVisit();
 
     } catch (error) {
-      console.error('\u274C Erro na inicializa\u00e7\u00e3o:', error);
+      console.error('❌ Erro na inicialização:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();
-      this.showError('Erro ao inicializar aplica\u00e7\u00e3o');
+      this.showError('Erro ao inicializar aplicação');
     }
   }
 
   setupGeolocation() {
     geolocationService.getCurrentPosition()
       .then(position => this.mapManager.updateUserMarker(position))
-      .catch(err => console.warn('\u26A0\uFE0F Localiza\u00e7\u00e3o indispon\u00edvel:', err.message));
+      .catch(err => console.warn('⚠️ Localização indisponível:', err.message));
   }
 
   setupEventListeners() {
@@ -186,6 +194,7 @@ export class BusMapApp {
         const stopInfo = await apiService.fetchStopInfo(stopId);
         const stop = {
           stop_id:   stopInfo?.stop_id   || stopId,
+          stop_code: stopInfo?.stop_code || stopId,
           stop_name: stopInfo?.stop_name || `Paragem ${stopId}`,
           latitude:  stopInfo?.latitude  || 41.1579,
           longitude: stopInfo?.longitude || -8.6291,
@@ -194,7 +203,7 @@ export class BusMapApp {
         this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
         await this._handleStopClick(stop);
       } catch (e) {
-        console.warn('Deep-link: paragem n\u00e3o encontrada', stopId, e);
+        console.warn('Deep-link: paragem não encontrada', stopId, e);
       }
     }
   }
@@ -212,11 +221,28 @@ export class BusMapApp {
   async fetchAndUpdateBuses() {
     try {
       const rawBusData = await apiService.fetchBusData();
+      const source     = apiService.getVehiclesSource();
+
+      // Monitorizar "10s sem qualquer veículo" em modo primário (stcp.live)
+      if (source === 'primary') {
+        if (Array.isArray(rawBusData) && rawBusData.length > 0) {
+          this._primaryEmptySince = null;
+        } else {
+          const now = Date.now();
+          if (!this._primaryEmptySince) {
+            this._primaryEmptySince = now;
+          } else if (!this._fallbackPromptVisible && now - this._primaryEmptySince > 10_000) {
+            this._showFallbackPrompt();
+          }
+        }
+      }
+
       if (!Array.isArray(rawBusData) || rawBusData.length === 0) {
         this.busMarkerManager.clearAllMarkers();
         this.lastUpdateDisplay.update();
         return;
       }
+
       const processed = await vehicleService.processBusDataBatch(rawBusData);
       this._allProcessedBuses = processed;
 
@@ -239,7 +265,7 @@ export class BusMapApp {
       }
       this.lastUpdateDisplay.update();
     } catch (error) {
-      console.error('\u274C Erro ao atualizar autocarros:', error);
+      console.error('❌ Erro ao atualizar autocarros:', error);
       this.showError('Erro ao obter dados dos autocarros');
     }
   }
@@ -335,9 +361,9 @@ export class BusMapApp {
         await this._updateArrivalsOnMap(arrivals, vehicles, centerMap);
       }
     } catch (error) {
-      console.error('\u274C Erro ao carregar chegadas:', error);
+      console.error('❌ Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
-      this.showError('Erro ao carregar informa\u00e7\u00f5es da paragem');
+      this.showError('Erro ao carregar informações da paragem');
     }
   }
 
@@ -389,7 +415,6 @@ export class BusMapApp {
   _handleArrivalClick(data) {
     const { vehicleId, location } = data;
     if (!location || !this.mapManager) return;
-    // extractVehicleLocation returns { lat, lon } — NOT { latitude, longitude }
     const lat = location.lat ?? location.latitude;
     const lon = location.lon ?? location.longitude;
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
@@ -475,8 +500,108 @@ export class BusMapApp {
     this.mapManager.fitBounds(positions, { paddingTopLeft: [60, 60], paddingBottomRight: [60, panelHeight + 60], maxZoom: 16, minZoom: 13 });
   }
 
+  _showFallbackPrompt() {
+    this._fallbackPromptVisible = true;
+
+    let modal = document.getElementById('vehicles-fallback-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'vehicles-fallback-modal';
+      modal.className = 'fallback-modal-overlay';
+      modal.innerHTML = `
+        <div class="fallback-modal">
+          <h2>Método de localização indisponível</h2>
+          <p>O método atual de localização dos autocarros com elevada precisão encontra-se indisponível. Deseja utilizar um método alternativo mas menos preciso?</p>
+          <div class="fallback-modal-actions">
+            <button id="fallback-btn-wait"  class="btn-secondary">Aguardar</button>
+            <button id="fallback-btn-switch" class="btn-primary">Alterar para informação alternativa</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      const style = document.createElement('style');
+      style.textContent = `
+        .fallback-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        }
+        .fallback-modal {
+          background: #1f2933;
+          color: #f9fafb;
+          max-width: 420px;
+          width: 90%;
+          padding: 20px 24px;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        .fallback-modal h2 {
+          margin: 0 0 8px;
+          font-size: 18px;
+        }
+        .fallback-modal p {
+          margin: 0 0 16px;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+        .fallback-modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+        }
+        .fallback-modal .btn-primary,
+        .fallback-modal .btn-secondary {
+          border: none;
+          padding: 8px 14px;
+          border-radius: 8px;
+          font-size: 14px;
+          cursor: pointer;
+        }
+        .fallback-modal .btn-secondary {
+          background: #4b5563;
+          color: #f9fafb;
+        }
+        .fallback-modal .btn-primary {
+          background: #22c55e;
+          color: #052e16;
+          font-weight: 600;
+        }
+      `;
+      document.head.appendChild(style);
+
+      modal.querySelector('#fallback-btn-wait')?.addEventListener('click', () => {
+        this._primaryEmptySince     = Date.now();
+        this._fallbackPromptVisible = false;
+        modal.remove();
+      });
+
+      modal.querySelector('#fallback-btn-switch')?.addEventListener('click', async () => {
+        this._vehiclesSource        = 'fallback';
+        this._fallbackPromptVisible = false;
+        this._primaryEmptySince     = null;
+        apiService.setVehiclesSource('fallback');
+
+        modal.remove();
+
+        AnnouncementBanner.show(
+          'A mostrar localização dos autocarros com base em informação alternativa, possivelmente menos precisa.',
+          { type: 'info', id: 'rt-fallback', dismissible: true }
+        );
+
+        await this.fetchAndUpdateBuses();
+      });
+    } else {
+      modal.style.display = 'flex';
+    }
+  }
+
   showError(message) {
-    console.error('\u274C', message);
+    console.error('❌', message);
     const el = document.getElementById('error-message');
     if (el) { el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 5000); }
   }

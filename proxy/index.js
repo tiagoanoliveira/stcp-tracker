@@ -1,11 +1,19 @@
 // Cloudflare Worker - CORS Proxy para STCP API
-// v4.4 - Suporte a rotas custom (MB1 Metrobus) injectadas na lista de rotas e info de paragens custom
+// v4.5 - Suporte a rotas custom (MB1 Metrobus) + veículos em tempo real unificados
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
+
+// ---------------------------------------------------------------------------
+// Endpoints externos
+// ---------------------------------------------------------------------------
+const FIWARE_VEHICLES_URL =
+  'https://broker.fiware.urbanplatform.portodigital.pt/v2/entities?q=vehicleType==bus&limit=1000';
+
+const STCP_LIVE_VEHICLES_URL = 'https://stcp.live/api/vehicles';
 
 // ---------------------------------------------------------------------------
 // Lista completa de linhas STCP com cores oficiais.
@@ -126,6 +134,154 @@ const MB1_STOPS = {
 // Map auxiliar de stops MB1 por ID para endpoints de info
 const MB1_STOPS_MAP = new Map(MB1_STOPS.stops.map(s => [s.stop_id, s]));
 
+// ---------------------------------------------------------------------------
+// Veículos - normalização para formato comum
+// ---------------------------------------------------------------------------
+
+function normalizeStcpLiveVehicle(v) {
+  if (!Number.isFinite(v.lat) || !Number.isFinite(v.lng)) return null;
+
+  return {
+    id: String(v.id),
+    routeId: String(v.routeId ?? ''),
+    directionId: Number(v.directionId ?? 0),
+    lat: v.lat,
+    lng: v.lng,
+    speed: Number.isFinite(v.speed) ? v.speed : 0,
+    bearing: Number.isFinite(v.bearing) ? v.bearing : null,
+    timestamp: Number.isFinite(v.timestamp)
+      ? v.timestamp
+      : Math.floor(Date.now() / 1000),
+    tripId: v.tripId ?? null,
+  };
+}
+
+function extractAnnotationFromFiware(bus, prefix) {
+  const arr = bus.annotations?.value;
+  if (!Array.isArray(arr)) return null;
+  for (const raw of arr) {
+    const decoded = decodeURIComponent(raw);
+    if (decoded.startsWith(prefix)) return decoded.slice(prefix.length);
+  }
+  return null;
+}
+
+function normalizeFiwareVehicle(bus) {
+  const coords = bus.location?.value?.coordinates;
+  if (!Array.isArray(coords) || coords.length < 2) return null;
+
+  const lon = coords[0];
+  const lat = coords[1];
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  const routeId = extractAnnotationFromFiware(bus, 'stcp:route:');
+  const directionStr = extractAnnotationFromFiware(bus, 'stcp:sentido:');
+  const tripId = extractAnnotationFromFiware(bus, 'stcp:nr_viagem:');
+
+  if (!routeId || directionStr == null) return null;
+
+  const directionId = Number(directionStr);
+  const speedVal = bus.speed?.value;
+  const speed = Number.isFinite(speedVal) ? speedVal : 0;
+
+  const tsRaw =
+    bus.dateObserved?.value ||
+    bus.observedAt ||
+    bus.modifiedAt ||
+    Date.now();
+  const tsMs = typeof tsRaw === 'string' ? Date.parse(tsRaw) : tsRaw;
+  const timestamp = Number.isFinite(tsMs)
+    ? Math.floor(tsMs / 1000)
+    : Math.floor(Date.now() / 1000);
+
+  const id =
+    bus.fleetVehicleId?.value != null
+      ? String(bus.fleetVehicleId.value)
+      : String(bus.id);
+
+  return {
+    id,
+    routeId: String(routeId),
+    directionId: Number.isNaN(directionId) ? 0 : directionId,
+    lat,
+    lng: lon,
+    speed,
+    bearing: null,
+    timestamp,
+    tripId: tripId ?? null,
+  };
+}
+
+async function handleStcpLiveVehicles() {
+  try {
+    const resp = await fetch(STCP_LIVE_VEHICLES_URL, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.5)',
+      },
+    });
+
+    if (!resp.ok) {
+      return errorResponse(
+        `Erro ao obter veículos da STCP LIVE (status ${resp.status})`,
+        resp.status
+      );
+    }
+
+    const raw = await resp.json();
+    const vehicles = Array.isArray(raw)
+      ? raw.map(normalizeStcpLiveVehicle).filter(Boolean)
+      : [];
+
+    return jsonResponse(
+      { success: true, source: 'stcp-live', vehicles },
+      'vehicles',
+      'public, max-age=3'
+    );
+  } catch (error) {
+    return errorResponse(
+      `Erro ao obter veículos da STCP LIVE: ${error.message}`,
+      502
+    );
+  }
+}
+
+async function handleFiwareVehicles() {
+  try {
+    const resp = await fetch(FIWARE_VEHICLES_URL, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.5)',
+      },
+    });
+
+    if (!resp.ok) {
+      return errorResponse(
+        `Erro ao obter veículos da FIWARE (status ${resp.status})`,
+        resp.status
+      );
+    }
+
+    const raw = await resp.json();
+    const vehicles = Array.isArray(raw)
+      ? raw.map(normalizeFiwareVehicle).filter(Boolean)
+      : [];
+
+    return jsonResponse(
+      { success: true, source: 'fiware', vehicles },
+      'vehicles_fiware',
+      'no-store'
+    );
+  } catch (error) {
+    return errorResponse(
+      `Erro ao obter veículos da FIWARE: ${error.message}`,
+      502
+    );
+  }
+}
+
 async function handleRequest(request) {
   const url = new URL(request.url);
   const pathParts = url.pathname.slice(1).split('/').filter(p => p);
@@ -134,12 +290,13 @@ async function handleRequest(request) {
     return new Response(
       JSON.stringify({
         message: 'STCP CORS Proxy',
-        version: '4.4',
+        version: '4.5',
         endpoints: {
           stop_endpoints:     ['realtime', 'routes', 'schedule', 'info', 'services'],
           location_endpoints: ['nearby'],
           route_endpoints:    ['schedule', 'shape', 'stops', 'list'],
-          search_endpoints:   ['search']
+          search_endpoints:   ['search'],
+          vehicles_endpoints: ['vehicles', 'vehicles/fiware']
         },
         usage: {
           realtime:       'GET /{STOP_ID}/realtime',
@@ -152,7 +309,8 @@ async function handleRequest(request) {
           route_shape:    'GET /route/{ROUTE_ID}/shape?direction_id={DIR}',
           route_stops:    'GET /route/{ROUTE_ID}/stops?direction_id={DIR}',
           routes_list:    'GET /routes/list',
-          search:         'GET /search?q={QUERY}&limit={LIMIT}'
+          search:         'GET /search?q={QUERY}&limit={LIMIT}',
+          vehicles:       'GET /vehicles (preciso) ou /vehicles/fiware (alternativo)'
         }
       }, null, 2),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -165,6 +323,15 @@ async function handleRequest(request) {
 
   try {
     const firstSegment = pathParts[0];
+
+    // -----------------------------------------------------------------------
+    // 0. Vehicle endpoints: /vehicles (stcp.live) e /vehicles/fiware (FIWARE)
+    // -----------------------------------------------------------------------
+    if (firstSegment === 'vehicles') {
+      const mode = pathParts[1] || 'primary';
+      if (mode === 'fiware') return await handleFiwareVehicles();
+      return await handleStcpLiveVehicles();
+    }
 
     // -----------------------------------------------------------------------
     // 1. Nearby stops: /nearby/{lat}/{lng}/{radius}
@@ -375,7 +542,7 @@ function jsonResponse(data, endpoint, cacheControl) {
       ...corsHeaders,
       'Content-Type': 'application/json',
       'Cache-Control': cacheControl,
-      'X-Proxy-Version': '4.4',
+      'X-Proxy-Version': '4.5',
       'X-Endpoint': endpoint,
     },
   });
@@ -384,7 +551,7 @@ function jsonResponse(data, endpoint, cacheControl) {
 async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
   const response = await fetch(stcpApiUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.4)', 'Accept': 'application/json' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.5)', 'Accept': 'application/json' },
   });
   const data = await response.text();
   return new Response(data, {
@@ -393,7 +560,7 @@ async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
       ...corsHeaders,
       'Content-Type': 'application/json',
       'Cache-Control': cacheControl,
-      'X-Proxy-Version': '4.4',
+      'X-Proxy-Version': '4.5',
       'X-Endpoint': endpoint
     }
   });
@@ -402,7 +569,7 @@ async function proxyRequest(stcpApiUrl, endpoint, cacheControl) {
 async function proxyRawRequest(stcpApiUrl) {
   return await fetch(stcpApiUrl, {
     method: 'GET',
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.4)', 'Accept': 'application/json' },
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.5)', 'Accept': 'application/json' },
   });
 }
 
