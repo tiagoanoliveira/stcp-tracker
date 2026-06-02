@@ -75,13 +75,13 @@ export class StopsMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
-      /*
-      // Aviso temporário
+      
+      // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'Alterações de serviço em vigor. <a href="https://stcp.pt/uploads/alteracoes-de-servico/IFP%20GCRI%20157.25_200-201-202-207-208-304-etc.pdf" target="_blank" rel="noopener noreferrer" style="color:inherit;font-weight:700;text-decoration:underline;">Consulta aqui mais detalhes</a>',
-        { type: 'warning', id: 'queima-fitas-2026', dismissible: false }
+        'Devido à lentidão no processamento de informação por parte da STCP nas horas de ponta, é possível que não consigas visualizar corretamente os dados. Estãoa ser procuradas alternativas para mitigar este problema.',
+        { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
-      */
+      
       await scheduleService.loadScheduleData();
 
       this.mapManager = new MapManager(this.mapElementId);
