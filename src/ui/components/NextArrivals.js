@@ -247,7 +247,7 @@ export class NextArrivals {
   // Loading
   // ---------------------------------------------------------------------------
 
-  showLoading(message = 'A carregar próximas chegadas... Está lento? Não é só para ti (culpa da STCP que está com falhas há vários dias!)') {
+  showLoading(message = 'A carregar próximas chegadas...') {
     if (!this.element) return;
     const listContainer = this.element.querySelector('#arrivals-list-panel');
     listContainer.classList.add('panel-loading');

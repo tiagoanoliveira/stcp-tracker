@@ -90,7 +90,7 @@ export class RouteFilterBar {
     const chipsEl = this._chipsEl();
     if (!chipsEl) return;
     if (isLoading) {
-      chipsEl.innerHTML = '<span class="rfb-loading">A carregar linhas... Está lento? Não é só para ti (culpa da STCP que está com falhas há vários dias!)</span>';
+      chipsEl.innerHTML = '<span class="rfb-loading">A carregar linhas...</span>';
     } else {
       this._render();
     }

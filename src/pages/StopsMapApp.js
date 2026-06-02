@@ -67,7 +67,7 @@ export class StopsMapApp {
 
   async initialize() {
     try {
-      this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de paragens... Está lento? Não é só para ti (culpa da STCP que está com falhas há vários dias!)');
+      this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de paragens...');
 
       if (!REALTIME_BUSES_ENABLED) {
         AnnouncementBanner.show(

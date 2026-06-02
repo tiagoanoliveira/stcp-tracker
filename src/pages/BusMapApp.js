@@ -69,7 +69,7 @@ export class BusMapApp {
       // por isso os restantes componentes da página ficam visíveis enquanto o mapa carrega.
       const mapEl = document.getElementById(this.mapElementId);
       this.loadingOverlay = LoadingSpinner.createOverlay(
-        'A carregar mapa de autocarros... Está lento? Não é só para ti (culpa da STCP que está com falhas há vários dias!)',
+        'A carregar mapa de autocarros...',
         mapEl  // passa o elemento pai — o overlay fica absoluto sobre ele
       );
 
@@ -152,7 +152,7 @@ export class BusMapApp {
       apiService.setVehiclesSource(this._vehiclesSource);
 
       if (REALTIME_BUSES_ENABLED) {
-        this.loadingOverlay.update('A carregar autocarros... Está lento? Não é só para ti (culpa da STCP que está com falhas há vários dias!)');
+        this.loadingOverlay.update('A carregar autocarros...');
         await this.fetchAndUpdateBuses();
         this.startAutoRefresh();
       }
