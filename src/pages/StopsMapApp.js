@@ -67,7 +67,7 @@ export class StopsMapApp {
 
   async initialize() {
     try {
-      this.loadingOverlay = LoadingSpinner.createOverlay('Que alterações gostarias de ver? Clica no link do rodapé e envia as tuas sugestões!');
+      this.loadingOverlay = LoadingSpinner.createOverlay('Que alterações gostarias de ver? Clica <a href="https://tiagoanoliveira.pt/support/a260e7bee11b401b9fd09290e8a8d6d9">aqui</a> e envia as tuas sugestões!');
 
       if (!REALTIME_BUSES_ENABLED) {
         AnnouncementBanner.show(

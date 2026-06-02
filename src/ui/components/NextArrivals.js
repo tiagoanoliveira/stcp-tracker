@@ -247,7 +247,7 @@ export class NextArrivals {
   // Loading
   // ---------------------------------------------------------------------------
 
-  showLoading(message = 'A carregar próximas chegadas...') {
+  showLoading(message = 'O que gostarias de ver aqui em breve? Submete as tuas sugestões <a href="https://tiagoanoliveira.pt/support/a260e7bee11b401b9fd09290e8a8d6d9">aqui</a>.') {
     if (!this.element) return;
     const listContainer = this.element.querySelector('#arrivals-list-panel');
     listContainer.classList.add('panel-loading');
