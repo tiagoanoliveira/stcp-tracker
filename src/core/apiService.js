@@ -45,7 +45,7 @@ class ApiService {
    * sempre via Cloudflare Worker.
    *
    * Resposta esperada do worker:
-   *   { success: true, source: 'stcp-live'|'fiware', vehicles: [...] }
+   *   { success: true, source: 'stcp-fast'|'fiware', vehicles: [...] }
    */
   async fetchBusData() {
     try {

@@ -13,7 +13,7 @@ const corsHeaders = {
 const FIWARE_VEHICLES_URL =
   'https://broker.fiware.urbanplatform.portodigital.pt/v2/entities?q=vehicleType==bus&limit=1000';
 
-const STCP_LIVE_VEHICLES_URL = 'https://stcp.live/api/vehicles';
+const STCP_FAST_VEHICLES_URL = 'https://stcp.live/api/vehicles';
 
 // ---------------------------------------------------------------------------
 // Lista completa de linhas STCP com cores oficiais.
@@ -214,7 +214,7 @@ function normalizeFiwareVehicle(bus) {
 
 async function handleStcpLiveVehicles() {
   try {
-    const resp = await fetch(STCP_LIVE_VEHICLES_URL, {
+    const resp = await fetch(STCP_FAST_VEHICLES_URL, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -224,7 +224,7 @@ async function handleStcpLiveVehicles() {
 
     if (!resp.ok) {
       return errorResponse(
-        `Erro ao obter veículos da STCP LIVE (status ${resp.status})`,
+        `Erro ao obter veículos da STCP Fast (status ${resp.status})`,
         resp.status
       );
     }
@@ -235,13 +235,13 @@ async function handleStcpLiveVehicles() {
       : [];
 
     return jsonResponse(
-      { success: true, source: 'stcp-live', vehicles },
+      { success: true, source: 'stcp-fast', vehicles },
       'vehicles',
       'public, max-age=3'
     );
   } catch (error) {
     return errorResponse(
-      `Erro ao obter veículos da STCP LIVE: ${error.message}`,
+      `Erro ao obter veículos da STCP Fast: ${error.message}`,
       502
     );
   }
