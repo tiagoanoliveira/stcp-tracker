@@ -65,7 +65,13 @@ export class BusMapApp {
 
   async initialize() {
     try {
-      this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de autocarros... Está lento? Não é só para ti (culpa da STCP que está com falhas há vários dias!)');
+      // O overlay de loading é criado sobre o elemento #map (posição absoluta),
+      // por isso os restantes componentes da página ficam visíveis enquanto o mapa carrega.
+      const mapEl = document.getElementById(this.mapElementId);
+      this.loadingOverlay = LoadingSpinner.createOverlay(
+        'A carregar mapa de autocarros... Está lento? Não é só para ti (culpa da STCP que está com falhas há vários dias!)',
+        mapEl  // passa o elemento pai — o overlay fica absoluto sobre ele
+      );
 
       if (!REALTIME_BUSES_ENABLED) {
         AnnouncementBanner.show(
@@ -86,7 +92,18 @@ export class BusMapApp {
       this.mapManager.initialize();
       await this.mapManager.waitForReady();
 
-      this.centerControl = createCenterControl(this.mapManager.map, () => this.mapManager.getUserPosition());
+      // Centrar automaticamente na localização do utilizador ao abrir a página.
+      // O zoom 16 é suficiente para ver os autocarros nas ruas ao redor.
+      // Fazemos isto antes de adicionar os controlos para que a posição inicial
+      // já esteja definida quando o utilizador interagir pela primeira vez.
+      this._initUserLocation();
+
+      this.centerControl = createCenterControl(
+        this.mapManager.map,
+        () => this.mapManager.getUserPosition(),
+        // Callback para atualizar o marcador com a posição fresca do GPS
+        (freshPosition) => this.mapManager.updateUserMarker(freshPosition)
+      );
       this.centerControl.addTo(this.mapManager.map);
 
       this.stopsControl = createStopsControl(this.mapManager.map);
@@ -128,7 +145,6 @@ export class BusMapApp {
         this.routeFilterBar.setRoutes(routes);
       }).catch(() => this.routeFilterBar.setLoading(false));
 
-      this.setupGeolocation();
       this.setupEventListeners();
       this.lastUpdateDisplay.initialize();
 
@@ -155,9 +171,17 @@ export class BusMapApp {
     }
   }
 
-  setupGeolocation() {
+  /**
+   * Tenta obter a localização atual do utilizador e centra o mapa nessa posição.
+   * zoom 16 = ruas visíveis ao redor do utilizador com autocarros legíveis.
+   * Não bloqueia a inicialização — corre em background.
+   */
+  _initUserLocation() {
     geolocationService.getCurrentPosition()
-      .then(position => this.mapManager.updateUserMarker(position))
+      .then(position => {
+        this.mapManager.updateUserMarker(position);
+        this.mapManager.centerOn(position, 16);
+      })
       .catch(err => console.warn('⚠️ Localização indisponível:', err.message));
   }
 
@@ -519,60 +543,6 @@ export class BusMapApp {
         </div>
       `;
       document.body.appendChild(modal);
-
-      const style = document.createElement('style');
-      style.textContent = `
-        .fallback-modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 9999;
-        }
-        .fallback-modal {
-          background: #1f2933;
-          color: #f9fafb;
-          max-width: 420px;
-          width: 90%;
-          padding: 20px 24px;
-          border-radius: 12px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-        }
-        .fallback-modal h2 {
-          margin: 0 0 8px;
-          font-size: 18px;
-        }
-        .fallback-modal p {
-          margin: 0 0 16px;
-          font-size: 14px;
-          line-height: 1.5;
-        }
-        .fallback-modal-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 8px;
-        }
-        .fallback-modal .btn-primary,
-        .fallback-modal .btn-secondary {
-          border: none;
-          padding: 8px 14px;
-          border-radius: 8px;
-          font-size: 14px;
-          cursor: pointer;
-        }
-        .fallback-modal .btn-secondary {
-          background: #4b5563;
-          color: #f9fafb;
-        }
-        .fallback-modal .btn-primary {
-          background: #22c55e;
-          color: #052e16;
-          font-weight: 600;
-        }
-      `;
-      document.head.appendChild(style);
 
       modal.querySelector('#fallback-btn-wait')?.addEventListener('click', () => {
         this._primaryEmptySince     = Date.now();

@@ -13,7 +13,8 @@ class GeolocationService {
   }
 
   /**
-   * Obter localização atual do utilizador uma única vez
+   * Obter localização atual do utilizador uma única vez.
+   * Usa maximumAge: 30 000 ms → pode devolver uma posição em cache do browser.
    */
   async getCurrentPosition(options = {}) {
     return new Promise((resolve, reject) => {
@@ -43,6 +44,43 @@ class GeolocationService {
           reject(error);
         },
         defaultOptions
+      );
+    });
+  }
+
+  /**
+   * Forçar um novo pedido de geolocalização ao browser, sem usar cache.
+   * Usar quando se quer a posição ATUAL (ex: ao clicar no botão GPS).
+   * maximumAge: 0 garante que o browser faz uma nova leitura do GPS/WiFi.
+   */
+  async getFreshPosition(options = {}) {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation not supported'));
+        return;
+      }
+
+      const freshOptions = {
+        enableHighAccuracy: true,
+        maximumAge: 0,        // sem cache — leitura fresca obrigatória
+        timeout: 15000,
+        ...options
+      };
+
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          this.userPosition = [
+            position.coords.latitude,
+            position.coords.longitude
+          ];
+          eventBus.emit('geolocation:update', this.userPosition);
+          resolve(this.userPosition);
+        },
+        error => {
+          eventBus.emit('geolocation:error', error);
+          reject(error);
+        },
+        freshOptions
       );
     });
   }
