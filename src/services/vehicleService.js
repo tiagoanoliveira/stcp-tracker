@@ -130,6 +130,8 @@ class VehicleService {
    * Suporta:
    *  - Formato normalizado do worker (/vehicles): { id, routeId, directionId, lat, lng, speed, tripId }
    *  - Formato FIWARE bruto: annotations + location.value.coordinates
+   *
+   * VELOCIDADE: arredondada às unidades (Math.round) para apresentação ao utilizador.
    */
   processBusData(bus) {
     // Formato normalizado do worker (/vehicles)
@@ -140,15 +142,18 @@ class VehicleService {
 
       if (!line || direction == null) return null;
 
+      const rawSpeed = bus.speed;
+      const speed    = Number.isFinite(rawSpeed) ? Math.round(rawSpeed) : 'N/A';
+
       return {
         id:          String(bus.id),
         line,
-        displayLine: this.getDisplayLine(line), // nome real da linha (ex: 'ZC' em vez de '107')
+        displayLine: this.getDisplayLine(line),
         latitude:    bus.lat,
         longitude:   bus.lng,
-        speed:       Number.isFinite(bus.speed) ? bus.speed : 'N/A',
+        speed,
         busNumber:   bus.id ?? 'N/A',
-        destination: null, // resolvido lazy ao clicar
+        destination: null,
         direction,
         tripId
       };
@@ -164,13 +169,16 @@ class VehicleService {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
     if (!line || direction == null) return null;
 
+    const rawSpeedFiware = bus.speed?.value;
+    const speedFiware    = Number.isFinite(rawSpeedFiware) ? Math.round(rawSpeedFiware) : 'N/A';
+
     return {
       id:          bus.id,
       line,
       displayLine: this.getDisplayLine(line),
       latitude:    lat,
       longitude:   lon,
-      speed:       bus.speed?.value ?? 'N/A',
+      speed:       speedFiware,
       busNumber:   bus.fleetVehicleId?.value ?? 'N/A',
       destination: null,
       direction,
