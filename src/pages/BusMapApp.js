@@ -152,7 +152,7 @@ export class BusMapApp {
       apiService.setVehiclesSource(this._vehiclesSource);
 
       if (REALTIME_BUSES_ENABLED) {
-        this.loadingOverlay.update('A carregar autocarros...');
+        this.loadingOverlay.update('Agora tens uma app mais rápida com localizações mais precisas. Esperemos que gostes!');
         await this.fetchAndUpdateBuses();
         this.startAutoRefresh();
       }

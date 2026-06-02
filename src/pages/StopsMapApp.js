@@ -67,19 +67,19 @@ export class StopsMapApp {
 
   async initialize() {
     try {
-      this.loadingOverlay = LoadingSpinner.createOverlay('A carregar mapa de paragens...');
+      this.loadingOverlay = LoadingSpinner.createOverlay('Que alterações gostarias de ver? Clica no link do rodapé e envia as tuas sugestões!');
 
       if (!REALTIME_BUSES_ENABLED) {
         AnnouncementBanner.show(
-          'Localiza\u00e7\u00e3o dos autocarros temporariamente indispon\u00edvel. Motivo: Aus\u00eancia de dados por parte da STCP.',
+          'Localização dos autocarros temporariamente indisponível. Motivo: Ausência de dados por parte da STCP.',
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
       /*
-      // Aviso temporário — Queima das Fitas
+      // Aviso temporário
       AnnouncementBanner.show(
-        'Altera\u00e7\u00f5es de servi\u00e7o em vigor no \u00e2mbito da Queima das Fitas. <a href="https://stcp.pt/uploads/alteracoes-de-servico/IFP%20GCRI%20157.25_200-201-202-207-208-304-etc.pdf" target="_blank" rel="noopener noreferrer" style="color:inherit;font-weight:700;text-decoration:underline;">Consulta aqui mais detalhes</a>',
-        { type: 'warning', id: 'queima-fitas-2025', dismissible: false }
+        'Alterações de serviço em vigor. <a href="https://stcp.pt/uploads/alteracoes-de-servico/IFP%20GCRI%20157.25_200-201-202-207-208-304-etc.pdf" target="_blank" rel="noopener noreferrer" style="color:inherit;font-weight:700;text-decoration:underline;">Consulta aqui mais detalhes</a>',
+        { type: 'warning', id: 'queima-fitas-2026', dismissible: false }
       );
       */
       await scheduleService.loadScheduleData();
