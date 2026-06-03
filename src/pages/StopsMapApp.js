@@ -78,7 +78,7 @@ export class StopsMapApp {
       
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'Devido à lentidão no processamento de informação por parte da STCP nas horas de ponta, é possível que não consigas visualizar corretamente os dados. Estãoa ser procuradas alternativas para mitigar este problema.',
+        'Por motivos de greve muitos dos horários previstos nas paragens não irão concretizar-se. Acede ao mapa em tempo real (botão no quanto inferior esquerdo) para veres os autocarros em circulação.',
         { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
       

@@ -82,7 +82,7 @@ export class BusMapApp {
       
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'Devido à lentidão no processamento de informação por parte da STCP nas horas de ponta, é possível que não consigas visualizar corretamente os dados. Estãoa ser procuradas alternativas para mitigar este problema.',
+        'Por motivos de greve muitas viagens foram suprimidas. Se não visualizares o teu autocarro no mapa após a hora prevista de partida, prioriza encontrar alternativas de transporte.',
         { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
       
