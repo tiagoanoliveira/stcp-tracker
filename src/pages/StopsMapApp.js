@@ -78,7 +78,7 @@ export class StopsMapApp {
       
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'Por motivos de greve muitos dos horários previstos nas paragens não irão concretizar-se. Acede ao mapa em tempo real (botão no quanto inferior esquerdo) para veres os autocarros em circulação.',
+        'Por motivos de greve muitos dos horários previstos nas paragens não irão concretizar-se. Acede ao mapa em tempo real (botão no canto inferior esquerdo) para veres os autocarros em circulação.',
         { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
       
