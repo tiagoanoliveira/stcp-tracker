@@ -90,8 +90,8 @@ export class LineOverlayManager {
     const group = L.layerGroup().addTo(this.map);
     stops.forEach(stop => {
       const marker = L.circleMarker([stop.latitude, stop.longitude], {
-        radius: 5, fillColor: '#FFFFFF', color: lineColor,
-        weight: 2, opacity: 1, fillOpacity: 1
+        radius: 7, fillColor: '#FFFFFF', color: lineColor,
+        weight: 3, opacity: 1, fillOpacity: 1
       });
       marker.bindPopup(
         this._buildStopPopup(stop, lineColor),
