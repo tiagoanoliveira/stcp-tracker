@@ -79,13 +79,13 @@ export class BusMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
-      
+      /**
       // Aviso temporário — STCP
       AnnouncementBanner.show(
         'Por motivos de greve muitas viagens foram suprimidas. Se não visualizares o teu autocarro no mapa após a hora prevista de partida, prioriza encontrar alternativas de transporte.',
         { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
-      
+      */
       await scheduleService.loadScheduleData();
 
       this.mapManager = new MapManager(this.mapElementId);
