@@ -15,7 +15,7 @@ class ApiService {
   }
 
   setVehiclesSource(source) {
-    if (source === 'primary' || source === 'fallback') {
+    if (source === 'fallback' || source === 'primary') {
       this.vehiclesSource = source;
     }
   }
