@@ -11,11 +11,11 @@ class ApiService {
     this.timeoutMs = 10000;
 
     // Fonte de veículos: 'primary' (stcp.live) ou 'fallback' (FIWARE via worker)
-    this.vehiclesSource = 'fallback';
+    this.vehiclesSource = 'primary';
   }
 
   setVehiclesSource(source) {
-    if (source === 'fallback' || source === 'primary') {
+    if (source === 'primary' || source === 'fallback') {
       this.vehiclesSource = source;
     }
   }
