@@ -75,13 +75,13 @@ export class StopsMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
-      /**
+      
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'Por motivos de greve muitos dos horários previstos nas paragens não irão concretizar-se. Acede ao mapa em tempo real (botão no canto inferior esquerdo) para veres os autocarros em circulação.',
+        'Por motivos alheios a localização dos autocarros poderá não ser exata - a fonte original de dados está em baixo e está a ser usado um backup.',
         { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
-      */
+      
       await scheduleService.loadScheduleData();
 
       this.mapManager = new MapManager(this.mapElementId);
