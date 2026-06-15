@@ -82,7 +82,7 @@ export class BusMapApp {
       
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'Por motivos alheios a localização dos autocarros poderá não ser exata - a fonte original de dados está em baixo e está a ser usado um backup.',
+        'Por motivos alheios a localização dos autocarros poderá não ser exata - a fonte original de dados está em baixo e está a ser usado um backup. Estamos a trabalhar para corrigir o problema.',
         { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
       
