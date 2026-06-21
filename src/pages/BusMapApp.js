@@ -82,7 +82,7 @@ export class BusMapApp {
       
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'No seguimento do Air Invictus, muitos dos destinos foram alterados e alguns percursos foram suprimidos parcialmente ou mesmo na totalidade (18 e 403).',
+        'No seguimento do Air Invictus, muitos dos destinos foram alterados e alguns percursos foram suprimidos parcialmente ou mesmo na totalidade (18 e 403). Verifique o destino do veículo antes de embarcar.',
         { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
       
