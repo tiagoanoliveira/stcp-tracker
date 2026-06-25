@@ -21,6 +21,20 @@
  *   O ficheiro .proto do GTFS-RT é carregado a partir de
  *   ./resources/gtfs-realtime.proto (deve existir no repo).
  *   Em alternativa, se o broker enviar JSON, basta desativar a descodificação.
+ *
+ * ─── DEBUG ───────────────────────────────────────────────────────────────────
+ * Activar logs detalhados na consola:
+ *   localStorage.setItem('MQTT_DEBUG', '1')  → depois recarregar
+ * Desactivar:
+ *   localStorage.removeItem('MQTT_DEBUG')    → depois recarregar
+ *
+ * Logs emitidos:
+ *   [MQTT RAW]       payload em bytes, tópico recebido
+ *   [MQTT PROTO]     objecto descodificado do protobuf (antes de processBusData)
+ *   [MQTT VEHICLE]   objecto final após processBusData (o que vai para o mapa)
+ *   [MQTT SKIP]      payload descartado e motivo (proto inválido, coords em falta, etc.)
+ *   [MQTT STATS]     contagem de mensagens a cada 10 s
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { eventBus } from '../core/eventBus.js';
@@ -38,11 +52,34 @@ let _vehicles    = {};     // { vehicleId → veículo normalizado }
 let _isConnected = false;
 let _isStarted   = false;
 
+// ─── Debug ───────────────────────────────────────────────────────────────────
+const _debug = () => localStorage.getItem('MQTT_DEBUG') === '1';
+
+// Contadores para estatísticas periódicas
+let _stats = { received: 0, decoded: 0, processed: 0, skipped: 0 };
+let _statsInterval = null;
+
+function _startStats() {
+  if (_statsInterval) return;
+  _statsInterval = setInterval(() => {
+    if (!_debug()) return;
+    const total = Object.keys(_vehicles).length;
+    console.groupCollapsed(
+      `%c[MQTT STATS] ⏱ últimos 10s: ${_stats.received} msgs recebidas | ${_stats.decoded} descodificadas | ${_stats.processed} aceites | ${_stats.skipped} descartadas | ${total} veículos em memória`,
+      'color:#0c4e54;font-weight:bold'
+    );
+    console.table({ ..._stats, veiculos_em_memoria: total });
+    console.groupEnd();
+    _stats = { received: 0, decoded: 0, processed: 0, skipped: 0 };
+  }, 10_000);
+}
+
+function _stopStats() {
+  if (_statsInterval) { clearInterval(_statsInterval); _statsInterval = null; }
+}
+
 // ─── Auxiliares de carregamento dinâmico ─────────────────────────────────────
 
-/**
- * Carrega mqtt.js dinamicamente a partir do CDN se ainda não estiver disponível.
- */
 async function loadMqttLib() {
   if (window.mqtt) return window.mqtt;
   await _loadScript('https://unpkg.com/mqtt/dist/mqtt.min.js');
@@ -50,9 +87,6 @@ async function loadMqttLib() {
   return window.mqtt;
 }
 
-/**
- * Carrega protobufjs dinamicamente a partir do CDN.
- */
 async function loadProtobufLib() {
   if (window.protobuf) return window.protobuf;
   await _loadScript('https://cdn.jsdelivr.net/npm/protobufjs@7/dist/protobuf.min.js');
@@ -70,10 +104,6 @@ function _loadScript(src) {
   });
 }
 
-/**
- * Carrega e compila o esquema .proto do GTFS-RT.
- * Usa fetch para obter o ficheiro local e protobufjs.parse para compilar.
- */
 async function loadProtoSchema() {
   if (_protoRoot) return _protoRoot;
   const protobuf = await loadProtobufLib();
@@ -87,30 +117,59 @@ async function loadProtoSchema() {
 // ─── Descodificação de mensagens ─────────────────────────────────────────────
 
 /**
- * Descodifica um payload protobuf GTFS-RT e devolve um objecto normalizado
- * no mesmo formato que vehicleService.processBusData espera para o formato
- * de worker (lat/lng/routeId/directionId/tripId/speed).
- *
- * @param {Uint8Array} payload - bytes recebidos via MQTT
- * @returns {Object|null} veículo normalizado ou null se inválido
+ * Descodifica um payload protobuf GTFS-RT.
+ * Em modo debug loga cada fase: raw bytes → proto → raw normalizado.
  */
-function decodeGtfsRtMessage(payload) {
+function decodeGtfsRtMessage(payload, topic) {
+  _stats.received++;
+
+  if (_debug()) {
+    console.log(
+      `%c[MQTT RAW] tópico: ${topic} | bytes: ${payload.byteLength}`,
+      'color:#888'
+    );
+  }
+
   try {
     const FeedMessage = _protoRoot.lookupType('transit_realtime.FeedMessage');
     const feed = FeedMessage.decode(payload);
 
-    // Cada mensagem do broker do Porto contém normalmente 1 entidade
+    if (_debug() && (feed.entity || []).length === 0) {
+      console.warn('%c[MQTT SKIP] feed sem entidades', 'color:#b07a00', { topic });
+      _stats.skipped++;
+      return null;
+    }
+
     for (const entity of (feed.entity || [])) {
       const vp = entity.vehicle;
-      if (!vp) continue;
+
+      if (!vp) {
+        if (_debug()) console.warn('%c[MQTT SKIP] entidade sem VehiclePosition', 'color:#b07a00', { entity_id: entity.id });
+        _stats.skipped++;
+        continue;
+      }
 
       const pos       = vp.position;
       const trip      = vp.trip;
       const vehicleId = vp.vehicle?.id || entity.id;
 
-      if (!pos || !Number.isFinite(pos.latitude) || !Number.isFinite(pos.longitude)) continue;
+      if (_debug()) {
+        console.groupCollapsed(
+          `%c[MQTT PROTO] veículo ${vehicleId} | rota ${trip?.route_id ?? '?'} | lat ${pos?.latitude?.toFixed(5)} lng ${pos?.longitude?.toFixed(5)}`,
+          'color:#006494'
+        );
+        console.log('VehiclePosition completo:', JSON.parse(JSON.stringify(vp)));
+        console.groupEnd();
+      }
 
-      // Constrói objecto no formato do worker normalizado
+      if (!pos || !Number.isFinite(pos.latitude) || !Number.isFinite(pos.longitude)) {
+        if (_debug()) console.warn('%c[MQTT SKIP] posição inválida ou em falta', 'color:#b07a00', { vehicleId, pos });
+        _stats.skipped++;
+        continue;
+      }
+
+      _stats.decoded++;
+
       const raw = {
         id:          String(vehicleId),
         routeId:     trip?.route_id  || null,
@@ -121,11 +180,18 @@ function decodeGtfsRtMessage(payload) {
         speed:       Number.isFinite(pos.speed) ? pos.speed * 3.6 : null, // m/s → km/h
       };
 
+      if (_debug()) {
+        console.log('%c[MQTT PROTO→RAW]', 'color:#006494', raw);
+      }
+
       return raw;
     }
     return null;
   } catch (err) {
-    // Mensagem inválida ou formato inesperado — ignorar silenciosamente
+    _stats.skipped++;
+    if (_debug()) {
+      console.error('%c[MQTT SKIP] erro ao descodificar protobuf', 'color:#a12c7b', err);
+    }
     return null;
   }
 }
@@ -134,16 +200,6 @@ function decodeGtfsRtMessage(payload) {
 
 export const mqttVehicleService = {
 
-  /**
-   * Inicia a ligação MQTT.
-   * Deve ser chamado uma só vez após o mapa estar pronto.
-   *
-   * @param {Object} options
-   * @param {Function} options.onVehicleUpdate - callback(vehicle) chamado por cada
-   *   atualização de posição. vehicle tem o formato interno de processBusData.
-   * @param {Function} [options.onConnected]   - chamado quando a ligação é estabelecida
-   * @param {Function} [options.onDisconnected]- chamado quando a ligação cai
-   */
   async start({ onVehicleUpdate, onConnected, onDisconnected } = {}) {
     if (_isStarted) {
       console.warn('⚠ MQTT já iniciado');
@@ -151,15 +207,19 @@ export const mqttVehicleService = {
     }
     _isStarted = true;
 
+    // Instrução de debug logo no arranque (sempre visível)
+    console.info(
+      '%c[MQTT] Para activar logs detalhados: localStorage.setItem(\'MQTT_DEBUG\', \'1\') e recarrega a página',
+      'color:#01696f;font-style:italic'
+    );
+
     try {
-      // Carregar dependências
       await Promise.all([loadMqttLib(), loadProtoSchema()]);
 
-      // Ligar ao broker
       _client = window.mqtt.connect(BROKER_URL, {
-        clean:        true,
-        reconnectPeriod: 3000,   // tenta reconectar a cada 3 s
-        connectTimeout: 8000,
+        clean:           true,
+        reconnectPeriod: 3000,
+        connectTimeout:  8000,
       });
 
       _client.on('connect', () => {
@@ -169,6 +229,7 @@ export const mqttVehicleService = {
           if (err) console.error('❌ Erro ao subscrever tópico MQTT:', err);
           else     console.info(`📡 Subscrito ao tópico: ${TOPIC}`);
         });
+        _startStats();
         eventBus.emit('mqtt:connected');
         onConnected?.();
       });
@@ -180,6 +241,7 @@ export const mqttVehicleService = {
 
       _client.on('disconnect', () => {
         _isConnected = false;
+        _stopStats();
         eventBus.emit('mqtt:disconnected');
         onDisconnected?.();
       });
@@ -189,15 +251,36 @@ export const mqttVehicleService = {
         eventBus.emit('mqtt:error', err);
       });
 
-      _client.on('message', (_topic, payload) => {
-        const raw = decodeGtfsRtMessage(payload);
+      _client.on('message', (topic, payload) => {
+        const raw = decodeGtfsRtMessage(payload, topic);
+
         if (!raw) return;
 
         const vehicle = vehicleService.processBusData(raw);
-        if (!vehicle) return;
 
-        // Guarda estado mais recente para snapshot completo
+        if (!vehicle) {
+          _stats.skipped++;
+          if (_debug()) {
+            console.warn(
+              '%c[MQTT SKIP] processBusData devolveu null — routeId ou direction em falta?',
+              'color:#b07a00',
+              raw
+            );
+          }
+          return;
+        }
+
+        _stats.processed++;
         _vehicles[vehicle.id] = vehicle;
+
+        if (_debug()) {
+          console.log(
+            `%c[MQTT VEHICLE] ✔ id:${vehicle.id} linha:${vehicle.displayLine} dir:${vehicle.direction} ` +
+            `lat:${vehicle.latitude?.toFixed(5)} lng:${vehicle.longitude?.toFixed(5)} speed:${vehicle.speed}km/h`,
+            'color:#437a22',
+            vehicle
+          );
+        }
 
         onVehicleUpdate?.(vehicle);
         eventBus.emit('mqtt:vehicleUpdate', vehicle);
@@ -211,9 +294,6 @@ export const mqttVehicleService = {
     }
   },
 
-  /**
-   * Para a ligação MQTT e limpa o estado.
-   */
   stop() {
     if (_client) {
       _client.end(true);
@@ -222,10 +302,10 @@ export const mqttVehicleService = {
     _isConnected = false;
     _isStarted   = false;
     _vehicles    = {};
+    _stopStats();
     eventBus.emit('mqtt:stopped');
   },
 
-  /** Devolve snapshot de todos os veículos conhecidos. */
   getAllVehicles() {
     return Object.values(_vehicles);
   },
