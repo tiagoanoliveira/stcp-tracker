@@ -58,19 +58,17 @@ export class BusMapApp {
     this._busMapCentered          = false;
 
     // Controlo de fonte de veículos e fallback
-    this._vehiclesSource        = 'primary'; // 'primary' (stcp.live) ou 'fallback' (FIWARE via worker)
+    this._vehiclesSource        = 'mqtt';
     this._primaryEmptySince     = null;
     this._fallbackPromptVisible = false;
   }
 
   async initialize() {
     try {
-      // O overlay de loading é criado sobre o elemento #map (posição absoluta),
-      // por isso os restantes componentes da página ficam visíveis enquanto o mapa carrega.
       const mapEl = document.getElementById(this.mapElementId);
       this.loadingOverlay = LoadingSpinner.createOverlay(
         'A carregar mapa de autocarros...',
-        mapEl  // passa o elemento pai — o overlay fica absoluto sobre ele
+        mapEl
       );
 
       if (!REALTIME_BUSES_ENABLED) {
@@ -92,16 +90,11 @@ export class BusMapApp {
       this.mapManager.initialize();
       await this.mapManager.waitForReady();
 
-      // Centrar automaticamente na localização do utilizador ao abrir a página.
-      // O zoom 16 é suficiente para ver os autocarros nas ruas ao redor.
-      // Fazemos isto antes de adicionar os controlos para que a posição inicial
-      // já esteja definida quando o utilizador interagir pela primeira vez.
       this._initUserLocation();
 
       this.centerControl = createCenterControl(
         this.mapManager.map,
         () => this.mapManager.getUserPosition(),
-        // Callback para atualizar o marcador com a posição fresca do GPS
         (freshPosition) => this.mapManager.updateUserMarker(freshPosition)
       );
       this.centerControl.addTo(this.mapManager.map);
@@ -168,11 +161,6 @@ export class BusMapApp {
     }
   }
 
-  /**
-   * Tenta obter a localização atual do utilizador e centra o mapa nessa posição.
-   * zoom 16 = ruas visíveis ao redor do utilizador com autocarros legíveis.
-   * Não bloqueia a inicialização — corre em background.
-   */
   _initUserLocation() {
     geolocationService.getCurrentPosition()
       .then(position => {
@@ -193,24 +181,69 @@ export class BusMapApp {
       onSnapshot: (vehicles) => {
         const processed = vehicleService.processBusDataBatch(vehicles);
         this._allProcessedBuses = processed;
+        // updateBusMarkers com a lista completa é seguro aqui — é o snapshot inicial
         this.busMarkerManager.updateBusMarkers(processed);
         this.lastUpdateDisplay.update();
       },
-      // Chamado individualmente por cada autocarro que atualiza posição via MQTT
+
+      // Chamado individualmente por cada autocarro que atualiza posição via MQTT.
+      //
+      // ATENÇÃO: NÃO usar updateBusMarkers([vehicle]) aqui.
+      // updateBusMarkers remove todos os marcadores que não estejam no array recebido,
+      // por isso chamar com um array de 1 elemento apagaria todos os outros marcadores.
+      // Em vez disso, actualizamos/criamos só o marcador deste veículo directamente.
       onVehicleUpdate: (vehicle) => {
-        // Atualizar o array global
+        // 1. Manter o array global sincronizado
         const idx = this._allProcessedBuses.findIndex(b => b.id === vehicle.id);
         if (idx >= 0) this._allProcessedBuses[idx] = vehicle;
         else this._allProcessedBuses.push(vehicle);
 
-        // Aplicar filtro de rota se ativo
-        const activeRoutes = routeFilterState.selectedRoutes;
-        if (activeRoutes.size > 0 && !activeRoutes.has(String(vehicle.displayLine || vehicle.line || ''))) return;
+        // 2. Registar a rota/direção neste veículo (necessário para filterByRoutes)
+        this.busMarkerManager.setRouteForMarker(
+          vehicle.id,
+          vehicle.displayLine || vehicle.line || '',
+          vehicle.direction
+        );
 
-        this.busMarkerManager.updateBusMarkers([vehicle]);
+        // 3. Se houver filtro de rota activo e este veículo não pertencer à rota,
+        //    não o mostrar (mas mantê-lo em _allProcessedBuses para quando o filtro mudar)
+        const activeRoutes = routeFilterState.selectedRoutes;
+        if (activeRoutes.size > 0 && !activeRoutes.has(String(vehicle.displayLine || vehicle.line || ''))) {
+          return;
+        }
+
+        // 4. Actualizar só ESTE marcador — sem tocar nos restantes
+        this._updateSingleMarker(vehicle);
         this.lastUpdateDisplay.update();
       },
     });
+  }
+
+  /**
+   * Actualiza (ou cria) o marcador de um único veículo no mapa,
+   * sem afectar os marcadores dos restantes veículos.
+   *
+   * Replica a lógica interna de updateBusMarkers para um único bus:
+   *   - se o marcador já existe → move e actualiza ícone
+   *   - se não existe → cria novo marcador
+   */
+  _updateSingleMarker(bus) {
+    const { iconCache } = this.busMarkerManager;
+
+    // O BusMarkerManager expõe markers, _busData e _createBusMarker publicamente
+    this.busMarkerManager._busData[bus.id] = bus;
+
+    if (this.busMarkerManager.markers[bus.id]) {
+      // Marcador já existe — apenas mover e actualizar ícone
+      const marker = this.busMarkerManager.markers[bus.id];
+      marker.setLatLng([bus.latitude, bus.longitude]);
+      if (bus.destination !== null) {
+        marker.bindPopup(this.busMarkerManager._createPopupContent(bus));
+      }
+    } else {
+      // Novo veículo — criar marcador
+      this.busMarkerManager._createBusMarker(bus);
+    }
   }
 
   async _handleDeepLink() {
@@ -266,7 +299,6 @@ export class BusMapApp {
       const rawBusData = await apiService.fetchBusData();
       const source     = apiService.getVehiclesSource();
 
-      // Monitorizar "10s sem qualquer veículo" em modo primário (stcp.live)
       if (source === 'primary') {
         if (Array.isArray(rawBusData) && rawBusData.length > 0) {
           this._primaryEmptySince = null;
@@ -451,10 +483,6 @@ export class BusMapApp {
     }
   }
 
-  /**
-   * Clique num autocarro nas próximas chegadas — foca no mapa.
-   * `location` vem de vehicleService.extractVehicleLocation → { lat, lon }
-   */
   _handleArrivalClick(data) {
     const { vehicleId, location } = data;
     if (!location || !this.mapManager) return;
