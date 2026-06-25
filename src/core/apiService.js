@@ -1,6 +1,17 @@
 /**
  * Core API Service - Centraliza todas as chamadas API
+ *
+ * FONTES DE VEÍCULOS:
+ *   'primary'  - stcp.live via Cloudflare Worker (polling HTTP)
+ *   'fallback' - FIWARE Broker via Cloudflare Worker (polling HTTP)
+ *   'mqtt'     - Porto Digital MQTT/WebSocket (event-driven, sem polling)
+ *
+ * Com a fonte 'mqtt', fetchBusData() devolve apenas o snapshot
+ * em memória do MqttVehicleService — o arranque inicial usa ainda
+ * o FIWARE REST para não deixar o mapa vazio.
  */
+
+import { mqttVehicleService } from '../services/mqttVehicleService.js';
 
 class ApiService {
   constructor() {
@@ -10,12 +21,12 @@ class ApiService {
     this.delayMs   = 500;
     this.timeoutMs = 10000;
 
-    // Fonte de veículos: 'primary' (stcp.live) ou 'fallback' (FIWARE via worker)
-    this.vehiclesSource = 'primary';
+    // Fonte de veículos: 'primary' (stcp.live), 'fallback' (FIWARE) ou 'mqtt'
+    this.vehiclesSource = 'mqtt';
   }
 
   setVehiclesSource(source) {
-    if (source === 'primary' || source === 'fallback') {
+    if (['primary', 'fallback', 'mqtt'].includes(source)) {
       this.vehiclesSource = source;
     }
   }
@@ -41,41 +52,63 @@ class ApiService {
   }
 
   /**
-   * Veículos em tempo real (stcp.live como primário, FIWARE como fallback),
-   * sempre via Cloudflare Worker.
+   * Veículos em tempo real.
    *
-   * Resposta esperada do worker:
-   *   { success: true, source: 'stcp-fast'|'fiware', vehicles: [...] }
+   * - 'mqtt'    → devolve snapshot em memória (actualizado pelo MqttVehicleService).
+   *               Para o primeiro arranque usa FIWARE REST como bootstrap.
+   * - 'primary' → stcp.live via Cloudflare Worker (polling)
+   * - 'fallback'→ FIWARE via Cloudflare Worker (polling)
    */
   async fetchBusData() {
+    const source = this.getVehiclesSource();
+
+    if (source === 'mqtt') {
+      // Se o MQTT já tem veículos em memória, usa esse snapshot.
+      const cached = mqttVehicleService.getAllVehicles();
+      if (cached.length > 0) return cached;
+
+      // Bootstrap: FIWARE REST para arranque imediato enquanto o MQTT liga.
+      console.info('ℹ️  MQTT ainda sem dados — bootstrap via FIWARE REST');
+      return await this._fetchFiwareVehicles();
+    }
+
+    // Modo polling (mantido para fallback/debug)
     try {
-      const source = this.getVehiclesSource();
-      const path   = source === 'fallback' ? '/vehicles/fiware' : '/vehicles';
-      const data   = await this.fetchWithRetry(
+      const path = source === 'fallback' ? '/vehicles/fiware' : '/vehicles';
+      const data = await this.fetchWithRetry(
         `${this.proxyUrl}${path}`,
         {},
         this.retries,
         this.delayMs,
         8000
       );
-
       const vehicles = Array.isArray(data)
         ? data
         : Array.isArray(data?.vehicles)
           ? data.vehicles
           : [];
-
-      if (!Array.isArray(vehicles)) {
-        console.error('❌ Dados inválidos recebidos do worker de veículos');
-        return [];
-      }
-
       return vehicles;
     } catch (error) {
       console.error('❌ Erro ao obter dados dos autocarros:', error);
       return [];
     }
   }
+
+  /**
+   * Obtém veículos directamente do FIWARE Broker (usado como bootstrap do MQTT).
+   * @private
+   */
+  async _fetchFiwareVehicles() {
+    try {
+      const data = await this.fetchWithRetry(this.fiwareUrl, {}, 2, 500, 8000);
+      return Array.isArray(data) ? data : [];
+    } catch (err) {
+      console.error('❌ Bootstrap FIWARE falhou:', err);
+      return [];
+    }
+  }
+
+  // ─── Paragens e rotas (inalterado) ────────────────────────────────────────
 
   async fetchStopRealtime(stopId) {
     try {
@@ -105,14 +138,6 @@ class ApiService {
     }
   }
 
-  /**
-   * Obtém os serviços ativos para uma paragem numa data específica.
-   * Passa pelo proxy Cloudflare Worker para evitar erros de CORS.
-   * Rota do proxy: GET /{stopId}/services?date={date}
-   * @param {string} stopId - Código da paragem (ex: "PLNT2")
-   * @param {string} date - Data no formato YYYY-MM-DD (ex: "2026-04-02")
-   * @returns {Promise<Object>} Objeto com active_service_id e lista de serviços
-   */
   async fetchStopServices(stopId, date) {
     try {
       return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/services?date=${date}`);
@@ -122,10 +147,6 @@ class ApiService {
     }
   }
 
-  /**
-   * Info completa de uma paragem (nome, coordenadas, linhas com cores)
-   * Usa o endpoint GET /{stopId}/info do worker.
-   */
   async fetchStopInfo(stopId) {
     try {
       return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/info`);
