@@ -148,9 +148,6 @@ export class BusMapApp {
       this.setupEventListeners();
       this.lastUpdateDisplay.initialize();
 
-      // Garante que o apiService começa em modo primário (stcp.live)
-      apiService.setVehiclesSource(this._vehiclesSource);
-
       if (REALTIME_BUSES_ENABLED) {
         this.loadingOverlay.update('Agora tens uma app mais rápida com localizações mais precisas. Esperemos que gostes!');
         await this.fetchAndUpdateBuses();
@@ -191,7 +188,29 @@ export class BusMapApp {
   }
 
   startAutoRefresh() {
-    autoRefreshManager.start('bus-map', () => this.fetchAndUpdateBuses(), this.refreshInterval);
+    autoRefreshManager.startMqtt('bus-map', {
+      // Chamado uma vez no arranque com todos os autocarros (snapshot FIWARE)
+      onSnapshot: (vehicles) => {
+        const processed = vehicleService.processBusDataBatch(vehicles);
+        this._allProcessedBuses = processed;
+        this.busMarkerManager.updateBusMarkers(processed);
+        this.lastUpdateDisplay.update();
+      },
+      // Chamado individualmente por cada autocarro que atualiza posição via MQTT
+      onVehicleUpdate: (vehicle) => {
+        // Atualizar o array global
+        const idx = this._allProcessedBuses.findIndex(b => b.id === vehicle.id);
+        if (idx >= 0) this._allProcessedBuses[idx] = vehicle;
+        else this._allProcessedBuses.push(vehicle);
+
+        // Aplicar filtro de rota se ativo
+        const activeRoutes = routeFilterState.selectedRoutes;
+        if (activeRoutes.size > 0 && !activeRoutes.has(String(vehicle.displayLine || vehicle.line || ''))) return;
+
+        this.busMarkerManager.updateBusMarkers([vehicle]);
+        this.lastUpdateDisplay.update();
+      },
+    });
   }
 
   async _handleDeepLink() {
