@@ -8,50 +8,74 @@
  * O tópico "/gtfsrt/vp/#" entrega todas as posições de veículos.
  * As mensagens chegam em protobuf no formato GTFS-RT.
  *
- * Formato do tópico MQTT (Porto Digital):
- *   /gtfsrt/vp/{feedId}/{agencyId}/{mode}/{routeId}/{directionId}/{headsign}/{tripDescriptor}/...
- *   ex: /gtfsrt/vp/2///BUS/507/1/Cordoaria/507_0_2|257|D6|T5|N7//11:18/3261/41;-8/16/42/70/507/FCD116/
+ * ─── FORMATO DO TÓPICO (Porto Digital) ──────────────────────────────────────
  *
- * PARSING DE METADADOS:
- *   O headsign (destino) e a velocidade são extraídos do PROTOBUF, não do tópico.
- *   O tópico tem campos vazios (//) que tornam os índices fixos instáveis:
- *     - trip.headsign do VehiclePosition protobuf é a fonte fidedigna do destino.
- *     - pos.speed (m/s × 3.6) do protobuf é a fonte fidedigna da velocidade.
- *   O tópico apenas é usado para extrair a matrícula (último segmento não-vazio).
+ *   /gtfsrt/vp/{feedId}/{agencyId}/{mode}/{routeId}/{directionId}/{headsign}/{tripDescriptor}//{hora}/{vehicleNumber}/{coords}/{bearing}/{?}/{speed_kmh}/{routeId2}/{plate}/
  *
- * DEDUPLICAÇÃO:
- *   Antes de guardar/emitir cada veículo, o serviço garante que o id não existe
- *   já em memória (seja de bootstrap FIWARE ou de update anterior).
- *   Caso exista, o registo antigo é substituído pelo novo.
- *   O callback onVehicleUpdate recebe sempre o objecto mais recente.
+ *   Exemplo real:
+ *   /gtfsrt/vp/2///BUS/507/1/Cordoaria/507_0_2|257|D6|T5|N7//11:18/3261/41;-8/16/42/70/507/FCD116/
  *
- * TTL dos veículos:
+ *   Mapa de índices (split por '/', 0-based, tópico começa por '/'):
+ *   idx  0 = ""            (antes do primeiro /)
+ *   idx  1 = "gtfsrt"
+ *   idx  2 = "vp"
+ *   idx  3 = "2"           (feedId)
+ *   idx  4 = ""            (agencyId vazio)
+ *   idx  5 = ""            (modo antigo vazio)
+ *   idx  6 = "BUS"         (modo)
+ *   idx  7 = "507"         (routeId / linha)
+ *   idx  8 = "1"           (directionId: 0 ou 1)  ← NÃO é o destino!
+ *   idx  9 = "Cordoaria"   (headsign / destino)   ← DESTINO
+ *   idx 10 = "507_0_2|..." (trip descriptor)
+ *   idx 11 = ""            (campo vazio)
+ *   idx 12 = "11:18"       (hora de partida)
+ *   idx 13 = "3261"        (número do veículo = ID único)  ← ID + busNumber
+ *   idx 14 = "41;-8"       (coordenadas lat;lng no tópico)
+ *   idx 15 = "16"          (bearing em graus)
+ *   idx 16 = "42"          (campo desconhecido)
+ *   idx 17 = "70"          (velocidade em km/h no tópico)   ← SPEED
+ *   idx 18 = "507"         (routeId repetido)
+ *   idx 19 = "FCD116"      (matrícula)                       ← PLATE
+ *
+ * ─── FONTES DOS CAMPOS ───────────────────────────────────────────────────────
+ *
+ *   campo id / busNumber : idx 13 do tópico ("3261")
+ *     O mesmo número que o FIWARE usa como ID de entidade — garante
+ *     deduplicar correctamente quando o MQTT substitui o bootstrap FIWARE.
+ *
+ *   destination (destino): idx 9 do tópico ("Cordoaria")
+ *     O protobuf Porto Digital não preenche trip.headsign; o tópico é a
+ *     única fonte fidedigna. Não usar idx 8 (direction_id).
+ *
+ *   speed (km/h)         : idx 17 do tópico ("70")
+ *     A velocidade vem directamente em km/h no tópico.
+ *     pos.speed do protobuf pode estar a 0 ou ausente neste broker.
+ *
+ *   plate (matrícula)    : idx 19 do tópico ("FCD116")
+ *     Campo apenas visual — não usado para identificação.
+ *
+ *   routeId, directionId,
+ *   tripId, lat, lng     : protobuf GTFS-RT (fonte canonica para estes campos)
+ *
+ * ─── DEDUPLICAÇÃO ────────────────────────────────────────────────────────────
+ *
+ *   O campo id usa o número do veículo do tópico (idx 13), que coincide com
+ *   o ID de entidade FIWARE. Assim, quando o MQTT actualiza um veículo já
+ *   criado pelo bootstrap FIWARE, o BusMarkerManager move o marcador existente
+ *   em vez de criar um duplicado.
+ *
+ * ─── TTL ─────────────────────────────────────────────────────────────────────
+ *
  *   Cada veículo recebe um timestamp ao ser recebido.
- *   A cada 5 s é feita uma limpeza: veículos com mais de 30 s sem actualização
- *   são removidos do snapshot e o callback onVehicleExpired é chamado.
- *
- * Fluxo:
- *   1. Snapshot inicial via FIWARE REST (mapa não começa vazio)
- *   2. Ligação MQTT — cada mensagem atualiza o veículo correspondente no mapa
- *   3. Em caso de desconexão, tenta reconnect automático (mqtt.js faz isso)
- *
- * Dependências externas (CDN, sem build step):
- *   - mqtt.js  : https://unpkg.com/mqtt/dist/mqtt.min.js
- *   - protobufjs: https://cdn.jsdelivr.net/npm/protobufjs@7/dist/protobuf.min.js
+ *   A cada 5 s: veículos sem update há mais de 30 s são removidos.
  *
  * ─── DEBUG ───────────────────────────────────────────────────────────────────
- * Activar logs detalhados na consola:
- *   localStorage.setItem('MQTT_DEBUG', '1')  → depois recarregar
- * Desactivar:
- *   localStorage.removeItem('MQTT_DEBUG')    → depois recarregar
  *
- * Logs emitidos:
- *   [MQTT RAW]       payload em bytes, tópico recebido
- *   [MQTT PROTO]     objecto descodificado do protobuf (antes de processBusData)
- *   [MQTT VEHICLE]   objecto final após processBusData (o que vai para o mapa)
- *   [MQTT SKIP]      payload descartado e motivo (proto inválido, coords em falta, etc.)
- *   [MQTT STATS]     contagem de mensagens a cada 10 s
- *   [MQTT TTL]       veículo removido por expiração de 30 s
+ *   localStorage.setItem('MQTT_DEBUG', '1')  → activar logs
+ *   localStorage.removeItem('MQTT_DEBUG')    → desactivar
+ *
+ *   Logs: [MQTT RAW] [MQTT PROTO] [MQTT PROTO→RAW] [MQTT VEHICLE]
+ *         [MQTT SKIP] [MQTT STATS] [MQTT TTL]
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -62,25 +86,31 @@ import { vehicleService } from './vehicleService.js';
 const BROKER_URL   = 'wss://mmt.portodigital.pt/websocket/';
 const TOPIC        = '/gtfsrt/vp/#';
 const PROTO_PATH   = './resources/gtfs-realtime.proto';
-const VEHICLE_TTL  = 30_000; // ms — veículo removido se não houver update em 30 s
-const TTL_CHECK_MS = 5_000;  // ms — frequência da limpeza de TTL
+const VEHICLE_TTL  = 30_000; // ms
+const TTL_CHECK_MS = 5_000;  // ms
+
+// Índices dos segmentos do tópico (split por '/', 0-based)
+// Tópico: /gtfsrt/vp/2///BUS/507/1/Cordoaria/507_0_2|...//11:18/3261/41;-8/16/42/70/507/FCD116/
+const TIDX_HEADSIGN    = 9;   // "Cordoaria" — destino
+const TIDX_VEHICLE_NUM = 13;  // "3261" — número/ID do veículo
+const TIDX_SPEED       = 17;  // "70" — velocidade em km/h
+const TIDX_PLATE       = 19;  // "FCD116" — matrícula
 
 // ─── Estado interno ─────────────────────────────────────────────────────────
-let _client           = null;   // instância mqtt.js
-let _protoRoot        = null;   // protobufjs root carregado
-let _vehicles         = {};     // { vehicleId → veículo normalizado }
-let _vehicleTimestamp = {};     // { vehicleId → Date.now() do último update }
+let _client           = null;
+let _protoRoot        = null;
+let _vehicles         = {};
+let _vehicleTimestamp = {};
 let _isConnected      = false;
 let _isStarted        = false;
 let _ttlInterval      = null;
-let _onVehicleExpired = null;   // callback(vehicleId)
+let _onVehicleExpired = null;
 
 // ─── Debug ───────────────────────────────────────────────────────────────────
 const _debug = () => {
   try { return localStorage.getItem('MQTT_DEBUG') === '1'; } catch { return false; }
 };
 
-// Contadores para estatísticas periódicas
 let _stats = { received: 0, decoded: 0, processed: 0, skipped: 0 };
 let _statsInterval = null;
 
@@ -90,7 +120,7 @@ function _startStats() {
     if (!_debug()) return;
     const total = Object.keys(_vehicles).length;
     console.groupCollapsed(
-      `%c[MQTT STATS] ⏱ últimos 10s: ${_stats.received} msgs recebidas | ` +
+      `%c[MQTT STATS] ⏱ últimos 10s: ${_stats.received} recebidas | ` +
       `${_stats.decoded} descodificadas | ${_stats.processed} aceites | ` +
       `${_stats.skipped} descartadas | ${total} veículos em memória`,
       'color:#0c4e54;font-weight:bold'
@@ -105,7 +135,7 @@ function _stopStats() {
   if (_statsInterval) { clearInterval(_statsInterval); _statsInterval = null; }
 }
 
-// ─── TTL — limpeza de veículos expirados ─────────────────────────────────────
+// ─── TTL ───────────────────────────────────────────────────────────────────
 
 function _startTtlCheck() {
   if (_ttlInterval) return;
@@ -134,7 +164,7 @@ function _stopTtlCheck() {
   if (_ttlInterval) { clearInterval(_ttlInterval); _ttlInterval = null; }
 }
 
-// ─── Auxiliares de carregamento dinâmico ─────────────────────────────────────
+// ─── Carregamento dinâmico ──────────────────────────────────────────────────────
 
 async function loadMqttLib() {
   if (window.mqtt) return window.mqtt;
@@ -170,34 +200,37 @@ async function loadProtoSchema() {
   return _protoRoot;
 }
 
-// ─── Extracção da matrícula do tópico ────────────────────────────────────────
+// ─── Parsing do tópico MQTT ────────────────────────────────────────────────────
 
 /**
- * Extrai a matrícula do veículo a partir do tópico MQTT.
+ * Extrai todos os metadados relevantes do tópico MQTT.
  *
- * O tópico tem campos vazios (//) que tornam os índices fixos instáveis.
- * Para a matrícula, o padrão do Porto Digital é colocá-la como o último
- * segmento não-vazio antes do trailing slash.
+ * Tópico: /gtfsrt/vp/2///BUS/507/1/Cordoaria/507_0_2|257|D6|T5|N7//11:18/3261/41;-8/16/42/70/507/FCD116/
+ * Índices (0-based após split por '/'):
+ *   9  → headsign (destino)    ex: "Cordoaria"
+ *   13 → vehicleNumber (ID)    ex: "3261"
+ *   17 → speed em km/h         ex: "70"
+ *   19 → plate (matrícula)     ex: "FCD116"
  *
- * ex: /gtfsrt/vp/2///BUS/507/1/Cordoaria/.../FCD116/
- *   → 'FCD116'
- *
- * Se o último segmento não parecer uma matrícula portuguesa (2-3 letras +
- * 2-6 dígitos, ex: FCD116, AL1234), devolve null.
+ * @returns {{ vehicleNumber, headsign, speed, plate }}
  */
-function _extractBusNumberFromTopic(topic) {
+function _parseTopicMeta(topic) {
   const parts = topic.split('/');
-  // Percorrer de trás para a frente para encontrar o último segmento não-vazio
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const seg = parts[i].trim();
-    if (!seg) continue;
-    // Padrão de matrícula portuguesa: 2-3 letras seguidas de 2-6 dígitos (ou inverso)
-    if (/^[A-Z]{2,3}\d{2,6}$/i.test(seg) || /^\d{2,6}[A-Z]{2,3}$/i.test(seg)) {
-      return seg.toUpperCase();
-    }
-    break; // Se o último segmento não-vazio não for matrícula, desistir
-  }
-  return null;
+
+  const seg = (idx) => {
+    const s = parts[idx];
+    return (s && s.trim() !== '') ? decodeURIComponent(s.trim()) : null;
+  };
+
+  const headsign     = seg(TIDX_HEADSIGN);    // idx 9 → "Cordoaria"
+  const vehicleNumber = seg(TIDX_VEHICLE_NUM); // idx 13 → "3261"
+  const plate         = seg(TIDX_PLATE);       // idx 19 → "FCD116"
+
+  // Velocidade: idx 17 já em km/h
+  const speedRaw = seg(TIDX_SPEED);
+  const speed    = (speedRaw && !isNaN(Number(speedRaw))) ? Number(speedRaw) : null;
+
+  return { headsign, vehicleNumber, speed, plate };
 }
 
 // ─── Descodificação de mensagens ─────────────────────────────────────────────
@@ -205,31 +238,28 @@ function _extractBusNumberFromTopic(topic) {
 /**
  * Descodifica um payload protobuf GTFS-RT e devolve o objecto raw normalizado.
  *
- * FONTES DE CADA CAMPO:
- *   - latitude / longitude : pos.latitude / pos.longitude (protobuf)
- *   - speed (km/h)         : pos.speed (m/s) × 3.6       (protobuf)
- *   - destination          : vp.trip.headsign             (protobuf)
- *   - routeId              : vp.trip.route_id             (protobuf)
- *   - directionId          : vp.trip.direction_id         (protobuf)
- *   - tripId               : vp.trip.trip_id              (protobuf)
- *   - vehicleId            : vp.vehicle.id ou entity.id   (protobuf)
- *   - busNumber (matrícula): último segmento do tópico    (tópico MQTT)
- *
- * O tópico NÃO é usado para destino nem velocidade porque os campos vazios
- * (ex: //) tornam os índices fixos instáveis entre mensagens.
+ * FONTES DE CADA CAMPO (pós-correcção):
+ *   id / busNumber  → idx 13 do tópico ("3261") — coincide com ID FIWARE
+ *   destination     → idx 9 do tópico ("Cordoaria")
+ *   speed (km/h)    → idx 17 do tópico (já em km/h)
+ *   plate           → idx 19 do tópico ("FCD116") — apenas visual
+ *   routeId         → protobuf trip.route_id
+ *   directionId     → protobuf trip.direction_id
+ *   tripId          → protobuf trip.trip_id
+ *   lat / lng       → protobuf pos.latitude / pos.longitude
  */
 function decodeGtfsRtMessage(payload, topic) {
   _stats.received++;
+
+  const meta = _parseTopicMeta(topic);
 
   if (_debug()) {
     console.log(
       `%c[MQTT RAW] tópico: ${topic} | bytes: ${payload.byteLength}`,
       'color:#888'
     );
+    console.log('%c[MQTT RAW] metadados do tópico:', 'color:#888', meta);
   }
-
-  // Matrícula extraída do tópico (único campo que continua a vir do tópico)
-  const busNumber = _extractBusNumberFromTopic(topic);
 
   try {
     const FeedMessage = _protoRoot.lookupType('transit_realtime.FeedMessage');
@@ -252,9 +282,16 @@ function decodeGtfsRtMessage(payload, topic) {
         continue;
       }
 
-      const pos       = vp.position;
-      const trip      = vp.trip;
-      const vehicleId = vp.vehicle?.id || entity.id;
+      const pos  = vp.position;
+      const trip = vp.trip;
+
+      // ID: usar o número do veículo do tópico (idx 13, ex: "3261").
+      // Este número coincide com o ID de entidade FIWARE e permite deduplicar
+      // correctamente quando o MQTT substitui o bootstrap FIWARE.
+      // Fallback para vp.vehicle.id ou entity.id se o tópico não tiver o campo.
+      const vehicleId = meta.vehicleNumber
+        || vp.vehicle?.id
+        || entity.id;
 
       if (_debug()) {
         console.groupCollapsed(
@@ -263,7 +300,6 @@ function decodeGtfsRtMessage(payload, topic) {
           'color:#006494'
         );
         console.log('VehiclePosition completo:', JSON.parse(JSON.stringify(vp)));
-        console.log('Matrícula do tópico:', busNumber);
         console.groupEnd();
       }
 
@@ -277,39 +313,34 @@ function decodeGtfsRtMessage(payload, topic) {
 
       _stats.decoded++;
 
-      // ── Velocidade ────────────────────────────────────────────────────────
-      // pos.speed do GTFS-RT protobuf está em m/s — converter para km/h.
-      // NÃO usar o tópico para velocidade: campos vazios tornam índices fixos
-      // instáveis (ex: //) e o valor seria frequentemente null ou errado.
-      const speed = Number.isFinite(pos.speed)
-        ? Math.round(pos.speed * 3.6)
-        : null;
-
-      // ── Destino ───────────────────────────────────────────────────────────
-      // trip.headsign é o campo padrão do GTFS-RT para destino.
-      // Alguns brokers colocam-no em trip.trip_headsign (extensão).
-      // Não usar índice fixo do tópico: instável com campos vazios.
-      const destination =
-        (trip?.headsign       && trip.headsign       !== '') ? trip.headsign       :
-        (trip?.trip_headsign  && trip.trip_headsign  !== '') ? trip.trip_headsign  :
-        null;
-
       const raw = {
+        // Identificação — número do veículo do tópico (mesmo que FIWARE)
         id:          String(vehicleId),
-        routeId:     trip?.route_id                                      || null,
-        directionId: trip?.direction_id != null ? Number(trip.direction_id) : null,
-        tripId:      trip?.trip_id                                       || null,
+        busNumber:   String(vehicleId),   // campo visual no popup
+        plate:       meta.plate,           // matrícula (ex: "FCD116") — só visual
+
+        // Localização — do protobuf
         lat:         pos.latitude,
         lng:         pos.longitude,
-        speed,                  // km/h (convertido de m/s do protobuf)
-        destination,            // do protobuf trip.headsign
-        busNumber,              // matrícula do tópico (último seg não-vazio)
+
+        // Destino — idx 9 do tópico
+        // O broker Porto Digital não preenche trip.headsign no protobuf;
+        // o tópico é a única fonte fidedigna.
+        destination: meta.headsign,
+
+        // Velocidade — idx 17 do tópico (já em km/h)
+        speed:       meta.speed,
+
+        // Metadados da viagem — do protobuf
+        routeId:     trip?.route_id                                        || null,
+        directionId: trip?.direction_id != null ? Number(trip.direction_id) : null,
+        tripId:      trip?.trip_id                                         || null,
       };
 
       if (_debug()) {
         console.log(
           `%c[MQTT PROTO→RAW] id:${raw.id} linha:${raw.routeId} dir:${raw.directionId} ` +
-          `speed:${raw.speed}km/h destino:"${raw.destination}" mat:${raw.busNumber}`,
+          `speed:${raw.speed}km/h destino:"${raw.destination}" mat:${raw.plate}`,
           'color:#006494',
           raw
         );
@@ -331,14 +362,6 @@ function decodeGtfsRtMessage(payload, topic) {
 
 export const mqttVehicleService = {
 
-  /**
-   * Inicia a ligação MQTT.
-   * @param {object} opts
-   * @param {function} opts.onVehicleUpdate   - chamado com o veículo normalizado em cada update
-   * @param {function} opts.onVehicleExpired  - chamado com o vehicleId quando o TTL expira
-   * @param {function} opts.onConnected       - chamado quando a ligação é estabelecida
-   * @param {function} opts.onDisconnected    - chamado quando a ligação é perdida
-   */
   async start({ onVehicleUpdate, onVehicleExpired, onConnected, onDisconnected } = {}) {
     if (_isStarted) {
       console.warn('⚠ MQTT já iniciado');
@@ -410,11 +433,6 @@ export const mqttVehicleService = {
         }
 
         _stats.processed++;
-
-        // ── Deduplicação ──────────────────────────────────────────────────
-        // Substituir sempre o registo existente (seja de bootstrap FIWARE ou
-        // de update anterior do MQTT). O BusMarkerManager trata de mover o
-        // marcador existente em vez de criar um novo (via updateSingleBusMarker).
         _vehicles[vehicle.id]         = vehicle;
         _vehicleTimestamp[vehicle.id] = Date.now();
 
@@ -456,7 +474,6 @@ export const mqttVehicleService = {
     eventBus.emit('mqtt:stopped');
   },
 
-  /** Remove imediatamente um veículo do snapshot (ex: ao receber TTL externo). */
   removeVehicle(vehicleId) {
     delete _vehicles[vehicleId];
     delete _vehicleTimestamp[vehicleId];
