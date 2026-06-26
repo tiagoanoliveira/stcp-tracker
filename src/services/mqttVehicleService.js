@@ -8,7 +8,11 @@
  * O tópico "/gtfsrt/vp/#" entrega todas as posições de veículos.
  * As mensagens chegam em protobuf no formato GTFS-RT.
  *
- * ─── FORMATO DO TÓPICO (Porto Digital) ──────────────────────────────────────
+ * Depois de ligar, passa o client e o protoRoot ao mqttTripUpdateService
+ * para que este adicione uma segunda subscrição (/gtfsrt/tu/#) à mesma
+ * ligação WebSocket, evitando uma segunda ligação ao broker.
+ *
+ * ─── FORMATO DO TÓPICO (Porto Digital) ───────────────────────────────────
  *
  *   /gtfsrt/vp/{feedId}/{agencyId}/{mode}/{routeId}/{directionId}/{headsign}/{tripDescriptor}//{hora}/{vehicleNumber}/{coords}/{bearing}/{?}/{speed_kmh}/{routeId2}/{plate}/
  *
@@ -37,7 +41,7 @@
  *   idx 18 = "507"         (routeId repetido)
  *   idx 19 = "FCD116"      (matrícula)                       ← PLATE
  *
- * ─── FONTES DOS CAMPOS ───────────────────────────────────────────────────────
+ * ─── FONTES DOS CAMPOS ─────────────────────────────────────────────────────
  *
  *   campo id / busNumber : idx 13 do tópico ("3261")
  *     O mesmo número que o FIWARE usa como ID de entidade — garante
@@ -57,30 +61,31 @@
  *   routeId, directionId,
  *   tripId, lat, lng     : protobuf GTFS-RT (fonte canonica para estes campos)
  *
- * ─── DEDUPLICAÇÃO ────────────────────────────────────────────────────────────
+ * ─── DEDUPLICAÇÃO ─────────────────────────────────────────────────────────────────
  *
  *   O campo id usa o número do veículo do tópico (idx 13), que coincide com
  *   o ID de entidade FIWARE. Assim, quando o MQTT actualiza um veículo já
  *   criado pelo bootstrap FIWARE, o BusMarkerManager move o marcador existente
  *   em vez de criar um duplicado.
  *
- * ─── TTL ─────────────────────────────────────────────────────────────────────
+ * ─── TTL ──────────────────────────────────────────────────────────────────────────────
  *
  *   Cada veículo recebe um timestamp ao ser recebido.
  *   A cada 5 s: veículos sem update há mais de 30 s são removidos.
  *
- * ─── DEBUG ───────────────────────────────────────────────────────────────────
+ * ─── DEBUG ──────────────────────────────────────────────────────────────────────────────
  *
  *   localStorage.setItem('MQTT_DEBUG', '1')  → activar logs
  *   localStorage.removeItem('MQTT_DEBUG')    → desactivar
  *
  *   Logs: [MQTT RAW] [MQTT PROTO] [MQTT PROTO→RAW] [MQTT VEHICLE]
  *         [MQTT SKIP] [MQTT STATS] [MQTT TTL]
- * ─────────────────────────────────────────────────────────────────────────────
+ * ───────────────────────────────────────────────────────────────────────────────
  */
 
-import { eventBus } from '../core/eventBus.js';
-import { vehicleService } from './vehicleService.js';
+import { eventBus }             from '../core/eventBus.js';
+import { vehicleService }       from './vehicleService.js';
+import { mqttTripUpdateService } from './mqttTripUpdateService.js';
 
 // ─── Constantes ────────────────────────────────────────────────────────────
 const BROKER_URL   = 'wss://mmt.portodigital.pt/websocket/';
@@ -96,7 +101,7 @@ const TIDX_VEHICLE_NUM = 13;  // "3261" — número/ID do veículo
 const TIDX_SPEED       = 17;  // "70" — velocidade em km/h
 const TIDX_PLATE       = 19;  // "FCD116" — matrícula
 
-// ─── Estado interno ─────────────────────────────────────────────────────────
+// ─── Estado interno ───────────────────────────────────────────────────────────
 let _client           = null;
 let _protoRoot        = null;
 let _vehicles         = {};
@@ -135,7 +140,7 @@ function _stopStats() {
   if (_statsInterval) { clearInterval(_statsInterval); _statsInterval = null; }
 }
 
-// ─── TTL ───────────────────────────────────────────────────────────────────
+// ─── TTL ─────────────────────────────────────────────────────────────────────
 
 function _startTtlCheck() {
   if (_ttlInterval) return;
@@ -164,7 +169,7 @@ function _stopTtlCheck() {
   if (_ttlInterval) { clearInterval(_ttlInterval); _ttlInterval = null; }
 }
 
-// ─── Carregamento dinâmico ──────────────────────────────────────────────────────
+// ─── Carregamento dinâmico ──────────────────────────────────────────────────────────────────
 
 async function loadMqttLib() {
   if (window.mqtt) return window.mqtt;
@@ -200,7 +205,7 @@ async function loadProtoSchema() {
   return _protoRoot;
 }
 
-// ─── Parsing do tópico MQTT ────────────────────────────────────────────────────
+// ─── Parsing do tópico MQTT ──────────────────────────────────────────────────────────────
 
 /**
  * Extrai todos os metadados relevantes do tópico MQTT.
@@ -233,7 +238,7 @@ function _parseTopicMeta(topic) {
   return { headsign, vehicleNumber, speed, plate };
 }
 
-// ─── Descodificação de mensagens ─────────────────────────────────────────────
+// ─── Descodificação de mensagens ──────────────────────────────────────────────────────────
 
 /**
  * Descodifica um payload protobuf GTFS-RT e devolve o objecto raw normalizado.
@@ -269,217 +274,4 @@ function decodeGtfsRtMessage(payload, topic) {
       console.warn('%c[MQTT SKIP] feed sem entidades', 'color:#b07a00', { topic });
       _stats.skipped++;
       return null;
-    }
-
-    for (const entity of (feed.entity || [])) {
-      const vp = entity.vehicle;
-
-      if (!vp) {
-        if (_debug()) {
-          console.warn('%c[MQTT SKIP] entidade sem VehiclePosition', 'color:#b07a00', { entity_id: entity.id });
-        }
-        _stats.skipped++;
-        continue;
-      }
-
-      const pos  = vp.position;
-      const trip = vp.trip;
-
-      // ID: usar o número do veículo do tópico (idx 13, ex: "3261").
-      // Este número coincide com o ID de entidade FIWARE e permite deduplicar
-      // correctamente quando o MQTT substitui o bootstrap FIWARE.
-      // Fallback para vp.vehicle.id ou entity.id se o tópico não tiver o campo.
-      const vehicleId = meta.vehicleNumber
-        || vp.vehicle?.id
-        || entity.id;
-
-      if (_debug()) {
-        console.groupCollapsed(
-          `%c[MQTT PROTO] veículo ${vehicleId} | rota ${trip?.route_id ?? '?'} | ` +
-          `lat ${pos?.latitude?.toFixed(5)} lng ${pos?.longitude?.toFixed(5)}`,
-          'color:#006494'
-        );
-        console.log('VehiclePosition completo:', JSON.parse(JSON.stringify(vp)));
-        console.groupEnd();
-      }
-
-      if (!pos || !Number.isFinite(pos.latitude) || !Number.isFinite(pos.longitude)) {
-        if (_debug()) {
-          console.warn('%c[MQTT SKIP] posição inválida ou em falta', 'color:#b07a00', { vehicleId, pos });
-        }
-        _stats.skipped++;
-        continue;
-      }
-
-      _stats.decoded++;
-
-      const raw = {
-        // Identificação — número do veículo do tópico (mesmo que FIWARE)
-        id:          String(vehicleId),
-        busNumber:   String(vehicleId),   // campo visual no popup
-        plate:       meta.plate,           // matrícula (ex: "FCD116") — só visual
-
-        // Localização — do protobuf
-        lat:         pos.latitude,
-        lng:         pos.longitude,
-
-        // Destino — idx 9 do tópico
-        // O broker Porto Digital não preenche trip.headsign no protobuf;
-        // o tópico é a única fonte fidedigna.
-        destination: meta.headsign,
-
-        // Velocidade — idx 17 do tópico (já em km/h)
-        speed:       meta.speed,
-
-        // Metadados da viagem — do protobuf
-        routeId:     trip?.route_id                                        || null,
-        directionId: trip?.direction_id != null ? Number(trip.direction_id) : null,
-        tripId:      trip?.trip_id                                         || null,
-      };
-
-      if (_debug()) {
-        console.log(
-          `%c[MQTT PROTO→RAW] id:${raw.id} linha:${raw.routeId} dir:${raw.directionId} ` +
-          `speed:${raw.speed}km/h destino:"${raw.destination}" mat:${raw.plate}`,
-          'color:#006494',
-          raw
-        );
-      }
-
-      return raw;
-    }
-    return null;
-  } catch (err) {
-    _stats.skipped++;
-    if (_debug()) {
-      console.error('%c[MQTT SKIP] erro ao descodificar protobuf', 'color:#a12c7b', err);
-    }
-    return null;
-  }
-}
-
-// ─── API pública ─────────────────────────────────────────────────────────────
-
-export const mqttVehicleService = {
-
-  async start({ onVehicleUpdate, onVehicleExpired, onConnected, onDisconnected } = {}) {
-    if (_isStarted) {
-      console.warn('⚠ MQTT já iniciado');
-      return;
-    }
-    _isStarted = true;
-    _onVehicleExpired = onVehicleExpired || null;
-
-    console.info(
-      '%c[MQTT] Para activar logs detalhados: localStorage.setItem(\'MQTT_DEBUG\', \'1\') e recarrega a página',
-      'color:#01696f;font-style:italic'
-    );
-
-    try {
-      await Promise.all([loadMqttLib(), loadProtoSchema()]);
-
-      _client = window.mqtt.connect(BROKER_URL, {
-        clean:           true,
-        reconnectPeriod: 3000,
-        connectTimeout:  8000,
-      });
-
-      _client.on('connect', () => {
-        _isConnected = true;
-        console.info('✅ MQTT ligado ao Porto Digital broker');
-        _client.subscribe(TOPIC, { qos: 0 }, (err) => {
-          if (err) console.error('❌ Erro ao subscrever tópico MQTT:', err);
-          else     console.info(`📡 Subscrito ao tópico: ${TOPIC}`);
-        });
-        _startStats();
-        _startTtlCheck();
-        eventBus.emit('mqtt:connected');
-        onConnected?.();
-      });
-
-      _client.on('reconnect', () => {
-        console.info('🔄 MQTT a reconectar…');
-        eventBus.emit('mqtt:reconnecting');
-      });
-
-      _client.on('disconnect', () => {
-        _isConnected = false;
-        _stopStats();
-        eventBus.emit('mqtt:disconnected');
-        onDisconnected?.();
-      });
-
-      _client.on('error', (err) => {
-        console.error('❌ Erro MQTT:', err);
-        eventBus.emit('mqtt:error', err);
-      });
-
-      _client.on('message', (topic, payload) => {
-        const raw = decodeGtfsRtMessage(payload, topic);
-        if (!raw) return;
-
-        const vehicle = vehicleService.processBusData(raw);
-
-        if (!vehicle) {
-          _stats.skipped++;
-          if (_debug()) {
-            console.warn(
-              '%c[MQTT SKIP] processBusData devolveu null — routeId ou direction em falta?',
-              'color:#b07a00',
-              raw
-            );
-          }
-          return;
-        }
-
-        _stats.processed++;
-        _vehicles[vehicle.id]         = vehicle;
-        _vehicleTimestamp[vehicle.id] = Date.now();
-
-        if (_debug()) {
-          console.log(
-            `%c[MQTT VEHICLE] ✔ id:${vehicle.id} linha:${vehicle.displayLine} ` +
-            `dir:${vehicle.direction} lat:${vehicle.latitude?.toFixed(5)} ` +
-            `lng:${vehicle.longitude?.toFixed(5)} speed:${vehicle.speed}km/h ` +
-            `destino:"${vehicle.destination}" mat:${vehicle.busNumber}`,
-            'color:#437a22',
-            vehicle
-          );
-        }
-
-        onVehicleUpdate?.(vehicle);
-        eventBus.emit('mqtt:vehicleUpdate', vehicle);
-      });
-
-    } catch (err) {
-      _isStarted = false;
-      console.error('❌ Falha ao iniciar MQTT:', err);
-      eventBus.emit('mqtt:error', err);
-      throw err;
-    }
-  },
-
-  stop() {
-    if (_client) {
-      _client.end(true);
-      _client = null;
-    }
-    _isConnected      = false;
-    _isStarted        = false;
-    _vehicles         = {};
-    _vehicleTimestamp = {};
-    _onVehicleExpired = null;
-    _stopStats();
-    _stopTtlCheck();
-    eventBus.emit('mqtt:stopped');
-  },
-
-  removeVehicle(vehicleId) {
-    delete _vehicles[vehicleId];
-    delete _vehicleTimestamp[vehicleId];
-  },
-
-  getAllVehicles() { return Object.values(_vehicles); },
-  isConnected()   { return _isConnected; },
-  isStarted()     { return _isStarted;   },
-};
+   
