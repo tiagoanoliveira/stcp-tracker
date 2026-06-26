@@ -1,5 +1,14 @@
 /**
  * StopsMapApp - Aplicação de mapa de paragens
+ *
+ * Integração MQTT:
+ *  - Quando REALTIME_BUSES_ENABLED, o MQTT é iniciado no initialize().
+ *  - onVehicleUpdate: actualiza o marcador individual em tempo real.
+ *  - onVehicleExpired: remove o marcador do veículo expirado (TTL 30 s).
+ *  - loadStopArrivals usa mqttVehicleService.getAllVehicles() em vez de
+ *    apiService.fetchBusData(), eliminando o polling HTTP.
+ *  - O intervalo de autoRefresh mantém-se para refrescar as chegadas previstas
+ *    (plannedArrivalsService), mas a posição dos veículos é sempre em tempo real.
  */
 
 import { geolocationService }    from '../core/geolocationService.js';
@@ -10,6 +19,7 @@ import { plannedArrivalsService } from '../services/plannedArrivalsService.js';
 import { scheduleService }        from '../services/scheduleService.js';
 import { routeService }           from '../services/routeService.js';
 import { routeFilterState }       from '../services/routeFilterState.js';
+import { mqttVehicleService }     from '../services/mqttVehicleService.js';
 import { MapManager }             from '../map/MapManager.js';
 import { StopMarkerManager }      from '../map/markers/StopMarkerManager.js';
 import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
@@ -63,6 +73,9 @@ export class StopsMapApp {
     this._globalSelectedRoutes    = new Set();
     this._globalSelectedRouteObjs = [];
     this._lineFilterMode          = false;
+
+    // Flag: indica se o MQTT foi iniciado e está activo
+    this._mqttActive = false;
   }
 
   async initialize() {
@@ -75,13 +88,7 @@ export class StopsMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
-      /**
-      // Aviso temporário — STCP
-      AnnouncementBanner.show(
-        'No seguimento do Air Invictus, muitos dos destinos foram alterados e alguns percursos foram suprimidos parcialmente ou mesmo na totalidade (18 e 403). Verifique o destino do veículo antes de embarcar.',
-        { type: 'warning', id: 'stcp-warning', dismissible: false }
-      );
-     */ 
+
       await scheduleService.loadScheduleData();
 
       this.mapManager = new MapManager(this.mapElementId);
@@ -136,6 +143,11 @@ export class StopsMapApp {
       this.setupEventListeners();
       this.setupMapListeners();
 
+      // ── Iniciar MQTT ────────────────────────────────────────────────────────
+      if (REALTIME_BUSES_ENABLED) {
+        this._startMqtt();
+      }
+
       const deepLinkHandled = await this._handleDeepLink();
       if (!deepLinkHandled) await this.loadNearbyStops();
 
@@ -151,6 +163,55 @@ export class StopsMapApp {
       this.showError('Erro ao inicializar aplica\u00e7\u00e3o');
     }
   }
+
+  // ── MQTT ───────────────────────────────────────────────────────────────────
+
+  _startMqtt() {
+    mqttVehicleService.start({
+      onVehicleUpdate: (vehicle) => this._handleMqttVehicleUpdate(vehicle),
+      onVehicleExpired: (vehicleId) => this._handleMqttVehicleExpired(vehicleId),
+      onConnected: () => {
+        this._mqttActive = true;
+      },
+      onDisconnected: () => {
+        this._mqttActive = false;
+      },
+    }).catch(err => {
+      console.error('❌ Falha ao iniciar MQTT:', err);
+      this._mqttActive = false;
+    });
+  }
+
+  /**
+   * Chamado pelo MQTT para cada actualização de posição de veículo.
+   * Actualiza o marcador individual no mapa se a paragem estiver aberta
+   * e o veículo for relevante para as chegadas actuais.
+   */
+  _handleMqttVehicleUpdate(vehicle) {
+    if (!this.currentStopId || !this.busMarkerManager) return;
+    // Só actualizar se o veículo já tiver um marcador visível
+    // (foi previamente associado a uma chegada desta paragem)
+    if (this.busMarkerManager.markers[vehicle.id]) {
+      this.busMarkerManager.updateSingleBusMarker(vehicle);
+    }
+  }
+
+  /**
+   * Chamado pelo TTL do MQTT quando um veículo expira (sem update há 30 s).
+   * Remove o marcador do mapa.
+   */
+  _handleMqttVehicleExpired(vehicleId) {
+    if (!this.busMarkerManager) return;
+    if (this.busMarkerManager.markers[vehicleId]) {
+      this.busMarkerManager.removeBusMarker(vehicleId);
+      // Remover também da lista de posições visíveis
+      this.currentBusPositions = this.busMarkerManager
+        .getAllPositions()
+        .map(ll => [ll.lat, ll.lng]);
+    }
+  }
+
+  // ── Geolocalização ─────────────────────────────────────────────────────────
 
   async setupGeolocation() {
     try {
@@ -226,12 +287,11 @@ export class StopsMapApp {
 
   async _handleDeepLink() {
     const params  = new URLSearchParams(window.location.search);
-    const stopId  = params.get('stop');   // may be stop_code from line-detail.html
+    const stopId  = params.get('stop');
     const lineNum = params.get('line');
     const dir     = parseInt(params.get('dir') ?? '0', 10);
     if (!stopId && !lineNum) return false;
 
-    // Apply line filter first (so the overlay is drawn before the stop opens)
     if (lineNum && this.routeFilterBar) {
       await this._waitForRoutes();
       const route = (this.routeFilterBar.routes || []).find(r => String(r.number) === String(lineNum));
@@ -245,27 +305,18 @@ export class StopsMapApp {
 
     if (stopId) {
       try {
-        // fetchStopInfo accepts both stop_id and stop_code
         const stopInfo = await apiService.fetchStopInfo(stopId);
         const stop = {
-          // Prefer the canonical stop_id returned by the API; fall back to
-          // the URL value so marker lookup still works if the API is down.
           stop_id:   stopInfo?.stop_id   || stopId,
           stop_name: stopInfo?.stop_name || `Paragem ${stopId}`,
           latitude:  stopInfo?.latitude  || 41.1579,
           longitude: stopInfo?.longitude || -8.6291,
           routes:    stopInfo?.routes    || []
         };
-
-        // Centre the map BEFORE rendering markers so the stop is visible
         this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
-
-        // If we are NOT in line-filter mode, load nearby stop markers so the
-        // stop marker for this stop exists in the manager before we highlight it.
         if (!this._lineFilterMode) {
           await this.loadNearbyStops();
         }
-
         await this.handleStopClick(stop);
       } catch (e) {
         console.warn('Deep-link: paragem n\u00e3o encontrada', stopId, e);
@@ -386,7 +437,6 @@ export class StopsMapApp {
     if (!this._lineFilterMode) {
       this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     }
-    // Highlight the selected stop marker (orange icon)
     this.stopMarkerManager.setSelectedStop(stop.stop_id);
 
     const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
@@ -414,7 +464,14 @@ export class StopsMapApp {
         this.nextArrivals.updateLastUpdate();
         return;
       }
-      const vehicles = REALTIME_BUSES_ENABLED ? await apiService.fetchBusData() : [];
+
+      // Usar snapshot MQTT se disponível; caso contrário, fallback ao HTTP
+      const vehicles = REALTIME_BUSES_ENABLED
+        ? (this._mqttActive
+            ? mqttVehicleService.getAllVehicles()
+            : await apiService.fetchBusData())
+        : [];
+
       this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
       if (REALTIME_BUSES_ENABLED) {
@@ -504,14 +561,9 @@ export class StopsMapApp {
     this.mapManager.fitBounds(positions, { paddingTopLeft: [60, 60], paddingBottomRight: [60, panelHeight + 60], maxZoom: 16, minZoom: 13 });
   }
 
-  /**
-   * Clique num autocarro nas próximas chegadas — foca no mapa.
-   * `location` vem de vehicleService.extractVehicleLocation → { lat, lon }
-   */
   handleArrivalClick(data) {
     const { vehicleId, location } = data;
     if (!location || !this.mapManager) return;
-    // extractVehicleLocation returns { lat, lon } — NOT { latitude, longitude }
     const lat = location.lat ?? location.latitude;
     const lon = location.lon ?? location.longitude;
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
@@ -537,7 +589,6 @@ export class StopsMapApp {
     this.currentStopName     = null;
     this.currentStopPosition = null;
     this._setGlobalFilterBarDisabled(false);
-    // Clear stop highlight
     this.stopMarkerManager.setSelectedStop(null);
 
     const params = new URLSearchParams(window.location.search);
@@ -600,6 +651,7 @@ export class StopsMapApp {
     if (this.favouritesPanel)    this.favouritesPanel.destroy();
     if (this.tutorialModal)      this.tutorialModal.destroy();
     if (this.mapManager)         this.mapManager.cleanup();
+    if (REALTIME_BUSES_ENABLED)  mqttVehicleService.stop();
     routeFilterState.clear();
   }
 }

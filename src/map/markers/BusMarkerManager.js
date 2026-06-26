@@ -1,7 +1,12 @@
 /**
  * BusMarkerManager - Gestão de marcadores de autocarros
  *
- * Popup lazy: o destino (headsign) é resolvido apenas no primeiro clique.
+ * Popup lazy: o destino (headsign) é resolvido apenas no primeiro clique,
+ * a menos que bus.destination já esteja preenchido (ex: vindo do tópico MQTT).
+ *
+ * Deduplicação: updateBusMarkers() move o marcador existente se o id já existir
+ * em vez de criar um novo, garantindo que não aparecem duplicados.
+ * Marcadores cujos ids não constem na lista passada são removidos.
  */
 
 import { iconCache }      from '../../ui/design/iconCache.js';
@@ -33,15 +38,12 @@ export class BusMarkerManager {
     const visiblePositions = [];
 
     Object.entries(this.markers).forEach(([id, marker]) => {
-      // Usar displayLine para a filtragem, que já tem aliases resolvidos (ex: 'ZC')
       const bus         = this._busData[id];
       const displayLine = (bus?.displayLine) || this._markerRoutes[id] || '';
       const markerDir   = this._markerDirs[id];
 
       let visible = showAll || selectedRoutes.has(displayLine);
 
-      // Se há mapa de direções e o autocarro tem direção conhecida,
-      // filtrar também pela direção seleccionada para essa linha
       if (visible && routeDirMap && routeDirMap.has(displayLine) && markerDir !== null) {
         visible = markerDir === routeDirMap.get(displayLine);
       }
@@ -57,33 +59,67 @@ export class BusMarkerManager {
     return visiblePositions;
   }
 
+  /**
+   * Actualiza (ou cria) os marcadores para a lista de veículos fornecida.
+   * Se um veículo com o mesmo id já tiver marcador, move-o e actualiza os dados
+   * em vez de criar um duplicado. Veículos ausentes da lista são removidos.
+   */
   updateBusMarkers(busData) {
     const validIDs = new Set();
     busData.forEach(bus => {
       validIDs.add(bus.id);
       this._busData[bus.id] = bus;
-      // O ícone usa bus.line (ID da API, ex: '107') para encontrar a cor correcta em BUS_COLORS
       const icon = iconCache.getBusIcon(bus.line);
+
       if (this.markers[bus.id]) {
+        // Marcador já existe — mover e actualizar ícone
         this.markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
         this.markers[bus.id].setIcon(icon);
+        // Actualizar popup se o destino já estiver resolvido
         if (bus.destination !== null) {
-          this.markers[bus.id].bindPopup(this._createPopupContent(bus));
+          this.markers[bus.id].setPopupContent(this._createPopupContent(bus));
         }
       } else {
+        // Marcador novo
         this._createBusMarker(bus);
       }
     });
+
+    // Remover marcadores de veículos que já não estão na lista
     Object.keys(this.markers).forEach(id => {
       if (!validIDs.has(id)) this.removeBusMarker(id);
     });
   }
 
+  /**
+   * Actualiza um único marcador de veículo sem afectar os restantes.
+   * Útil para actualizações individuais vindas do MQTT (onVehicleUpdate).
+   * Cria o marcador se ainda não existir.
+   */
+  updateSingleBusMarker(bus) {
+    this._busData[bus.id] = bus;
+    const icon = iconCache.getBusIcon(bus.line);
+
+    if (this.markers[bus.id]) {
+      this.markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
+      this.markers[bus.id].setIcon(icon);
+      if (bus.destination !== null) {
+        this.markers[bus.id].setPopupContent(this._createPopupContent(bus));
+      }
+    } else {
+      this._createBusMarker(bus);
+    }
+  }
+
   _createBusMarker(bus) {
-    // O ícone usa bus.line (ID da API, ex: '107') para encontrar a cor correcta em BUS_COLORS
     const icon   = iconCache.getBusIcon(bus.line);
+    // Se o destino já veio do tópico MQTT, mostrar directamente; senão lazy-load
+    const popupContent = bus.destination !== null
+      ? this._createPopupContent(bus)
+      : this._createLoadingPopup(bus);
     const marker = L.marker([bus.latitude, bus.longitude], { icon }).addTo(this.map);
-    marker.bindPopup(this._createLoadingPopup(bus), { maxWidth: 220 });
+    marker.bindPopup(popupContent, { maxWidth: 220 });
+    // Resolver o headsign só se necessário (destination === null)
     marker.on('popupopen', () => this._resolvePopupHeadsign(bus.id, marker));
     this.markers[bus.id] = marker;
     return marker;
@@ -92,6 +128,7 @@ export class BusMarkerManager {
   async _resolvePopupHeadsign(busId, marker) {
     const bus = this._busData[busId];
     if (!bus) return;
+    // Se o destino já veio do tópico MQTT, não há nada a resolver
     if (bus.destination !== null) {
       marker.setPopupContent(this._createPopupContent(bus));
       return;

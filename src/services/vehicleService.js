@@ -2,7 +2,9 @@
  * Vehicle Service - Lógica centralizada de processamento de dados de autocarros
  *
  * LAZY HEADSIGN: processBusData / processBusDataBatch não resolvem o destino.
- * Esse campo fica null até ao primeiro clique no marker.
+ * Esse campo fica null até ao primeiro clique no marker — A MENOS QUE o caller
+ * (ex: mqttVehicleService) já tenha extraído o destino do tópico MQTT e o passe
+ * no campo `bus.destination`. Nesse caso o valor é preservado sem resolver nada.
  *
  * TRIP MATCHING: O trip_id tem o formato:
  *   {linha}_{dir}_{seq}|{nr_viagem}|{dia}|{turno}|{servico}
@@ -128,13 +130,20 @@ class VehicleService {
    * Normaliza um veículo de qualquer origem para o formato interno usado no mapa.
    *
    * Suporta:
+   *  - Formato MQTT (mqttVehicleService): { id, routeId, directionId, lat, lng,
+   *      speed, tripId, destination, busNumber }
+   *    → speed já em km/h, destination já resolvido do tópico.
    *  - Formato normalizado do worker (/vehicles): { id, routeId, directionId, lat, lng, speed, tripId }
    *  - Formato FIWARE bruto: annotations + location.value.coordinates
    *
-   * VELOCIDADE: arredondada às unidades (Math.round) para apresentação ao utilizador.
+   * VELOCIDADE: para o formato MQTT e worker, o campo speed chega já em km/h
+   * (arredondado). Para FIWARE bruto, speed.value está em m/s e é convertido.
+   *
+   * DESTINO: se bus.destination já tiver valor (string não-nula e não-vazia),
+   * é preservado directamente — não é chamado resolveHeadsign.
    */
   processBusData(bus) {
-    // Formato normalizado do worker (/vehicles)
+    // Formato normalizado do worker (/vehicles) ou MQTT
     if (Number.isFinite(bus.lat) && Number.isFinite(bus.lng)) {
       const line      = this.extractLineNumber(bus);
       const direction = this.extractDirection(bus);
@@ -142,8 +151,17 @@ class VehicleService {
 
       if (!line || direction == null) return null;
 
+      // Speed já em km/h (MQTT e worker enviam valor convertido)
       const rawSpeed = bus.speed;
       const speed    = Number.isFinite(rawSpeed) ? Math.round(rawSpeed) : 'N/A';
+
+      // Destino: usar o valor do tópico se disponível, senão resolver preguiçosamente
+      const destination = (bus.destination != null && bus.destination !== '')
+        ? bus.destination
+        : null;
+
+      // busNumber: do tópico MQTT se disponível, senão do campo id
+      const busNumber = bus.busNumber || bus.id || 'N/A';
 
       return {
         id:          String(bus.id),
@@ -152,8 +170,8 @@ class VehicleService {
         latitude:    bus.lat,
         longitude:   bus.lng,
         speed,
-        busNumber:   bus.id ?? 'N/A',
-        destination: null,
+        busNumber,
+        destination,
         direction,
         tripId
       };
@@ -169,8 +187,9 @@ class VehicleService {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
     if (!line || direction == null) return null;
 
+    // FIWARE: speed.value em m/s → converter para km/h
     const rawSpeedFiware = bus.speed?.value;
-    const speedFiware    = Number.isFinite(rawSpeedFiware) ? Math.round(rawSpeedFiware) : 'N/A';
+    const speedFiware    = Number.isFinite(rawSpeedFiware) ? Math.round(rawSpeedFiware * 3.6) : 'N/A';
 
     return {
       id:          bus.id,
@@ -193,10 +212,13 @@ class VehicleService {
 
   /**
    * Resolve o headsign ao clicar no marker.
+   * Só é chamado se bus.destination for null (ou seja, não veio do tópico MQTT).
    * O serviceId é obtido do cache (aquecido em loadScheduleData)
    * e passado directamente a getHeadsignForTrip.
    */
   async resolveHeadsign(bus) {
+    // Se o destino já foi resolvido (ex: via tópico MQTT), devolver directamente
+    if (bus.destination) return bus.destination;
     if (!bus.tripId || !bus.line || bus.direction == null) return 'Destino desconhecido';
     try {
       const serviceId = await scheduleService.getServiceIdAtual();
