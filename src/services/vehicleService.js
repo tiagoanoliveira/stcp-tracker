@@ -14,6 +14,14 @@
  * LINE ALIASES: Algumas linhas são reportadas pela API com um ID numérico
  * diferente do nome real da linha. O mapa LINE_ID_ALIASES faz essa tradução.
  * Exemplo: a linha ZC é transmitida como '107' na localização em tempo real.
+ *
+ * ID NORMALISATION (FIWARE):
+ *   O FIWARE usa o formato "urn:ngsi-ld:Vehicle:{number}" como id de entidade.
+ *   O MQTT usa apenas o número do veículo (ex: "3261").
+ *   Para garantir deduplicação correcta no BusMarkerManager, o branch FIWARE
+ *   de processBusData extrai o número final do URN:
+ *     "urn:ngsi-ld:Vehicle:3261" → "3261"
+ *   Se o id não seguir esse padrão, é usado tal qual.
  */
 
 import { scheduleService } from './scheduleService.js';
@@ -25,6 +33,20 @@ import { scheduleService } from './scheduleService.js';
 const LINE_ID_ALIASES = {
   '107': 'ZC',
 };
+
+/**
+ * Normaliza um id de entidade FIWARE para o número puro do veículo.
+ * "urn:ngsi-ld:Vehicle:3261" → "3261"
+ * "3261"                     → "3261"  (passthrough)
+ * @param {string} rawId
+ * @returns {string}
+ */
+function _normalizeFiwareId(rawId) {
+  if (!rawId) return rawId;
+  // Extrair último segmento de URN separado por ':'
+  const parts = String(rawId).split(':');
+  return parts[parts.length - 1] || String(rawId);
+}
 
 class VehicleService {
   extractAnnotation(bus, prefix) {
@@ -141,6 +163,9 @@ class VehicleService {
    *
    * DESTINO: se bus.destination já tiver valor (string não-nula e não-vazia),
    * é preservado directamente — não é chamado resolveHeadsign.
+   *
+   * ID (FIWARE): o URN é normalizado para o número puro do veículo via
+   * _normalizeFiwareId, garantindo deduplicação com marcadores MQTT.
    */
   processBusData(bus) {
     // Formato normalizado do worker (/vehicles) ou MQTT
@@ -191,14 +216,19 @@ class VehicleService {
     const rawSpeedFiware = bus.speed?.value;
     const speedFiware    = Number.isFinite(rawSpeedFiware) ? Math.round(rawSpeedFiware * 3.6) : 'N/A';
 
+    // Normalizar ID FIWARE: "urn:ngsi-ld:Vehicle:3261" → "3261"
+    // Garante que o id coincide com o número do veículo usado pelo MQTT,
+    // evitando marcadores duplicados no BusMarkerManager.
+    const normalizedId = _normalizeFiwareId(bus.id);
+
     return {
-      id:          bus.id,
+      id:          normalizedId,
       line,
       displayLine: this.getDisplayLine(line),
       latitude:    lat,
       longitude:   lon,
       speed:       speedFiware,
-      busNumber:   bus.fleetVehicleId?.value ?? 'N/A',
+      busNumber:   normalizedId,
       destination: null,
       direction,
       tripId

@@ -9,6 +9,13 @@
  *    apiService.fetchBusData(), eliminando o polling HTTP.
  *  - O intervalo de autoRefresh mantém-se para refrescar as chegadas previstas
  *    (plannedArrivalsService), mas a posição dos veículos é sempre em tempo real.
+ *
+ * DEDUPLICAÇÃO DE MARCADORES:
+ *  - vehicleService.processBusData normaliza o id FIWARE ("urn:ngsi-ld:Vehicle:3261"
+ *    → "3261") para que coincida com o id MQTT, evitando marcadores duplicados.
+ *  - Adicionalmente, _mqttFirstSnapshot garante que na primeira actualização MQTT
+ *    após abrir um painel de paragem, todos os marcadores FIWARE residuais são
+ *    limpos antes de renderizar os dados MQTT.
  */
 
 import { geolocationService }    from '../core/geolocationService.js';
@@ -76,6 +83,11 @@ export class StopsMapApp {
 
     // Flag: indica se o MQTT foi iniciado e está activo
     this._mqttActive = false;
+
+    // Flag: indica se ainda não recebemos o primeiro update MQTT para a paragem
+    // actual. Quando true, o próximo update MQTT limpa todos os marcadores
+    // FIWARE residuais antes de renderizar os dados MQTT.
+    this._mqttFirstSnapshot = false;
   }
 
   async initialize() {
@@ -184,13 +196,31 @@ export class StopsMapApp {
 
   /**
    * Chamado pelo MQTT para cada actualização de posição de veículo.
-   * Actualiza o marcador individual no mapa se a paragem estiver aberta
-   * e o veículo for relevante para as chegadas actuais.
+   *
+   * Na PRIMEIRA actualização após abrir um painel de paragem (_mqttFirstSnapshot
+   * é true), limpa TODOS os marcadores existentes antes de renderizar — isto
+   * garante que eventuais marcadores FIWARE com IDs residuais são removidos,
+   * mesmo que a normalização de ID não os tenha apanhado.
+   *
+   * Nas actualizações seguintes, actualiza apenas o marcador individual.
    */
   _handleMqttVehicleUpdate(vehicle) {
     if (!this.currentStopId || !this.busMarkerManager) return;
-    // Só actualizar se o veículo já tiver um marcador visível
-    // (foi previamente associado a uma chegada desta paragem)
+
+    // Primeira chegada MQTT após abrir a paragem: limpar tudo e redesenhar
+    if (this._mqttFirstSnapshot) {
+      this._mqttFirstSnapshot = false;
+      this.busMarkerManager.clearAllMarkers();
+      // Redesenhar todos os veículos conhecidos pelo MQTT de uma vez
+      const allVehicles = mqttVehicleService.getAllVehicles();
+      if (allVehicles.length > 0) {
+        this.busMarkerManager.updateBusMarkers(allVehicles);
+        this.currentBusPositions = allVehicles.map(v => [v.latitude, v.longitude]);
+      }
+      return;
+    }
+
+    // Actualizações seguintes: mover/actualizar apenas este marcador
     if (this.busMarkerManager.markers[vehicle.id]) {
       this.busMarkerManager.updateSingleBusMarker(vehicle);
     }
@@ -427,6 +457,11 @@ export class StopsMapApp {
     this.busMapCentered      = false;
     this.currentBusPositions = [];
 
+    // Armar a flag de primeiro snapshot MQTT para esta paragem.
+    // Quando o MQTT entregar o próximo update, os marcadores FIWARE
+    // residuais serão limpos antes de renderizar os dados MQTT.
+    this._mqttFirstSnapshot = REALTIME_BUSES_ENABLED && this._mqttActive;
+
     clearTimeout(this.loadStopsDebounce);
     this.loadStopsDebounce = null;
 
@@ -583,6 +618,7 @@ export class StopsMapApp {
     this.lineOverlayManager.clearAll();
     this.busMapCentered      = false;
     this.currentBusPositions = [];
+    this._mqttFirstSnapshot  = false;
     const wasSearchActive = this.isSearchActive;
     const returnPosition  = this.currentStopPosition;
     this.currentStopId       = null;
