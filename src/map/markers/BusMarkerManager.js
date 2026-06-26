@@ -2,11 +2,19 @@
  * BusMarkerManager - Gestão de marcadores de autocarros
  *
  * Popup lazy: o destino (headsign) é resolvido apenas no primeiro clique,
- * a menos que bus.destination já esteja preenchido (ex: vindo do tópico MQTT).
+ * a menos que bus.destination já esteja preenchido (ex: vindo do protobuf MQTT).
  *
- * Deduplicação: updateBusMarkers() move o marcador existente se o id já existir
- * em vez de criar um novo, garantindo que não aparecem duplicados.
- * Marcadores cujos ids não constem na lista passada são removidos.
+ * DEDUPLICAÇÃO:
+ *   Antes de criar qualquer marcador, o método _upsertMarker() verifica se já
+ *   existe um marcador com o mesmo id (independentemente da origem — FIWARE
+ *   bootstrap ou MQTT). Se existir, o marcador é movido e actualizado em vez
+ *   de se criar um duplicado. Isto garante que cada veículo tem exactamente
+ *   um marcador no mapa em qualquer momento.
+ *
+ *   updateBusMarkers()     — actualiza o conjunto completo de marcadores;
+ *                            remove os que já não constam na lista.
+ *   updateSingleBusMarker()— actualiza (ou cria) um único marcador;
+ *                            usado pelo callback onVehicleUpdate do MQTT.
  */
 
 import { iconCache }      from '../../ui/design/iconCache.js';
@@ -17,7 +25,7 @@ export class BusMarkerManager {
     this.map = map;
     this.markers       = {};   // busId -> L.Marker
     this._busData      = {};   // busId -> objecto processado
-    this._markerRoutes = {};   // busId -> displayLine string (nome real da linha)
+    this._markerRoutes = {};   // busId -> displayLine string
     this._markerDirs   = {};   // busId -> direction number (0|1)
   }
 
@@ -28,10 +36,6 @@ export class BusMarkerManager {
 
   /**
    * Filtra marcadores por linha e, opcionalmente, por direção.
-   * A comparação é feita contra o displayLine do autocarro (nome real da linha,
-   * resolvendo aliases como '107' -> 'ZC'), não contra o ID interno da API.
-   * @param {Set<string>}         selectedRoutes  - números de linha seleccionados
-   * @param {Map<string,number>}  [routeDirMap]   - mapa linha -> direção (0|1)
    */
   filterByRoutes(selectedRoutes, routeDirMap) {
     const showAll = !selectedRoutes || selectedRoutes.size === 0;
@@ -59,30 +63,49 @@ export class BusMarkerManager {
     return visiblePositions;
   }
 
+  // ─── Método central de upsert ──────────────────────────────────────────────
+
   /**
-   * Actualiza (ou cria) os marcadores para a lista de veículos fornecida.
-   * Se um veículo com o mesmo id já tiver marcador, move-o e actualiza os dados
-   * em vez de criar um duplicado. Veículos ausentes da lista são removidos.
+   * Insere ou actualiza um marcador para o veículo dado.
+   *
+   * DEDUPLICAÇÃO: se já existir um marcador com bus.id (de qualquer origem),
+   * o marcador é movido e o ícone/popup actualizado em vez de se criar um novo.
+   * Nunca existem dois marcadores para o mesmo id no mapa.
+   *
+   * @param {object} bus - veículo normalizado (saída de vehicleService.processBusData)
+   * @returns {L.Marker} o marcador criado ou actualizado
+   */
+  _upsertMarker(bus) {
+    this._busData[bus.id] = bus;
+    const icon = iconCache.getBusIcon(bus.line);
+
+    if (this.markers[bus.id]) {
+      // ── Marcador já existe: mover + actualizar ──────────────────────────
+      const marker = this.markers[bus.id];
+      marker.setLatLng([bus.latitude, bus.longitude]);
+      marker.setIcon(icon);
+      if (bus.destination !== null && bus.destination !== undefined) {
+        marker.setPopupContent(this._createPopupContent(bus));
+      }
+      return marker;
+    }
+
+    // ── Marcador novo ────────────────────────────────────────────────────
+    return this._createBusMarker(bus);
+  }
+
+  // ─── API pública ───────────────────────────────────────────────────────────
+
+  /**
+   * Actualiza o conjunto completo de marcadores para a lista de veículos dada.
+   * Usa _upsertMarker() para garantir que não há duplicados.
+   * Veículos ausentes da lista são removidos.
    */
   updateBusMarkers(busData) {
     const validIDs = new Set();
     busData.forEach(bus => {
       validIDs.add(bus.id);
-      this._busData[bus.id] = bus;
-      const icon = iconCache.getBusIcon(bus.line);
-
-      if (this.markers[bus.id]) {
-        // Marcador já existe — mover e actualizar ícone
-        this.markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
-        this.markers[bus.id].setIcon(icon);
-        // Actualizar popup se o destino já estiver resolvido
-        if (bus.destination !== null) {
-          this.markers[bus.id].setPopupContent(this._createPopupContent(bus));
-        }
-      } else {
-        // Marcador novo
-        this._createBusMarker(bus);
-      }
+      this._upsertMarker(bus);
     });
 
     // Remover marcadores de veículos que já não estão na lista
@@ -92,34 +115,23 @@ export class BusMarkerManager {
   }
 
   /**
-   * Actualiza um único marcador de veículo sem afectar os restantes.
-   * Útil para actualizações individuais vindas do MQTT (onVehicleUpdate).
-   * Cria o marcador se ainda não existir.
+   * Actualiza um único marcador sem afectar os restantes.
+   * Usado pelo callback onVehicleUpdate do MQTT.
+   * Garante deduplicação via _upsertMarker().
    */
   updateSingleBusMarker(bus) {
-    this._busData[bus.id] = bus;
-    const icon = iconCache.getBusIcon(bus.line);
-
-    if (this.markers[bus.id]) {
-      this.markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
-      this.markers[bus.id].setIcon(icon);
-      if (bus.destination !== null) {
-        this.markers[bus.id].setPopupContent(this._createPopupContent(bus));
-      }
-    } else {
-      this._createBusMarker(bus);
-    }
+    this._upsertMarker(bus);
   }
 
+  // ─── Criação de marcador ───────────────────────────────────────────────────
+
   _createBusMarker(bus) {
-    const icon   = iconCache.getBusIcon(bus.line);
-    // Se o destino já veio do tópico MQTT, mostrar directamente; senão lazy-load
-    const popupContent = bus.destination !== null
+    const icon         = iconCache.getBusIcon(bus.line);
+    const popupContent = (bus.destination !== null && bus.destination !== undefined)
       ? this._createPopupContent(bus)
       : this._createLoadingPopup(bus);
     const marker = L.marker([bus.latitude, bus.longitude], { icon }).addTo(this.map);
     marker.bindPopup(popupContent, { maxWidth: 220 });
-    // Resolver o headsign só se necessário (destination === null)
     marker.on('popupopen', () => this._resolvePopupHeadsign(bus.id, marker));
     this.markers[bus.id] = marker;
     return marker;
@@ -128,8 +140,7 @@ export class BusMarkerManager {
   async _resolvePopupHeadsign(busId, marker) {
     const bus = this._busData[busId];
     if (!bus) return;
-    // Se o destino já veio do tópico MQTT, não há nada a resolver
-    if (bus.destination !== null) {
+    if (bus.destination !== null && bus.destination !== undefined) {
       marker.setPopupContent(this._createPopupContent(bus));
       return;
     }
@@ -144,7 +155,7 @@ export class BusMarkerManager {
       <div class="bus-popup">
         <strong>Linha ${bus.displayLine ?? bus.line}</strong><br>
         Destino: <em style="color:#999">A carregar...</em><br>
-        Velocidade: ${bus.speed} km/h<br>
+        Velocidade: ${bus.speed != null ? bus.speed + ' km/h' : 'N/A'}<br>
         Veículo nº ${bus.busNumber}
       </div>`;
   }
@@ -154,10 +165,12 @@ export class BusMarkerManager {
       <div class="bus-popup">
         <strong>Linha ${bus.displayLine ?? bus.line}</strong><br>
         Destino: ${bus.destination || 'Desconhecido'}<br>
-        Velocidade: ${bus.speed} km/h<br>
+        Velocidade: ${bus.speed != null ? bus.speed + ' km/h' : 'N/A'}<br>
         Veículo nº ${bus.busNumber}
       </div>`;
   }
+
+  // ─── Utilitários ──────────────────────────────────────────────────────────
 
   removeBusMarker(id) {
     if (this.markers[id]) {
