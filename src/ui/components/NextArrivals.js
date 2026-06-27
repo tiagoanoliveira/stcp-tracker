@@ -21,8 +21,10 @@ function getLineVisibility(date) {
 // ─── Helpers de delay ────────────────────────────────────────────────────────
 
 /**
- * Formata um delay em segundos como "MM min. SS seg."
- * Ex: 274 → "04 min. 34 seg."  |  -91 → "-01 min. 31 seg."
+ * Formata um delay em segundos como string compacta:
+ *   - Só segundos se minutos = 0:   "+34 seg."
+ *   - Só minutos  se segundos = 0:  "+04 min."
+ *   - Ambos caso contrário:         "+04 min. 34 seg."
  * @param {number} delaySeconds
  * @returns {string}
  */
@@ -31,6 +33,8 @@ function formatDelay(delaySeconds) {
   const sign = delaySeconds < 0 ? '-' : '+';
   const m    = Math.floor(abs / 60);
   const s    = abs % 60;
+  if (m === 0) return `${sign}${String(s).padStart(2, '0')} seg.`;
+  if (s === 0) return `${sign}${String(m).padStart(2, '0')} min.`;
   return `${sign}${String(m).padStart(2, '0')} min. ${String(s).padStart(2, '0')} seg.`;
 }
 
@@ -384,11 +388,11 @@ export class NextArrivals {
         statusHtml = `<span class="delay-label ${colorCls}">${labelText}</span>`;
       } else if (status === 'EARLY') {
         // Adiantado: rótulo + quanto tempo adiantado (delay é negativo)
-        const diff = formatDelay(delayS); // ex: "-01 min. 31 seg."
+        const diff = formatDelay(delayS);
         statusHtml = `<span class="delay-label ${colorCls}">${labelText} <strong>${diff}</strong></span>`;
       } else if (status === 'DELAYED') {
         // Atrasado: rótulo + atraso em mm:ss
-        const diff = formatDelay(delayS); // ex: "+04 min. 34 seg."
+        const diff = formatDelay(delayS);
         statusHtml = `<span class="delay-label ${colorCls}">${labelText} <strong>${diff}</strong></span>`;
       } else {
         statusHtml = `<span class="delay-label">${labelText}</span>`;
