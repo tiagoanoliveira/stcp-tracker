@@ -3,34 +3,30 @@
  * Suporta paragens STCP normais E paragens de rotas custom (ex: MB1).
  *
  * FONTE DE DADOS (por prioridade):
- *   1. MQTT TripUpdate (/gtfsrt/tu/#) — tempo real, sem HTTP, sem falhas
- *      Usado quando mqttTripUpdateService já tem dados para a paragem.
- *   2. HTTP fetchStopRealtime — fallback APENAS quando o MQTT está inactivo
- *      ou não tem ainda dados para esta paragem específica.
+ *   1. OTP GraphQL (otp.portodigital.pt) — tempo real, mesmo método do site oficial
+ *      Obtido via POST com query GraphQL. Cache TTL 20s.
+ *   2. HTTP fetchStopRealtime — fallback se OTP falhar
  *   3. Horários locais (scheduleService) — complementam chegadas sem tempo real
  *
  * getNextArrivals() devolve sempre um Array de chegadas ordenado por
  * arrival_minutes. A localização dos veículos no mapa é feita em
  * StopsMapApp.updateBusMap() via mqttVehicleService.getVehiclesByTripIds().
- *
- * Usa: apiService, scheduleService, customRouteScheduleService,
- *      mqttTripUpdateService
  */
 
 import { apiService }                  from '../core/apiService.js';
 import { scheduleService }             from './scheduleService.js';
 import { customRouteScheduleService }  from './customRouteScheduleService.js';
-import { mqttTripUpdateService }       from './mqttTripUpdateService.js';
+import { otpService }                  from './otpService.js';
 
 class PlannedArrivalsService {
   constructor() {
-    this.routesCache    = new Map(); // stopId -> { data, timestamp }
-    this.schedulesCache = new Map(); // `${stopId}_${routeId}_${serviceId}` -> { data, timestamp }
+    this.routesCache    = new Map();
+    this.schedulesCache = new Map();
     this.cacheTTL = 30 * 60 * 1000; // 30 minutos
   }
 
   /**
-   * Obtém próximas chegadas combinando tempo real + programadas.
+   * Obtém próximas chegadas combinando OTP (tempo real) + horários locais.
    * Para paragens custom, usa exclusivamente os dados locais.
    *
    * @param {string} stopId
@@ -44,52 +40,54 @@ class PlannedArrivalsService {
         return customRouteScheduleService.getNextArrivals(stopId, maxMinutes);
       }
 
-      // ── 1. MQTT TripUpdate (preferencial) ──────────────────────────────────
-      if (mqttTripUpdateService.isActive()) {
-        const mqttRaw      = mqttTripUpdateService.getArrivalsForStop(stopId);
-        const mqttArrivals = this.formatMqttArrivals(mqttRaw, maxMinutes);
-
-        if (mqttArrivals.length > 0) {
-          // Complementar com horários locais para linhas sem TripUpdate activo
-          const routes = await this.getStopRoutes(stopId);
-          const currentServiceId = routes.length > 0
-            ? await scheduleService.getServiceIdAtual(stopId)
-            : null;
-
-          const scheduledArrivals = [];
-          if (currentServiceId) {
-            for (const route of routes) {
-              const scheduleData = await this.getStopSchedule(stopId, route.route_id, currentServiceId);
-              if (scheduleData?.schedule) {
-                scheduledArrivals.push(...this.extractUpcomingTrips(scheduleData.schedule, maxMinutes, route));
-              }
-            }
-          }
-
-          return this.combineArrivals(
-            mqttArrivals,
-            this.formatArrivals(scheduledArrivals, false)
-          );
-        }
+      // ── 1. OTP GraphQL (preferencial) ───────────────────────────────────
+      let otpArrivals = [];
+      try {
+        otpArrivals = await otpService.getArrivalsForStop(stopId, maxMinutes);
+      } catch (otpErr) {
+        console.warn(`[PlannedArrivals] OTP falhou para ${stopId}:`, otpErr.message);
       }
 
-      // ── 2. Fallback HTTP ────────────────────────────────────────────────────
-      // Apenas usado quando:
-      //   - o mqttTripUpdateService ainda não tem dados para esta paragem
-      //   - ou o MQTT está inactivo
-      console.info(`[PlannedArrivals] ${stopId}: sem dados MQTT TU — fallback HTTP`);
+      // Se o OTP devolveu dados, complementar com horários locais
+      if (otpArrivals.length > 0) {
+        const scheduledArrivals = await this._getScheduledArrivals(stopId, maxMinutes);
+        return this.combineArrivals(otpArrivals, scheduledArrivals);
+      }
 
-      const realtimeData     = await apiService.fetchStopRealtime(stopId);
-      const realtimeArrivals = realtimeData?.arrivals || [];
+      // ── 2. Fallback HTTP (stcp.live ou API legacy) ─────────────────────
+      console.info(`[PlannedArrivals] ${stopId}: OTP sem dados — fallback HTTP`);
 
+      let realtimeArrivals = [];
+      try {
+        const realtimeData = await apiService.fetchStopRealtime(stopId);
+        realtimeArrivals   = (realtimeData?.arrivals || []);
+      } catch (httpErr) {
+        console.warn(`[PlannedArrivals] Fallback HTTP falhou para ${stopId}:`, httpErr.message);
+      }
+
+      const scheduledArrivals = await this._getScheduledArrivals(stopId, maxMinutes);
+
+      return this.combineArrivals(
+        this.formatArrivals(realtimeArrivals, true),
+        scheduledArrivals
+      );
+
+    } catch (error) {
+      console.error(`❌ Erro ao obter chegadas para ${stopId}:`, error);
+      return [];
+    }
+  }
+
+  // ─── Horários locais ─────────────────────────────────────────────────────
+
+  async _getScheduledArrivals(stopId, maxMinutes) {
+    try {
       const routes = await this.getStopRoutes(stopId);
-      if (routes.length === 0) {
-        return this.formatArrivals(realtimeArrivals, true);
-      }
+      if (!routes.length) return [];
 
       const currentServiceId = await scheduleService.getServiceIdAtual(stopId);
-
       const scheduledArrivals = [];
+
       for (const route of routes) {
         const scheduleData = await this.getStopSchedule(stopId, route.route_id, currentServiceId);
         if (scheduleData?.schedule) {
@@ -97,59 +95,14 @@ class PlannedArrivalsService {
         }
       }
 
-      return this.combineArrivals(
-        this.formatArrivals(realtimeArrivals, true),
-        this.formatArrivals(scheduledArrivals, false)
-      );
-    } catch (error) {
-      console.error(`❌ Erro ao obter chegadas para ${stopId}:`, error);
+      return this.formatArrivals(scheduledArrivals, false);
+    } catch (err) {
+      console.warn(`[PlannedArrivals] Erro ao obter horários locais para ${stopId}:`, err.message);
       return [];
     }
   }
 
-  // ─── Formatação de chegadas MQTT ─────────────────────────────────────────────
-
-  /**
-   * Converte TripArrival[] (mqttTripUpdateService) para o formato comum.
-   * Filtra chegadas fora da janela maxMinutes.
-   */
-  formatMqttArrivals(mqttArrivals, maxMinutes) {
-    const now = Math.floor(Date.now() / 1000);
-    const result = [];
-
-    for (const arr of (mqttArrivals || [])) {
-      if (!arr.arrivalTime) continue;
-
-      const diffSeconds    = arr.arrivalTime - now;
-      const arrivalMinutes = Math.round(diffSeconds / 60);
-
-      if (arrivalMinutes < -1 || arrivalMinutes > maxMinutes) continue;
-
-      const dt = new Date(arr.arrivalTime * 1000);
-      const hh = String(dt.getHours()).padStart(2, '0');
-      const mm = String(dt.getMinutes()).padStart(2, '0');
-
-      result.push({
-        route_short_name: arr.routeId       || '?',
-        route_color:      '#0072C6',
-        route_text_color: '#FFFFFF',
-        trip_headsign:    arr.headsign      || '',
-        arrival_minutes:  Math.max(0, arrivalMinutes),
-        arrival_time:     `${hh}:${mm}`,
-        trip_id:          arr.tripId        || null,
-        status:           'REALTIME',
-        delay_minutes:    arr.delaySeconds != null ? Math.round(arr.delaySeconds / 60) : 0,
-        delay_seconds:    arr.delaySeconds  || 0,
-        is_realtime:      true,
-        vehicle_number:   arr.vehicleNumber || null,
-        source:           'mqtt_tu',
-      });
-    }
-
-    return result.sort((a, b) => a.arrival_minutes - b.arrival_minutes);
-  }
-
-  // ─── Métodos de acesso a dados ───────────────────────────────────────────────
+  // ─── Métodos de acesso a dados ──────────────────────────────────────────
 
   async getStopRoutes(stopId) {
     if (customRouteScheduleService.handlesStop(stopId)) {
@@ -174,15 +127,11 @@ class PlannedArrivalsService {
     return data;
   }
 
-  /**
-   * Extrai próximas viagens do schedule.
-   * Suporta horários após 24h (a STCP usa 24, 25, 26 para após meia-noite).
-   */
   extractUpcomingTrips(schedule, maxMinutes, route) {
-    const now                = new Date();
-    const currentTotalMins   = now.getHours() * 60 + now.getMinutes();
-    const maxTotalMins       = currentTotalMins + maxMinutes;
-    const upcomingTrips      = [];
+    const now              = new Date();
+    const currentTotalMins = now.getHours() * 60 + now.getMinutes();
+    const maxTotalMins     = currentTotalMins + maxMinutes;
+    const upcomingTrips    = [];
 
     const endHour            = Math.min(23, Math.floor(maxTotalMins / 60));
     const checkAfterMidnight = maxTotalMins >= 1440;
@@ -208,9 +157,7 @@ class PlannedArrivalsService {
       let adjTrip    = tripTotalMins;
       let adjCurrent = currentTotalMins;
 
-      if (hour >= 24 && currentTotalMins >= 23 * 60) {
-        // entre 23h-24h, horários 24h+ são futuro próximo
-      } else if (hour >= 24) {
+      if (hour >= 24 && currentTotalMins < 23 * 60) {
         adjCurrent = 1440 + currentTotalMins;
       }
 
@@ -245,10 +192,6 @@ class PlannedArrivalsService {
     }));
   }
 
-  /**
-   * Combina chegadas tempo real + programadas, removendo duplicados.
-   * Duplicado: mesma linha + mesmo destino + tempo próximo (±5 min).
-   */
   combineArrivals(realtimeArrivals, scheduledArrivals) {
     const combined = [...realtimeArrivals];
     for (const scheduled of scheduledArrivals) {
@@ -256,7 +199,9 @@ class PlannedArrivalsService {
         const sameRoute    = rt.route_short_name === scheduled.route_short_name;
         const sameHeadsign = this._normalizeHeadsign(rt.trip_headsign) ===
                              this._normalizeHeadsign(scheduled.trip_headsign);
-        const timeDiff     = Math.abs((rt.arrival_minutes - (rt.delay_minutes || 0)) - scheduled.arrival_minutes);
+        const timeDiff     = Math.abs(
+          (rt.arrival_minutes - (rt.delay_minutes || 0)) - scheduled.arrival_minutes
+        );
         return sameRoute && sameHeadsign && timeDiff <= 5;
       });
       if (!isDuplicate) combined.push(scheduled);

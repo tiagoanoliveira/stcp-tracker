@@ -8,80 +8,75 @@
  * O tópico "/gtfsrt/vp/#" entrega todas as posições de veículos.
  * As mensagens chegam em protobuf no formato GTFS-RT.
  *
- * Depois de ligar, passa o client e o protoRoot ao mqttTripUpdateService
- * para que este adicione uma segunda subscrição (/gtfsrt/tu/#) à mesma
- * ligação WebSocket, evitando uma segunda ligação ao broker.
+ * ─── FORMATO DO TÓPICO (Porto Digital / Digitransit) ─────────────────────
  *
- * ─── FORMATO DO TÓPICO (Porto Digital) ─────────────────────────────────────
+ * Split por '/', 0-based (tópico começa por '/'):
  *
- *   /gtfsrt/vp/{feedId}/{agencyId}/{mode}/{routeId}/{directionId}/{headsign}/{tripDescriptor}//{hora}/{vehicleNumber}/{coords}/{bearing}/{?}/{speed_raw}/{routeId2}/{plate}/
+ *   idx  0 = ""          (vazio — começa com '/')
+ *   idx  1 = "gtfsrt"
+ *   idx  2 = "vp"
+ *   idx  3 = feedId      (ex: "2")
+ *   idx  4 = agencyId    (pode ser vazio)
+ *   idx  5 = agencyName  (pode ser vazio)
+ *   idx  6 = mode        (ex: "BUS")
+ *   idx  7 = routeId     (ex: "507")
+ *   idx  8 = directionId (ex: "1")
+ *   idx  9 = headsign    (ex: "Cordoaria")
+ *   idx 10 = tripDescriptor (ex: "507_0_2|257|D6|T5|N7")
+ *   idx 11 = nextStop
+ *   idx 12 = startTime   (ex: "11:18")
+ *   idx 13 = vehicleId   (ex: "3261")
+ *   idx 14 = coords      (ex: "41;-8") — lat;lng aproximado do geohash
+ *   idx 15 = bearing
+ *   idx 16 = ? (campo extra)
+ *   idx 17 = speed       (ex: "70") — pode ser km/h ou m/s, ver nota abaixo
+ *   idx 18 = routeId2
+ *   idx 19 = plate       (ex: "FCD116")
  *
- *   Exemplo real:
+ * Nota: exemplo real:
  *   /gtfsrt/vp/2///BUS/507/1/Cordoaria/507_0_2|257|D6|T5|N7//11:18/3261/41;-8/16/42/70/507/FCD116/
  *
- *   Mapa de índices (split por '/', 0-based, tópico começa por '/'):
- *   idx  9 = "Cordoaria"   (headsign / destino)
- *   idx 13 = "3261"        (número do veículo = ID único)
- *   idx 17 = "70"          (velocidade RAW — ver nota abaixo)
- *   idx 19 = "FCD116"      (matrícula)
+ * ─── VELOCIDADE ───────────────────────────────────────────────────────
  *
- * ─── VELOCIDADE ─────────────────────────────────────────────────────────────
+ *   idx 17: heurística — se < 35, assume m/s e converte para km/h;
+ *   caso contrário, assume já estar em km/h. Cap de 90 km/h.
  *
- *   O campo idx 17 do tópico não está em km/h nem em m/s de forma consistente.
- *   O broker Porto Digital publica os valores do GTFS-RT pos.speed que está
- *   definido pela especificação como m/s (float).
- *   Conversão: speed_kmh = round(speed_raw * 3.6)
- *   Cap de segurança: 90 km/h máximo (velocidade máxima legal de autocarro urbano
- *   em Portugal é 50-90 km/h; valores acima indicam erro de telemetria).
+ * ─── IMPORTANTE: routeId/directionId ───────────────────────────────────
  *
- * ─── NO-DATA TIMEOUT ────────────────────────────────────────────────────────
+ *   O payload protobuf do Porto Digital pode não incluir trip.route_id
+ *   e trip.direction_id. Esses campos estão sempre disponíveis no tópico
+ *   (idx 7 e idx 8). O processamento usa sempre o tópico como fonte
+ *   primária e o proto como fallback.
  *
- *   Se passarem NO_DATA_TIMEOUT_MS (15s) após conectar sem nenhum veículo
- *   ser processado com sucesso, emite 'mqtt:noDataTimeout' no eventBus.
- *   O UI deve mostrar um banner informando o utilizador que os dados de
- *   tempo real não estão disponíveis (falha no serviço externo).
- *   O banner desaparece ao receber o primeiro veículo ('mqtt:vehicleUpdate').
+ *   O processBusData() aceita direction=null (usa 0 como default internamente)
+ *   para que veículos sem direction no proto sejam igualmente mostrados no mapa.
  *
- * ─── DEDUPLICAÇÃO ───────────────────────────────────────────────────────────
- *
- *   O campo id usa o número do veículo do tópico (idx 13), que coincide com
- *   o ID de entidade FIWARE (legado). Garante que marcadores são actualizados
- *   em vez de duplicados.
- *
- * ─── TTL ─────────────────────────────────────────────────────────────────────
- *
- *   Cada veículo recebe um timestamp ao ser recebido.
- *   A cada 5 s: veículos sem update há mais de 30 s são removidos.
- *
- * ─── DEBUG ───────────────────────────────────────────────────────────────────
+ * ─── DEBUG ─────────────────────────────────────────────────────────────────
  *
  *   localStorage.setItem('MQTT_DEBUG', '1')  → activar logs
  *   localStorage.removeItem('MQTT_DEBUG')    → desactivar
- *
- *   Logs: [MQTT RAW] [MQTT PROTO] [MQTT PROTO→RAW] [MQTT VEHICLE]
- *         [MQTT SKIP] [MQTT STATS] [MQTT TTL] [MQTT SPEED]
- * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { eventBus }              from '../core/eventBus.js';
-import { vehicleService }        from './vehicleService.js';
-import { mqttTripUpdateService } from './mqttTripUpdateService.js';
+import { eventBus }       from '../core/eventBus.js';
+import { vehicleService } from './vehicleService.js';
 
-// ─── Constantes ──────────────────────────────────────────────────────────────
-const BROKER_URL          = 'wss://mmt.portodigital.pt/websocket/';
-const TOPIC               = '/gtfsrt/vp/#';
-const PROTO_PATH          = './resources/gtfs-realtime.proto';
-const VEHICLE_TTL         = 30_000; // ms
-const TTL_CHECK_MS        = 5_000;  // ms
-const NO_DATA_TIMEOUT_MS  = 15_000; // ms antes de emitir noDataTimeout
+// ─── Constantes ────────────────────────────────────────────────────────────
+const BROKER_URL         = 'wss://mmt.portodigital.pt/websocket/';
+const TOPIC              = '/gtfsrt/vp/#';
+const PROTO_PATH         = './resources/gtfs-realtime.proto';
+const VEHICLE_TTL        = 30_000; // ms
+const TTL_CHECK_MS       = 5_000;  // ms
+const NO_DATA_TIMEOUT_MS = 15_000; // ms
 
-// Índices dos segmentos do tópico
+// Índices do tópico Digitransit (0-based após split '/')
+const TIDX_ROUTE_ID    = 7;
+const TIDX_DIR_ID      = 8;
 const TIDX_HEADSIGN    = 9;
 const TIDX_VEHICLE_NUM = 13;
-const TIDX_SPEED       = 17;  // valor raw em m/s (spec GTFS-RT)
+const TIDX_SPEED       = 17;
 const TIDX_PLATE       = 19;
 
-// ─── Estado interno ───────────────────────────────────────────────────────────
+// ─── Estado interno ────────────────────────────────────────────────────────────
 let _client           = null;
 let _protoRoot        = null;
 let _vehicles         = {};
@@ -93,7 +88,7 @@ let _noDataTimer      = null;
 let _hasReceivedData  = false;
 let _onVehicleExpired = null;
 
-// ─── Debug ────────────────────────────────────────────────────────────────────
+// ─── Debug ───────────────────────────────────────────────────────────────────
 const _debug = () => {
   try { return localStorage.getItem('MQTT_DEBUG') === '1'; } catch { return false; }
 };
@@ -112,7 +107,6 @@ function _startStats() {
       `${_stats.skipped} descartadas | ${total} veículos em memória`,
       'color:#0c4e54;font-weight:bold'
     );
-    console.table({ ..._stats, veiculos_em_memoria: total });
     console.groupEnd();
     _stats = { received: 0, decoded: 0, processed: 0, skipped: 0 };
   }, 10_000);
@@ -122,16 +116,13 @@ function _stopStats() {
   if (_statsInterval) { clearInterval(_statsInterval); _statsInterval = null; }
 }
 
-// ─── No-data timeout ─────────────────────────────────────────────────────────
+// ─── No-data timeout ───────────────────────────────────────────────────
 
 function _startNoDataTimer() {
   _clearNoDataTimer();
   _noDataTimer = setTimeout(() => {
     if (!_hasReceivedData) {
-      console.warn(
-        '%c[MQTT] ⚠ Timeout de 15s sem dados de veículos — broker não está a enviar dados',
-        'color:#964219;font-weight:bold'
-      );
+      console.warn('%c[MQTT] ⚠ Timeout de 15s sem dados', 'color:#964219;font-weight:bold');
       eventBus.emit('mqtt:noDataTimeout');
     }
   }, NO_DATA_TIMEOUT_MS);
@@ -141,7 +132,7 @@ function _clearNoDataTimer() {
   if (_noDataTimer) { clearTimeout(_noDataTimer); _noDataTimer = null; }
 }
 
-// ─── TTL ──────────────────────────────────────────────────────────────────────
+// ─── TTL ─────────────────────────────────────────────────────────────────────
 
 function _startTtlCheck() {
   if (_ttlInterval) return;
@@ -151,13 +142,7 @@ function _startTtlCheck() {
       id => now - _vehicleTimestamp[id] > VEHICLE_TTL
     );
     for (const id of expired) {
-      if (_debug()) {
-        console.log(
-          `%c[MQTT TTL] 🗑 veículo ${id} removido (sem update há ` +
-          `${Math.round((now - _vehicleTimestamp[id]) / 1000)}s)`,
-          'color:#964219'
-        );
-      }
+      if (_debug()) console.log(`%c[MQTT TTL] 🗑 veículo ${id} removido`, 'color:#964219');
       delete _vehicles[id];
       delete _vehicleTimestamp[id];
       _onVehicleExpired?.(id);
@@ -170,7 +155,7 @@ function _stopTtlCheck() {
   if (_ttlInterval) { clearInterval(_ttlInterval); _ttlInterval = null; }
 }
 
-// ─── Carregamento dinâmico ───────────────────────────────────────────────────
+// ─── Carregamento dinâmico ─────────────────────────────────────────────────
 
 async function loadMqttLib() {
   if (window.mqtt) return window.mqtt;
@@ -206,77 +191,50 @@ async function loadProtoSchema() {
   return _protoRoot;
 }
 
-// ─── Parsing do tópico MQTT ──────────────────────────────────────────────────
+// ─── Parsing do tópico MQTT ─────────────────────────────────────────────────
 
 function _parseTopicMeta(topic) {
   const parts = topic.split('/');
-
   const seg = (idx) => {
     const s = parts[idx];
     return (s && s.trim() !== '') ? decodeURIComponent(s.trim()) : null;
   };
 
-  const headsign      = seg(TIDX_HEADSIGN);
-  const vehicleNumber = seg(TIDX_VEHICLE_NUM);
-  const plate         = seg(TIDX_PLATE);
-
-  // idx 17: valor raw em m/s conforme especificação GTFS-RT pos.speed
-  // Conversão: km/h = m/s × 3.6, cap 90 km/h
   const speedRaw = seg(TIDX_SPEED);
   let speed = null;
   if (speedRaw && !isNaN(Number(speedRaw))) {
     const ms = Number(speedRaw);
-    // Detectar se o valor já foi convertido incorrectamente para km/h:
-    // valores > 30 m/s (~108 km/h) são improváveis num autocarro urbano,
-    // mas o broker pode já ter enviado em km/h em alguns feeds.
-    // Heurística: se ms < 35, assumir m/s e converter; caso contrário, já é km/h.
     const kmh = ms < 35 ? Math.round(ms * 3.6) : Math.round(ms);
-    speed = Math.min(kmh, 90); // cap de segurança
-    if (_debug() && ms >= 35) {
-      console.log(`%c[MQTT SPEED] idx17=${ms} → assumido km/h directo → cap ${speed}`, 'color:#888');
-    }
+    speed = Math.min(kmh, 90);
   }
 
-  return { headsign, vehicleNumber, speed, plate };
+  return {
+    routeId:       seg(TIDX_ROUTE_ID),
+    directionId:   seg(TIDX_DIR_ID) != null ? Number(seg(TIDX_DIR_ID)) : null,
+    headsign:      seg(TIDX_HEADSIGN),
+    vehicleNumber: seg(TIDX_VEHICLE_NUM),
+    speed,
+    plate:         seg(TIDX_PLATE),
+  };
 }
 
-// ─── Descodificação de mensagens ─────────────────────────────────────────────
+// ─── Descodificação de mensagens ───────────────────────────────────────────────
 
-function decodeGtfsRtMessage(payload, topic) {
+function _decodeMessage(payload, topic) {
   _stats.received++;
 
   const meta = _parseTopicMeta(topic);
-
-  if (_debug()) {
-    console.log(
-      `%c[MQTT RAW] tópico: ${topic} | bytes: ${payload.byteLength}`,
-      'color:#888'
-    );
-    console.log('%c[MQTT RAW] metadados do tópico:', 'color:#888', meta);
-  }
 
   try {
     const FeedMessage = _protoRoot.lookupType('transit_realtime.FeedMessage');
     const feed = FeedMessage.decode(payload);
 
-    if (_debug() && (feed.entity || []).length === 0) {
-      console.warn('%c[MQTT SKIP] feed sem entidades', 'color:#b07a00', { topic });
-      _stats.skipped++;
-      return null;
-    }
-
     for (const entity of (feed.entity || [])) {
       const vp = entity.vehicle;
-
-      if (!vp) {
-        _stats.skipped++;
-        continue;
-      }
+      if (!vp) { _stats.skipped++; continue; }
 
       const pos  = vp.position;
       const trip = vp.trip;
-
-      const vehicleId = meta.vehicleNumber || vp.vehicle?.id || entity.id;
 
       if (!pos || !Number.isFinite(pos.latitude) || !Number.isFinite(pos.longitude)) {
         _stats.skipped++;
@@ -284,6 +242,14 @@ function decodeGtfsRtMessage(payload, topic) {
       }
 
       _stats.decoded++;
+
+      // Tópico é fonte primária; proto é fallback
+      const vehicleId  = meta.vehicleNumber || vp.vehicle?.id || entity.id;
+      const routeId    = meta.routeId    || trip?.route_id  || null;
+      const directionId = meta.directionId != null
+        ? meta.directionId
+        : (trip?.direction_id != null ? Number(trip.direction_id) : null);
+      const tripId     = trip?.trip_id || null;
 
       const raw = {
         id:          String(vehicleId),
@@ -293,17 +259,17 @@ function decodeGtfsRtMessage(payload, topic) {
         lng:         pos.longitude,
         destination: meta.headsign,
         speed:       meta.speed,
-        routeId:     trip?.route_id                                        || null,
-        directionId: trip?.direction_id != null ? Number(trip.direction_id) : null,
-        tripId:      trip?.trip_id                                         || null,
+        routeId,
+        directionId,
+        tripId,
       };
 
       if (_debug()) {
         console.log(
           `%c[MQTT PROTO→RAW] id:${raw.id} linha:${raw.routeId} dir:${raw.directionId} ` +
-          `speed:${raw.speed}km/h destino:"${raw.destination}" mat:${raw.plate} trip:${raw.tripId}`,
-          'color:#006494',
-          raw
+          `lat:${raw.lat?.toFixed(5)} lng:${raw.lng?.toFixed(5)} ` +
+          `speed:${raw.speed}km/h destino:"${raw.destination}" trip:${raw.tripId}`,
+          'color:#006494', raw
         );
       }
 
@@ -312,14 +278,12 @@ function decodeGtfsRtMessage(payload, topic) {
     return null;
   } catch (err) {
     _stats.skipped++;
-    if (_debug()) {
-      console.error('%c[MQTT SKIP] erro ao descodificar protobuf', 'color:#a12c7b', err);
-    }
+    if (_debug()) console.error('%c[MQTT ERR] decode', 'color:#a12c7b', err);
     return null;
   }
 }
 
-// ─── API pública ──────────────────────────────────────────────────────────────
+// ─── API pública ────────────────────────────────────────────────────────────
 
 export const mqttVehicleService = {
 
@@ -333,7 +297,7 @@ export const mqttVehicleService = {
     _onVehicleExpired = onVehicleExpired || null;
 
     console.info(
-      '%c[MQTT] Para activar logs detalhados: localStorage.setItem(\'MQTT_DEBUG\', \'1\') e recarrega a página',
+      '%c[MQTT] Para activar logs: localStorage.setItem(\'MQTT_DEBUG\', \'1\') e recarrega',
       'color:#01696f;font-style:italic'
     );
 
@@ -348,19 +312,14 @@ export const mqttVehicleService = {
 
       _client.on('connect', () => {
         _isConnected = true;
-        console.info('✅ MQTT ligado ao Porto Digital broker');
+        console.info('✅ MQTT ligado ao broker Porto Digital');
 
         _client.subscribe(TOPIC, { qos: 0 }, (err) => {
           if (err) console.error('❌ Erro ao subscrever tópico MQTT:', err);
-          else     console.info(`📡 Subscrito ao tópico: ${TOPIC}`);
+          else     console.info(`📡 Subscrito: ${TOPIC}`);
         });
 
-        // Activar TripUpdate na mesma ligação WebSocket
-        mqttTripUpdateService.attach(_client, _protoRoot);
-
-        // Iniciar timer de no-data
         _startNoDataTimer();
-
         _startStats();
         _startTtlCheck();
         eventBus.emit('mqtt:connected');
@@ -386,31 +345,35 @@ export const mqttVehicleService = {
       });
 
       _client.on('message', (topic, payload) => {
-        // Mensagens /tu são tratadas exclusivamente pelo mqttTripUpdateService
-        if (topic.startsWith('/gtfsrt/tu/')) return;
-
-        const raw = decodeGtfsRtMessage(payload, topic);
+        const raw = _decodeMessage(payload, topic);
         if (!raw) return;
+
+        // processBusData exige routeId (line) e tolera directionId=null
+        // Se não há routeId no tópico nem no proto, descartar
+        if (!raw.routeId) {
+          _stats.skipped++;
+          return;
+        }
+
+        // directionId=null é aceite — usar 0 como default no processamento
+        if (raw.directionId == null) raw.directionId = 0;
 
         const vehicle = vehicleService.processBusData(raw);
 
         if (!vehicle) {
           _stats.skipped++;
-          if (_debug()) {
-            console.warn(
-              '%c[MQTT SKIP] processBusData devolveu null',
-              'color:#b07a00',
-              raw
-            );
-          }
+          if (_debug()) console.warn('%c[MQTT SKIP] processBusData=null', 'color:#b07a00', raw);
           return;
         }
 
-        // Primeiro veículo com sucesso — cancelar timeout e limpar banner
         if (!_hasReceivedData) {
           _hasReceivedData = true;
           _clearNoDataTimer();
           eventBus.emit('mqtt:dataRestored');
+          console.info(
+            `%c🚌 MQTT: primeiro veículo recebido (id:${vehicle.id} linha:${vehicle.displayLine})`,
+            'color:#437a22;font-weight:bold'
+          );
         }
 
         _stats.processed++;
@@ -421,10 +384,8 @@ export const mqttVehicleService = {
           console.log(
             `%c[MQTT VEHICLE] ✔ id:${vehicle.id} linha:${vehicle.displayLine} ` +
             `dir:${vehicle.direction} lat:${vehicle.latitude?.toFixed(5)} ` +
-            `lng:${vehicle.longitude?.toFixed(5)} speed:${vehicle.speed}km/h ` +
-            `destino:"${vehicle.destination}" trip:${vehicle.tripId}`,
-            'color:#437a22',
-            vehicle
+            `lng:${vehicle.longitude?.toFixed(5)} speed:${vehicle.speed}km/h`,
+            'color:#437a22', vehicle
           );
         }
 
@@ -441,10 +402,7 @@ export const mqttVehicleService = {
   },
 
   stop() {
-    if (_client) {
-      _client.end(true);
-      _client = null;
-    }
+    if (_client) { _client.end(true); _client = null; }
     _isConnected      = false;
     _isStarted        = false;
     _hasReceivedData  = false;
@@ -454,7 +412,6 @@ export const mqttVehicleService = {
     _clearNoDataTimer();
     _stopStats();
     _stopTtlCheck();
-    mqttTripUpdateService.detach();
     eventBus.emit('mqtt:stopped');
   },
 
@@ -463,23 +420,11 @@ export const mqttVehicleService = {
     delete _vehicleTimestamp[vehicleId];
   },
 
-  /**
-   * Devolve o veículo em memória por tripId.
-   * Usado pelo UI ao abrir uma paragem para localizar os autocarros
-   * que irão passar, a partir dos tripIds das chegadas previstas.
-   * @param {string} tripId
-   * @returns {object|null}
-   */
   getVehicleByTripId(tripId) {
     if (!tripId) return null;
     return Object.values(_vehicles).find(v => v.tripId === tripId) || null;
   },
 
-  /**
-   * Devolve todos os veículos em memória cujo tripId está na lista fornecida.
-   * @param {string[]} tripIds
-   * @returns {object[]}
-   */
   getVehiclesByTripIds(tripIds) {
     if (!tripIds?.length) return [];
     const set = new Set(tripIds);
