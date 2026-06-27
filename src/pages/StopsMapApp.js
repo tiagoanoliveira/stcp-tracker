@@ -16,6 +16,11 @@
  *  - Adicionalmente, _mqttFirstSnapshot garante que na primeira actualização MQTT
  *    após abrir um painel de paragem, todos os marcadores FIWARE residuais são
  *    limpos antes de renderizar os dados MQTT.
+ *
+ * BANNER DE SERVIÇO INDISPONÍVEL:
+ *  - Se o broker MQTT ligar mas não entregar nenhum veículo em 15 s,
+ *    é emitido mqtt:noDataTimeout → mostra AnnouncementBanner.
+ *  - Quando o primeiro veículo chegar, mqtt:dataRestored → esconde o banner.
  */
 
 import { geolocationService }    from '../core/geolocationService.js';
@@ -27,6 +32,7 @@ import { scheduleService }        from '../services/scheduleService.js';
 import { routeService }           from '../services/routeService.js';
 import { routeFilterState }       from '../services/routeFilterState.js';
 import { mqttVehicleService }     from '../services/mqttVehicleService.js';
+import { eventBus }               from '../core/eventBus.js';
 import { MapManager }             from '../map/MapManager.js';
 import { StopMarkerManager }      from '../map/markers/StopMarkerManager.js';
 import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
@@ -88,6 +94,9 @@ export class StopsMapApp {
     // actual. Quando true, o próximo update MQTT limpa todos os marcadores
     // FIWARE residuais antes de renderizar os dados MQTT.
     this._mqttFirstSnapshot = false;
+
+    // ID do banner de no-data para poder escondê-lo depois
+    this._noDataBannerId = 'mqtt-no-data';
   }
 
   async initialize() {
@@ -179,6 +188,19 @@ export class StopsMapApp {
   // ── MQTT ───────────────────────────────────────────────────────────────────
 
   _startMqtt() {
+    // Banner: broker ligado mas sem dados em 15s
+    eventBus.on('mqtt:noDataTimeout', () => {
+      AnnouncementBanner.show(
+        '⚠\uFE0F Os dados de localização em tempo real não estão disponíveis de momento. ' +
+        'Isto é uma falha no serviço externo — o teu dispositivo e rede estão OK.',
+        { type: 'warning', id: this._noDataBannerId, dismissible: true }
+      );
+    });
+
+    eventBus.on('mqtt:dataRestored', () => {
+      AnnouncementBanner.hide(this._noDataBannerId);
+    });
+
     mqttVehicleService.start({
       onVehicleUpdate: (vehicle) => this._handleMqttVehicleUpdate(vehicle),
       onVehicleExpired: (vehicleId) => this._handleMqttVehicleExpired(vehicleId),
@@ -492,8 +514,10 @@ export class StopsMapApp {
 
   async loadStopArrivals(stopId, centerMap = false) {
     try {
+      // getNextArrivals devolve sempre um Array simples
       const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60);
-      if (arrivals.length === 0) {
+
+      if (!arrivals || arrivals.length === 0) {
         this.nextArrivals.setArrivals([], []);
         this.busMarkerManager.clearAllMarkers();
         this.nextArrivals.updateLastUpdate();
@@ -525,23 +549,53 @@ export class StopsMapApp {
       this.currentBusPositions = [];
       return;
     }
+
     const busesToShow  = [];
     const busPositions = [];
+
+    // Recolher tripIds de chegadas com is_realtime para lookup directo via MQTT
+    const realtimeTripIds = arrivals
+      .filter(a => a.is_realtime && a.trip_id)
+      .map(a => a.trip_id);
+
+    // Mapa tripId → veículo MQTT para lookup O(1)
+    const mqttByTripId = new Map(
+      mqttVehicleService.getVehiclesByTripIds(realtimeTripIds)
+        .map(v => [v.tripId, v])
+    );
+
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
-      const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
-      if (!vehicle) continue;
-      const processedBus = vehicleService.processBusData(vehicle);
+
+      // Tentar primeiro lookup directo por tripId no MQTT (mais fiável)
+      let rawVehicle = arrival.trip_id ? mqttByTripId.get(arrival.trip_id) : null;
+
+      // Fallback: procura no array vehicles (HTTP ou MQTT getAllVehicles)
+      if (!rawVehicle) {
+        rawVehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
+      }
+
+      if (!rawVehicle) continue;
+
+      const processedBus = vehicleService.processBusData(rawVehicle);
       if (!processedBus) continue;
+
       busesToShow.push(processedBus);
       busPositions.push([processedBus.latitude, processedBus.longitude]);
+
       const routeNum = String(
         arrival.route_short_name || arrival.route_number ||
         arrival.route_id || processedBus.displayLine || processedBus.line || ''
       );
       this.busMarkerManager.setRouteForMarker(processedBus.id, routeNum);
     }
-    if (busesToShow.length === 0) { this.busMarkerManager.clearAllMarkers(); this.currentBusPositions = []; return; }
+
+    if (busesToShow.length === 0) {
+      this.busMarkerManager.clearAllMarkers();
+      this.currentBusPositions = [];
+      return;
+    }
+
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this.currentBusPositions = busPositions;
 
@@ -688,6 +742,8 @@ export class StopsMapApp {
     if (this.tutorialModal)      this.tutorialModal.destroy();
     if (this.mapManager)         this.mapManager.cleanup();
     if (REALTIME_BUSES_ENABLED)  mqttVehicleService.stop();
+    eventBus.off('mqtt:noDataTimeout');
+    eventBus.off('mqtt:dataRestored');
     routeFilterState.clear();
   }
 }

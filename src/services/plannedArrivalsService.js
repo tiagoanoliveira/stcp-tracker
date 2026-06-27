@@ -9,19 +9,18 @@
  *      ou não tem ainda dados para esta paragem específica.
  *   3. Horários locais (scheduleService) — complementam chegadas sem tempo real
  *
- * Os marcadores dos autocarros que irão passar numa paragem são obtidos via
- * mqttVehicleService.getVehiclesByTripIds() a partir dos tripIds das chegadas
- * MQTT, e expostos em getNextArrivals() através do campo enriched.vehicles.
+ * getNextArrivals() devolve sempre um Array de chegadas ordenado por
+ * arrival_minutes. A localização dos veículos no mapa é feita em
+ * StopsMapApp.updateBusMap() via mqttVehicleService.getVehiclesByTripIds().
  *
  * Usa: apiService, scheduleService, customRouteScheduleService,
- *      mqttTripUpdateService, mqttVehicleService
+ *      mqttTripUpdateService
  */
 
 import { apiService }                  from '../core/apiService.js';
 import { scheduleService }             from './scheduleService.js';
 import { customRouteScheduleService }  from './customRouteScheduleService.js';
 import { mqttTripUpdateService }       from './mqttTripUpdateService.js';
-import { mqttVehicleService }          from './mqttVehicleService.js';
 
 class PlannedArrivalsService {
   constructor() {
@@ -34,45 +33,23 @@ class PlannedArrivalsService {
    * Obtém próximas chegadas combinando tempo real + programadas.
    * Para paragens custom, usa exclusivamente os dados locais.
    *
-   * O resultado inclui um campo `_vehiclesOnMap` com os veículos
-   * correspondentes às chegadas MQTT, para o UI poder mostrar os
-   * marcadores no mapa e fazer zoom.
-   *
    * @param {string} stopId
    * @param {number} maxMinutes
-   * @returns {Promise<{ arrivals: Array, vehiclesOnMap: Array }>}
+   * @returns {Promise<Array>}  array de chegadas ordenado por arrival_minutes
    */
   async getNextArrivals(stopId, maxMinutes = 60) {
     try {
       // Paragem de rota custom → sem chamada de rede, dados locais gerados
       if (customRouteScheduleService.handlesStop(stopId)) {
-        return {
-          arrivals:      customRouteScheduleService.getNextArrivals(stopId, maxMinutes),
-          vehiclesOnMap: [],
-        };
+        return customRouteScheduleService.getNextArrivals(stopId, maxMinutes);
       }
 
       // ── 1. MQTT TripUpdate (preferencial) ──────────────────────────────────
       if (mqttTripUpdateService.isActive()) {
-        const mqttRaw     = mqttTripUpdateService.getArrivalsForStop(stopId);
+        const mqttRaw      = mqttTripUpdateService.getArrivalsForStop(stopId);
         const mqttArrivals = this.formatMqttArrivals(mqttRaw, maxMinutes);
 
         if (mqttArrivals.length > 0) {
-          // Recolher tripIds para localizar autocarros no mapa
-          const tripIds = mqttArrivals
-            .map(a => a.trip_id)
-            .filter(Boolean);
-
-          const vehiclesOnMap = mqttVehicleService.getVehiclesByTripIds(tripIds);
-
-          if (vehiclesOnMap.length > 0 && process?.env?.NODE_ENV !== 'production') {
-            console.info(
-              `[PlannedArrivals] ${stopId}: ${mqttArrivals.length} chegadas MQTT, ` +
-              `${vehiclesOnMap.length} veículos localizados no mapa`,
-              vehiclesOnMap.map(v => `${v.id}(trip:${v.tripId})`)
-            );
-          }
-
           // Complementar com horários locais para linhas sem TripUpdate activo
           const routes = await this.getStopRoutes(stopId);
           const currentServiceId = routes.length > 0
@@ -89,13 +66,10 @@ class PlannedArrivalsService {
             }
           }
 
-          return {
-            arrivals: this.combineArrivals(
-              mqttArrivals,
-              this.formatArrivals(scheduledArrivals, false)
-            ),
-            vehiclesOnMap,
-          };
+          return this.combineArrivals(
+            mqttArrivals,
+            this.formatArrivals(scheduledArrivals, false)
+          );
         }
       }
 
@@ -110,10 +84,7 @@ class PlannedArrivalsService {
 
       const routes = await this.getStopRoutes(stopId);
       if (routes.length === 0) {
-        return {
-          arrivals:      this.formatArrivals(realtimeArrivals, true),
-          vehiclesOnMap: [],
-        };
+        return this.formatArrivals(realtimeArrivals, true);
       }
 
       const currentServiceId = await scheduleService.getServiceIdAtual(stopId);
@@ -126,22 +97,13 @@ class PlannedArrivalsService {
         }
       }
 
-      // Para chegadas HTTP, tentar também localizar veículos por tripId
-      const httpTripIds = realtimeArrivals
-        .map(a => a.trip_id)
-        .filter(Boolean);
-      const vehiclesOnMap = mqttVehicleService.getVehiclesByTripIds(httpTripIds);
-
-      return {
-        arrivals: this.combineArrivals(
-          this.formatArrivals(realtimeArrivals, true),
-          this.formatArrivals(scheduledArrivals, false)
-        ),
-        vehiclesOnMap,
-      };
+      return this.combineArrivals(
+        this.formatArrivals(realtimeArrivals, true),
+        this.formatArrivals(scheduledArrivals, false)
+      );
     } catch (error) {
       console.error(`❌ Erro ao obter chegadas para ${stopId}:`, error);
-      return { arrivals: [], vehiclesOnMap: [] };
+      return [];
     }
   }
 
