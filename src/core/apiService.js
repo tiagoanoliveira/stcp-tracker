@@ -2,26 +2,26 @@
  * Core API Service - Centraliza todas as chamadas API
  *
  * FONTES DE VEÍCULOS:
- *   'primary'  - stcp.live via Cloudflare Worker (polling HTTP)
- *   'fallback' - FIWARE Broker via Cloudflare Worker (polling HTTP)
- *   'mqtt'     - Porto Digital MQTT/WebSocket (event-driven, sem polling)
+ *   'mqtt'     - Porto Digital MQTT/WebSocket (event-driven, sem polling) — ÚNICA fonte activa
+ *   'primary'  - stcp.live via Cloudflare Worker (polling HTTP) — desactivado
+ *   'fallback' - FIWARE Broker via Cloudflare Worker (polling HTTP) — desactivado
  *
- * Com a fonte 'mqtt', fetchBusData() devolve apenas o snapshot
- * em memória do MqttVehicleService — o arranque inicial usa ainda
- * o FIWARE REST para não deixar o mapa vazio.
+ * O FIWARE foi removido como fonte de dados. A WebSocket liga sempre antes
+ * do site acabar de carregar, por isso não é necessário bootstrap via REST.
+ * Se o MQTT demorar, o mqttVehicleService emite 'mqtt:noDataTimeout' e o
+ * UI mostra um banner de aviso.
  */
 
 import { mqttVehicleService } from '../services/mqttVehicleService.js';
 
 class ApiService {
   constructor() {
-    this.fiwareUrl = 'https://broker.fiware.urbanplatform.portodigital.pt/v2/entities?q=vehicleType==bus&limit=1000';
     this.proxyUrl  = 'https://stcp-worker.tiagoanoliveira.pt';
     this.retries   = 3;
     this.delayMs   = 500;
     this.timeoutMs = 10000;
 
-    // Fonte de veículos: 'primary' (stcp.live), 'fallback' (FIWARE) ou 'mqtt'
+    // Fonte de veículos: apenas 'mqtt' em produção
     this.vehiclesSource = 'mqtt';
   }
 
@@ -52,27 +52,21 @@ class ApiService {
   }
 
   /**
-   * Veículos em tempo real.
-   *
-   * - 'mqtt'    → devolve snapshot em memória (actualizado pelo MqttVehicleService).
-   *               Para o primeiro arranque usa FIWARE REST como bootstrap.
-   * - 'primary' → stcp.live via Cloudflare Worker (polling)
-   * - 'fallback'→ FIWARE via Cloudflare Worker (polling)
+   * Veículos em tempo real — exclusivamente via MQTT.
+   * Devolve o snapshot em memória actualizado pelo mqttVehicleService.
+   * Enquanto o MQTT ainda não tiver dados, devolve [] e o UI aguarda
+   * pelo evento 'mqtt:vehicleUpdate' para renderizar.
    */
   async fetchBusData() {
     const source = this.getVehiclesSource();
 
     if (source === 'mqtt') {
-      // Se o MQTT já tem veículos em memória, usa esse snapshot.
-      const cached = mqttVehicleService.getAllVehicles();
-      if (cached.length > 0) return cached;
-
-      // Bootstrap: FIWARE REST para arranque imediato enquanto o MQTT liga.
-      console.info('ℹ️  MQTT ainda sem dados — bootstrap via FIWARE REST');
-      return await this._fetchFiwareVehicles();
+      // Devolve snapshot em memória — pode ser [] nos primeiros segundos.
+      // O mqttVehicleService emite 'mqtt:noDataTimeout' se passarem 15s sem dados.
+      return mqttVehicleService.getAllVehicles();
     }
 
-    // Modo polling (mantido para fallback/debug)
+    // Modo polling (mantido apenas para debug manual)
     try {
       const path = source === 'fallback' ? '/vehicles/fiware' : '/vehicles';
       const data = await this.fetchWithRetry(
@@ -94,27 +88,13 @@ class ApiService {
     }
   }
 
-  /**
-   * Obtém veículos directamente do FIWARE Broker (usado como bootstrap do MQTT).
-   * @private
-   */
-  async _fetchFiwareVehicles() {
-    try {
-      const data = await this.fetchWithRetry(this.fiwareUrl, {}, 2, 500, 8000);
-      return Array.isArray(data) ? data : [];
-    } catch (err) {
-      console.error('❌ Bootstrap FIWARE falhou:', err);
-      return [];
-    }
-  }
-
-  // ─── Paragens e rotas (inalterado) ────────────────────────────────────────
+  // ─── Paragens e rotas ──────────────────────────────────────────────────────
 
   async fetchStopRealtime(stopId) {
     try {
       return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/realtime`);
     } catch (error) {
-      console.error(`❌ Erro ao obter dados da paragem ${stopId}:`, error);
+      console.warn(`⚠️ fetchStopRealtime(${stopId}) falhou — usando apenas MQTT TripUpdate`, error);
       return null;
     }
   }
