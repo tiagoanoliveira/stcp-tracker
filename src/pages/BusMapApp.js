@@ -10,6 +10,7 @@ import { routeService }           from '../services/routeService.js';
 import { scheduleService }        from '../services/scheduleService.js';
 import { plannedArrivalsService } from '../services/plannedArrivalsService.js';
 import { routeFilterState }       from '../services/routeFilterState.js';
+import { mqttVehicleService }     from '../services/mqttVehicleService.js';
 import { MapManager }             from '../map/MapManager.js';
 import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
 import { LineOverlayManager }     from '../map/LineOverlayManager.js';
@@ -181,22 +182,19 @@ export class BusMapApp {
       onSnapshot: (vehicles) => {
         const processed = vehicleService.processBusDataBatch(vehicles);
         this._allProcessedBuses = processed;
-        // updateBusMarkers com a lista completa é seguro aqui — é o snapshot inicial
         this.busMarkerManager.updateBusMarkers(processed);
         this.lastUpdateDisplay.update();
       },
 
       // Chamado individualmente por cada autocarro que atualiza posição via MQTT.
       //
-      // ATENÇÃO: NÃO usar updateBusMarkers([vehicle]) aqui.
-      // updateBusMarkers remove todos os marcadores que não estejam no array recebido,
-      // por isso chamar com um array de 1 elemento apagaria todos os outros marcadores.
-      // Em vez disso, actualizamos/criamos só o marcador deste veículo directamente.
+      // NÃO usar updateBusMarkers([vehicle]) aqui — removeria todos os outros marcadores.
+      // updateSingleBusMarker garante deduplicação sem afectar os restantes.
       onVehicleUpdate: (vehicle) => {
         // 1. Manter o array global sincronizado
         const idx = this._allProcessedBuses.findIndex(b => b.id === vehicle.id);
         if (idx >= 0) this._allProcessedBuses[idx] = vehicle;
-        else this._allProcessedBuses.push(vehicle);
+        else          this._allProcessedBuses.push(vehicle);
 
         // 2. Registar a rota/direção neste veículo (necessário para filterByRoutes)
         this.busMarkerManager.setRouteForMarker(
@@ -205,45 +203,17 @@ export class BusMapApp {
           vehicle.direction
         );
 
-        // 3. Se houver filtro de rota activo e este veículo não pertencer à rota,
-        //    não o mostrar (mas mantê-lo em _allProcessedBuses para quando o filtro mudar)
+        // 3. Se houver filtro activo e este veículo não pertencer à rota, não mostrar
         const activeRoutes = routeFilterState.selectedRoutes;
         if (activeRoutes.size > 0 && !activeRoutes.has(String(vehicle.displayLine || vehicle.line || ''))) {
           return;
         }
 
-        // 4. Actualizar só ESTE marcador — sem tocar nos restantes
-        this._updateSingleMarker(vehicle);
+        // 4. Actualizar APENAS este marcador — sem afectar os restantes
+        this.busMarkerManager.updateSingleBusMarker(vehicle);
         this.lastUpdateDisplay.update();
       },
     });
-  }
-
-  /**
-   * Actualiza (ou cria) o marcador de um único veículo no mapa,
-   * sem afectar os marcadores dos restantes veículos.
-   *
-   * Replica a lógica interna de updateBusMarkers para um único bus:
-   *   - se o marcador já existe → move e actualiza ícone
-   *   - se não existe → cria novo marcador
-   */
-  _updateSingleMarker(bus) {
-    const { iconCache } = this.busMarkerManager;
-
-    // O BusMarkerManager expõe markers, _busData e _createBusMarker publicamente
-    this.busMarkerManager._busData[bus.id] = bus;
-
-    if (this.busMarkerManager.markers[bus.id]) {
-      // Marcador já existe — apenas mover e actualizar ícone
-      const marker = this.busMarkerManager.markers[bus.id];
-      marker.setLatLng([bus.latitude, bus.longitude]);
-      if (bus.destination !== null) {
-        marker.bindPopup(this.busMarkerManager._createPopupContent(bus));
-      }
-    } else {
-      // Novo veículo — criar marcador
-      this.busMarkerManager._createBusMarker(bus);
-    }
   }
 
   async _handleDeepLink() {
@@ -400,6 +370,9 @@ export class BusMapApp {
 
   async _handleStopClick(stop) {
     this._stopArrivalsRefresh();
+
+    // Ao abrir uma paragem: mostrar apenas os autocarros que chegam a essa paragem.
+    // Limpar os marcadores do modo "mapa global" sem apagar o snapshot MQTT.
     this.busMarkerManager.clearAllMarkers();
 
     this._currentStopId       = stop.stop_id;
@@ -429,7 +402,14 @@ export class BusMapApp {
         this.nextArrivals.updateLastUpdate();
         return;
       }
-      const vehicles = REALTIME_BUSES_ENABLED ? await apiService.fetchBusData() : [];
+
+      // Usar snapshot MQTT (já processado) em vez de fazer nova chamada HTTP
+      // fetchBusData em modo MQTT devolve o snapshot REST — ineficiente e desatualizado.
+      // getAllVehicles() devolve os veículos mais recentes recebidos pelo broker.
+      const vehicles = REALTIME_BUSES_ENABLED
+        ? this._getAllMqttVehiclesAsRaw()
+        : [];
+
       this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
       if (REALTIME_BUSES_ENABLED) {
@@ -442,18 +422,46 @@ export class BusMapApp {
     }
   }
 
+  /**
+   * Devolve os veículos MQTT no formato "raw" que vehicleService.matchVehicleToTrip
+   * e vehicleService.processBusData esperam.
+   *
+   * Os veículos em _allProcessedBuses já estão no formato processado
+   * (latitude/longitude em vez de lat/lng). Para que processBusData funcione
+   * correctamente precisamos do formato raw — mas getAllVehicles() já devolve
+   * os objectos processados guardados em _vehicles pelo mqttVehicleService.
+   *
+   * Como _allProcessedBuses é sincronizado com cada update MQTT, usamo-lo
+   * directamente e fazemos o match pelo tripId.
+   *
+   * @returns {Array} veículos processados (formato interno do mapa)
+   */
+  _getAllMqttVehiclesAsRaw() {
+    // Se o MQTT ainda não ligou ou não tem dados, devolver array vazio
+    if (!mqttVehicleService.hasData()) return [];
+    // Devolver os veículos já processados em memória
+    return this._allProcessedBuses;
+  }
+
   async _updateArrivalsOnMap(arrivals, vehicles, centerMap = false) {
     const busesToShow  = [];
     const busPositions = [];
 
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
-      const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
-      if (!vehicle) continue;
-      const processedBus = vehicleService.processBusData(vehicle);
+
+      // vehicles já está no formato processado (de _allProcessedBuses)
+      // Fazer match por trip_id
+      const processedBus = vehicles.find(v => {
+        if (!v.tripId || !arrival.trip_id) return false;
+        return vehicleService.tripIdsMatch(v.tripId, arrival.trip_id);
+      });
+
       if (!processedBus) continue;
+
       busesToShow.push(processedBus);
       busPositions.push([processedBus.latitude, processedBus.longitude]);
+
       const routeNum = String(
         arrival.route_short_name || arrival.route_number ||
         arrival.route_id || processedBus.displayLine || processedBus.line || ''
@@ -507,11 +515,18 @@ export class BusMapApp {
     this._busMapCentered      = false;
     this._currentBusPositions = [];
     this._clearStopFromURL();
+
     if (REALTIME_BUSES_ENABLED) {
       const activeRoutes = routeFilterState.selectedRoutes;
       if (activeRoutes.size > 0) {
+        // Repor os marcadores filtrados do snapshot MQTT
+        const toShow = this._allProcessedBuses.filter(
+          b => activeRoutes.has(String(b.displayLine || b.line || ''))
+        );
+        this.busMarkerManager.updateBusMarkers(toShow);
         this.busMarkerManager.filterByRoutes(activeRoutes, routeFilterState.dirMap);
       } else {
+        // Repor todos os marcadores do snapshot MQTT
         this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
       }
     }

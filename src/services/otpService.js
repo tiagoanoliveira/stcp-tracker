@@ -6,18 +6,18 @@
  *   Content-Type: application/json
  *   Body: { "query": "{ ... GraphQL ... }" }
  *
- * A query GraphQL pede stopTimes por stopId GTFS, que inclui:
- *   - scheduledArrival   (segundos desde meia-noite)
- *   - realtimeArrival    (segundos desde meia-noite, com desvio)
- *   - arrivalDelay       (segundos, + = atrasado)
- *   - realtime           (boolean)
- *   - trip { route { shortName, color }, headsign, tripId }
- *
  * ─── STOPID ─────────────────────────────────────────────────────────────────
  *
- * O OTP usa o stopId no formato GTFS: "STCP:{stopCode}"
- * Exemplo: paragem "200012" → OTP stopId "STCP:200012"
- * Se o stopId já vier com prefixo, é usado tal qual.
+ * O OTP Porto Digital usa o formato:  "2:{stopCode}"
+ * onde:
+ *   "2"         = feedId (sempre 2 para STCP no Porto Digital)
+ *   {stopCode}  = código alfanumérico da paragem, ex: "BS1", "CD", "BO"
+ *
+ * ERRADO:  "STCP:200012"  (código numérico — devolve {stop: null})
+ * CORRETO: "2:BS1"        (feedId + código alfanumérico)
+ *
+ * O caller deve passar o stop_code alfanumérico (ex: "BS1").
+ * O stop_id numérico (ex: "200012") NÃO funciona neste OTP.
  *
  * ─── CACHE ──────────────────────────────────────────────────────────────────
  *
@@ -30,10 +30,11 @@
  */
 
 const OTP_ENDPOINT = 'https://otp.portodigital.pt/otp/gtfs/v1';
+const OTP_FEED_ID  = '2';   // feedId STCP no broker Porto Digital
 const CACHE_TTL    = 20_000; // ms
 const MAX_RESULTS  = 12;     // máximo de chegadas por pedido
 
-// Cache: stopId → { data: TripArrival[], ts: Date.now() }
+// Cache: cacheKey → { data: TripArrival[], ts: Date.now() }
 const _cache = new Map();
 
 let _totalRequests  = 0;
@@ -45,13 +46,36 @@ const _debug = () => {
 };
 
 /**
- * Normaliza stopId para o formato GTFS que o OTP usa.
- * "200012"      → "STCP:200012"
- * "STCP:200012" → "STCP:200012"  (passthrough)
+ * Normaliza o stopCode para o formato OTP Porto Digital: "2:{stopCode}".
+ *
+ * Aceita:
+ *   "BS1"          → "2:BS1"     (código alfanumérico sem prefixo)
+ *   "2:BS1"        → "2:BS1"     (já no formato correto — passthrough)
+ *   "STCP:BS1"     → "2:BS1"     (prefixo errado — corrigido)
+ *   "STCP:200012"  → null        (código numérico — não funciona no OTP)
+ *   "200012"       → null        (código numérico — não funciona no OTP)
+ *
+ * Devolve null se o stopCode for puramente numérico (inválido para este OTP).
+ *
+ * @param {string} stopCode
+ * @returns {string|null}
  */
-function _normalizeStopId(stopId) {
-  const s = String(stopId);
-  return s.startsWith('STCP:') ? s : `STCP:${s}`;
+function _normalizeStopId(stopCode) {
+  if (!stopCode) return null;
+
+  let code = String(stopCode).trim();
+
+  // Remover prefixos conhecidos
+  if (code.startsWith('2:'))    code = code.slice(2);
+  if (code.startsWith('STCP:')) code = code.slice(5);
+
+  // Código puramente numérico → inválido para este OTP
+  if (/^\d+$/.test(code)) {
+    if (_debug()) console.warn(`[OTP] stopCode numérico "${code}" inválido — usar stop_code alfanumérico`);
+    return null;
+  }
+
+  return `${OTP_FEED_ID}:${code}`;
 }
 
 /**
@@ -90,7 +114,6 @@ function _buildQuery(otpStopId, numberOfArrivals) {
 
 /**
  * Converte segundos-desde-meia-noite + serviceDay em Unix timestamp (s).
- * serviceDay é o timestamp Unix do início do dia de serviço (meia-noite).
  */
 function _toUnixTs(secondsSinceMidnight, serviceDay) {
   return (serviceDay || 0) + secondsSinceMidnight;
@@ -110,13 +133,18 @@ function _formatTime(secondsSinceMidnight) {
 /**
  * Faz o pedido ao OTP e converte a resposta para o formato interno.
  *
- * @param {string} stopId  - ID da paragem (com ou sem prefixo "STCP:")
+ * @param {string} stopCode   - código alfanumérico da paragem (ex: "BS1")
  * @param {number} maxMinutes - janela de tempo em minutos
- * @returns {Promise<Array>} array de chegadas ordenado por arrival_minutes
+ * @returns {Promise<Array>}  array de chegadas ordenado por arrival_minutes
  */
-async function _fetchFromOtp(stopId, maxMinutes) {
-  const otpStopId = _normalizeStopId(stopId);
-  const body      = _buildQuery(otpStopId, MAX_RESULTS);
+async function _fetchFromOtp(stopCode, maxMinutes) {
+  const otpStopId = _normalizeStopId(stopCode);
+  if (!otpStopId) {
+    if (_debug()) console.warn(`[OTP] stopCode inválido: "${stopCode}" — a ignorar`);
+    return [];
+  }
+
+  const body = _buildQuery(otpStopId, MAX_RESULTS);
 
   if (_debug()) console.group(`%c[OTP] POST ${OTP_ENDPOINT} stopId=${otpStopId}`, 'color:#006494');
 
@@ -144,8 +172,14 @@ async function _fetchFromOtp(stopId, maxMinutes) {
     throw new Error(`OTP GraphQL error: ${msg}`);
   }
 
-  const stopData   = json.data?.stop;
-  const stoptimes  = stopData?.stoptimesWithoutPatterns || [];
+  const stopData  = json.data?.stop;
+  const stoptimes = stopData?.stoptimesWithoutPatterns || [];
+
+  // {stop: null} = stopCode inválido ou não encontrado no OTP
+  if (!stopData) {
+    if (_debug()) console.warn(`[OTP] {stop: null} para "${otpStopId}" — stopCode não encontrado no OTP`);
+    return [];
+  }
 
   if (!stoptimes.length) {
     if (_debug()) console.warn(`[OTP] Sem stoptimes para ${otpStopId}`);
@@ -164,10 +198,10 @@ async function _fetchFromOtp(stopId, maxMinutes) {
 
     if (arrivalMinutes < -1 || diffSeconds > maxSeconds) continue;
 
-    const route      = st.trip?.route || {};
-    const rawColor   = route.color ? `#${route.color.replace(/^#/, '')}` : '#0072C6';
-    const rawText    = route.textColor ? `#${route.textColor.replace(/^#/, '')}` : '#FFFFFF';
-    const delayS     = st.arrivalDelay || 0;
+    const route    = st.trip?.route || {};
+    const rawColor = route.color ? `#${route.color.replace(/^#/, '')}` : '#0072C6';
+    const rawText  = route.textColor ? `#${route.textColor.replace(/^#/, '')}` : '#FFFFFF';
+    const delayS   = st.arrivalDelay || 0;
 
     results.push({
       route_short_name: route.shortName || '?',
@@ -192,10 +226,13 @@ export const otpService = {
 
   /**
    * Obtém próximas chegadas para uma paragem via OTP GraphQL.
-   * Usa cache com TTL de 20s para evitar pedidos duplicados.
    *
-   * @param {string} stopId
-   * @param {number} maxMinutes
+   * IMPORTANTE: stopId deve ser o stop_code alfanumérico (ex: "BS1"),
+   * não o ID numérico (ex: "200012"). O OTP Porto Digital usa o formato
+   * "2:{stopCode}" — IDs numéricos devolvem {stop: null}.
+   *
+   * @param {string} stopId     - stop_code alfanumérico da paragem
+   * @param {number} maxMinutes - janela de tempo em minutos
    * @returns {Promise<Array>}
    */
   async getArrivalsForStop(stopId, maxMinutes = 60) {
@@ -225,7 +262,6 @@ export const otpService = {
     } catch (err) {
       _totalErrors++;
       console.warn(`[OTP] Erro ao obter chegadas para ${stopId}:`, err.message);
-      // Devolver cache expirado se existir (melhor que nada)
       if (cached) {
         console.info(`[OTP] A usar cache expirado para ${stopId}`);
         return cached.data;
@@ -241,6 +277,8 @@ export const otpService = {
   diagnose() {
     console.group('%c[OTP DIAGNOSE]', 'color:#01696f;font-weight:bold');
     console.log('Endpoint:', OTP_ENDPOINT);
+    console.log('Feed ID:', OTP_FEED_ID);
+    console.log('Formato stopId esperado: "2:{stopCode}" (ex: "2:BS1")');
     console.log('Total de pedidos:', _totalRequests);
     console.log('Erros:', _totalErrors);
     console.log('Cache hits:', _totalCacheHits);
