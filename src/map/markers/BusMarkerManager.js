@@ -182,6 +182,12 @@ export class BusMarkerManager {
     }
   }
 
+  hideAllMarkers() {
+    Object.values(this.markers).forEach(m => {
+      if (this.map.hasLayer(m)) this.map.removeLayer(m);
+    });
+  }
+
   openPopup(busId) {
     if (this.markers[busId]) this.markers[busId].openPopup();
   }

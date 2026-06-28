@@ -362,10 +362,25 @@ export class BusMapApp {
   }
 
   _handleArrivalFilterChange(selectedInPanel) {
+    // Construir dirMap com a direção inferida das chegadas OTP desta paragem
+    const arrivalDirMap = new Map();
+    for (const routeNum of selectedInPanel) {
+      const arrival = this.nextArrivals.allArrivals.find(
+          a => String(a.route_short_name) === String(routeNum) && a.trip_id
+      );
+      if (arrival?.trip_id) {
+        // trip_id: "201_1_1|..." → direção = 2º segmento após o 1º "_"
+        const parts = arrival.trip_id.split('_');
+        if (parts.length >= 2) arrivalDirMap.set(routeNum, Number(parts[1]));
+      }
+    }
     const effectiveFilter = selectedInPanel.size > 0
-      ? selectedInPanel
-      : routeFilterState.selectedRoutes;
-    this.busMarkerManager.filterByRoutes(effectiveFilter, routeFilterState.dirMap);
+        ? selectedInPanel
+        : routeFilterState.selectedRoutes;
+    const effectiveDirMap = arrivalDirMap.size > 0
+        ? arrivalDirMap
+        : routeFilterState.dirMap;
+    this.busMarkerManager.filterByRoutes(effectiveFilter, effectiveDirMap);
   }
 
   async _handleStopClick(stop) {
@@ -642,7 +657,7 @@ export class BusMapApp {
     autoRefreshManager.stop('bus-map');
     this._stopArrivalsRefresh();
     geolocationService.stopWatching();
-    if (this.busMarkerManager)   this.busMarkerManager.clearAllMarkers();
+    if (this.busMarkerManager)   this.busMarkerManager.hideAllMarkers();
     if (this.lineOverlayManager) this.lineOverlayManager.clearAll();
     if (this.routeFilterBar)     this.routeFilterBar.destroy();
     if (this.nextArrivals)       this.nextArrivals.destroy();
