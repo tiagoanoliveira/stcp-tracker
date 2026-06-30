@@ -770,9 +770,9 @@ export class StopsMapApp {
     }
 
     this.mapManager.fitBounds(positions, {
-      paddingTopLeft:     [30, 30],
+      paddingTopLeft:     [80, 30],
       paddingBottomRight: [30, panelH + 10],
-      maxZoom: 17,
+      maxZoom: 18,
       minZoom: 14,
     });
   }
