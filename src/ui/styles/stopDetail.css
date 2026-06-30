@@ -326,6 +326,7 @@
 /* ── Delay colours ── */
 .delay-green  { color: #22C55E; }
 .delay-yellow { color: #F59E0B; }
+.delay-label.delay-yellow    { color: #ffe0ab; }
 .delay-red    { color: #EF4444; }
 
 .delay-label {
@@ -334,6 +335,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+  padding: 2px 8px;
+  border-radius: 12px;
 }
 .delay-label strong {
   font-weight: 700;
