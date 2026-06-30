@@ -192,10 +192,138 @@ html, body {
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-/* Popups */
-.leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
-.bus-popup { font-family: inherit; padding: 4px 0; }
-.bus-popup strong { color: #0072c6; font-size: 15px; }
+/* ═══════════════════════════════════════════════════════════════════════
+   POPUP DO AUTOCARRO — card moderno com cabeçalho colorido
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Wrapper do Leaflet: sem padding, cantos arredondados maiores */
+.leaflet-popup-content-wrapper {
+  border-radius: 16px !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18) !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border: none !important;
+  min-width: 200px;
+}
+
+/* Seta do popup: transparente para combinar com o fundo branco */
+.leaflet-popup-tip-container .leaflet-popup-tip {
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+/* Remover padding interno padrão do Leaflet */
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.4 !important;
+  width: auto !important;
+}
+
+/* Faixa de cabeçalho azul STCP */
+.bus-popup__header {
+  background: linear-gradient(135deg, #0072c6 0%, #005fa3 100%);
+  padding: 10px 14px 9px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+/* Badge da linha (retângulo arredondado branco sobre azul) */
+.bus-popup__badge {
+  background: #fff;
+  color: #0058a0;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 7px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Destino no cabeçalho */
+.bus-popup__destination {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.92;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+
+/* Corpo do popup */
+.bus-popup__body {
+  background: #fff;
+  padding: 10px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Linha de detalhe (ícone + texto) */
+.bus-popup__row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: #333;
+}
+
+.bus-popup__row svg {
+  flex-shrink: 0;
+  color: #0072c6;
+  opacity: 0.85;
+}
+
+.bus-popup__row span {
+  white-space: nowrap;
+}
+
+.bus-popup__row .label {
+  color: #888;
+  font-size: 11.5px;
+  margin-right: 2px;
+}
+
+/* Número do veículo em destaque subtil */
+.bus-popup__vehicle {
+  font-size: 11px;
+  color: #aaa;
+  text-align: right;
+  margin-top: 2px;
+  letter-spacing: 0.03em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MARCADOR DA LOCALIZAÇÃO DO UTILIZADOR
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Anel de pulse animado em torno do marcador do utilizador */
+@keyframes user-pulse {
+  0%   { transform: scale(1);   opacity: 0.55; }
+  70%  { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+.user-marker-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-marker-icon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 114, 198, 0.35);
+  animation: user-pulse 2.2s ease-out infinite;
+  pointer-events: none;
+}
 
 /* Tablet */
 @media (max-width: 768px) {

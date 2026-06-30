@@ -1,19 +1,44 @@
 // mapInitializer.js - Wrapper em torno do Leaflet para inicializar mapas
 
+/**
+ * Cria o marcador SVG da localização actual do utilizador.
+ *
+ * Design: círculo azul sólido com anel branco, montado como DivIcon
+ * para evitar dependências de imagens externas. O CSS em busmap.css
+ * adiciona o anel de pulse animado via ::before.
+ */
 export function createUserMarker(map, position) {
-  const userIcon = L.icon({
-    iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34]
+  const size = 22; // diâmetro do ponto central em px
+
+  const svgIcon = `
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+      <!-- Sombra suave -->
+      <circle cx="${size/2}" cy="${size/2}" r="${size/2}" fill="rgba(0,0,0,0.12)" transform="translate(1,1)"/>
+      <!-- Anel branco -->
+      <circle cx="${size/2}" cy="${size/2}" r="${size/2}" fill="#fff"/>
+      <!-- Ponto azul central -->
+      <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 3}" fill="#0072c6"/>
+    </svg>`;
+
+  const icon = L.divIcon({
+    className:   'user-marker-icon',
+    html:        svgIcon,
+    iconSize:    [size, size],
+    iconAnchor:  [size / 2, size / 2],
+    popupAnchor: [0, -(size / 2 + 4)]
   });
 
   const marker = L.marker(position, {
-    icon: userIcon,
-    title: "Você está aqui"
+    icon,
+    title:     'Você está aqui',
+    zIndexOffset: 1000   // garantir que fica acima dos marcadores de paragem
   }).addTo(map);
 
-  marker.bindPopup("Localização Atual");
+  marker.bindPopup(
+    `<div style="font-size:13px;font-weight:600;color:#0072c6;padding:2px 4px">📍 A sua localização</div>`,
+    { offset: [0, -4] }
+  );
+
   return marker;
 }
 

@@ -20,6 +20,11 @@
 import { iconCache }      from '../../ui/design/iconCache.js';
 import { vehicleService } from '../../services/vehicleService.js';
 
+// SVGs inline para os ícones do popup (evita dependências externas)
+const _ICON_ROUTE    = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>`;
+const _ICON_SPEED    = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0"/><path d="M16.95 7.05a7 7 0 1 0 0 9.9"/><path d="m12 12 3-4"/></svg>`;
+const _ICON_BUS      = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v6M15 6v6M2 12h19.6M18 18h1a1 1 0 0 0 1-1v-5H4v5a1 1 0 0 0 1 1h1"/><path d="M7 18h10"/><circle cx="7.5" cy="18.5" r="1.5"/><circle cx="16.5" cy="18.5" r="1.5"/><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2"/></svg>`;
+
 export class BusMarkerManager {
   constructor(map) {
     this.map = map;
@@ -65,22 +70,11 @@ export class BusMarkerManager {
 
   // ─── Método central de upsert ──────────────────────────────────────────────
 
-  /**
-   * Insere ou actualiza um marcador para o veículo dado.
-   *
-   * DEDUPLICAÇÃO: se já existir um marcador com bus.id (de qualquer origem),
-   * o marcador é movido e o ícone/popup actualizado em vez de se criar um novo.
-   * Nunca existem dois marcadores para o mesmo id no mapa.
-   *
-   * @param {object} bus - veículo normalizado (saída de vehicleService.processBusData)
-   * @returns {L.Marker} o marcador criado ou actualizado
-   */
   _upsertMarker(bus) {
     this._busData[bus.id] = bus;
     const icon = iconCache.getBusIcon(bus.line);
 
     if (this.markers[bus.id]) {
-      // ── Marcador já existe: mover + actualizar ──────────────────────────
       const marker = this.markers[bus.id];
       marker.setLatLng([bus.latitude, bus.longitude]);
       marker.setIcon(icon);
@@ -90,35 +84,22 @@ export class BusMarkerManager {
       return marker;
     }
 
-    // ── Marcador novo ────────────────────────────────────────────────────
     return this._createBusMarker(bus);
   }
 
   // ─── API pública ───────────────────────────────────────────────────────────
 
-  /**
-   * Actualiza o conjunto completo de marcadores para a lista de veículos dada.
-   * Usa _upsertMarker() para garantir que não há duplicados.
-   * Veículos ausentes da lista são removidos.
-   */
   updateBusMarkers(busData) {
     const validIDs = new Set();
     busData.forEach(bus => {
       validIDs.add(bus.id);
       this._upsertMarker(bus);
     });
-
-    // Remover marcadores de veículos que já não estão na lista
     Object.keys(this.markers).forEach(id => {
       if (!validIDs.has(id)) this.removeBusMarker(id);
     });
   }
 
-  /**
-   * Actualiza um único marcador sem afectar os restantes.
-   * Usado pelo callback onVehicleUpdate do MQTT.
-   * Garante deduplicação via _upsertMarker().
-   */
   updateSingleBusMarker(bus) {
     this._upsertMarker(bus);
   }
@@ -131,7 +112,7 @@ export class BusMarkerManager {
       ? this._createPopupContent(bus)
       : this._createLoadingPopup(bus);
     const marker = L.marker([bus.latitude, bus.longitude], { icon }).addTo(this.map);
-    marker.bindPopup(popupContent, { maxWidth: 220 });
+    marker.bindPopup(popupContent, { maxWidth: 260, className: 'bus-popup-wrapper' });
     marker.on('popupopen', () => this._resolvePopupHeadsign(bus.id, marker));
     this.markers[bus.id] = marker;
     return marker;
@@ -150,23 +131,44 @@ export class BusMarkerManager {
     marker.setPopupContent(this._createPopupContent(bus));
   }
 
+  // ─── Templates dos popups ─────────────────────────────────────────────────
+
   _createLoadingPopup(bus) {
+    const line = bus.displayLine ?? bus.line ?? '?';
     return `
-      <div class="bus-popup">
-        <strong>Linha ${bus.displayLine ?? bus.line}</strong><br>
-        Destino: <em style="color:#999">A carregar...</em><br>
-        Velocidade: ${bus.speed != null ? bus.speed + ' km/h' : 'N/A'}<br>
-        Veículo nº ${bus.busNumber}
+      <div>
+        <div class="bus-popup__header">
+          <span class="bus-popup__badge">${line}</span>
+          <span class="bus-popup__destination">A carregar destino…</span>
+        </div>
+        <div class="bus-popup__body">
+          <div class="bus-popup__row">
+            ${_ICON_SPEED}
+            <span><span class="label">Velocidade</span> ${bus.speed != null ? bus.speed + ' km/h' : 'N/D'}</span>
+          </div>
+          <div class="bus-popup__vehicle">Veículo nº ${bus.busNumber ?? '—'}</div>
+        </div>
       </div>`;
   }
 
   _createPopupContent(bus) {
+    const line        = bus.displayLine ?? bus.line ?? '?';
+    const destination = bus.destination || 'Desconhecido';
+    const speed       = bus.speed != null ? bus.speed + ' km/h' : 'N/D';
+    const vehicle     = bus.busNumber ?? '—';
     return `
-      <div class="bus-popup">
-        <strong>Linha ${bus.displayLine ?? bus.line}</strong><br>
-        Destino: ${bus.destination || 'Desconhecido'}<br>
-        Velocidade: ${bus.speed != null ? bus.speed + ' km/h' : 'N/A'}<br>
-        Veículo nº ${bus.busNumber}
+      <div>
+        <div class="bus-popup__header">
+          <span class="bus-popup__badge">${line}</span>
+          <span class="bus-popup__destination" title="${destination}">${destination}</span>
+        </div>
+        <div class="bus-popup__body">
+          <div class="bus-popup__row">
+            ${_ICON_SPEED}
+            <span><span class="label">Velocidade</span> ${speed}</span>
+          </div>
+          <div class="bus-popup__vehicle">Veículo nº ${vehicle}</div>
+        </div>
       </div>`;
   }
 
