@@ -151,7 +151,10 @@ export class BusMapApp {
 
     } catch (error) {
       console.error('❌ Erro na inicialização:', error);
-      if (this.loadingOverlay) this.loadingOverlay.remove();
+      if (this.loadingOverlay) {
+        this.loadingOverlay.remove();
+        this.loadingOverlay = null;
+      }
       this.showError('Erro ao inicializar aplicação');
     }
   }
@@ -160,7 +163,10 @@ export class BusMapApp {
     geolocationService.getCurrentPosition()
       .then(position => {
         this.mapManager.updateUserMarker(position);
-        this.mapManager.centerOn(position, 16);
+        // Só centra na posição GPS se não houver paragem seleccionada
+        if (!this._currentStopId) {
+          this.mapManager.centerOn(position, 16);
+        }
       })
       .catch(err => console.warn('⚠️ Localização indisponível:', err.message));
   }
@@ -206,8 +212,34 @@ export class BusMapApp {
         // 4. Actualizar APENAS este marcador — sem afectar os restantes
         this.busMarkerManager.updateSingleBusMarker(vehicle);
         this.lastUpdateDisplay.update();
+
+        // 5. Se há paragem aberta e ainda não centrámos o mapa nos autocarros,
+        //    aproveitar este primeiro update MQTT para calcular os bounds.
+        if (this._currentStopId && !this._busMapCentered) {
+          this._tryCenterOnStopBuses();
+        }
       },
     });
+  }
+
+  /**
+   * Após o primeiro update MQTT com paragem aberta, calcula os bounds
+   * usando os veículos em memória que passam nessa paragem.
+   * Só actua uma vez (guarda _busMapCentered = true).
+   */
+  async _tryCenterOnStopBuses() {
+    if (this._busMapCentered || !this._currentStopId) return;
+
+    try {
+      // Reutilizar os veículos já em memória (sem novo fetch HTTP)
+      const vehicles  = this._getAllMqttVehiclesAsRaw();
+      const arrivals  = this.nextArrivals?.allArrivals || [];
+      if (arrivals.length === 0 || vehicles.length === 0) return;
+
+      await this._updateArrivalsOnMap(arrivals, vehicles, /* centerMap */ true);
+    } catch (err) {
+      console.warn('[BusMapApp] _tryCenterOnStopBuses falhou:', err);
+    }
   }
 
   async _handleDeepLink() {
@@ -425,6 +457,9 @@ export class BusMapApp {
     this._currentStopPosition = [stop.latitude, stop.longitude];
     this._busMapCentered      = false;
     this._currentBusPositions = [];
+
+    // Centrar imediatamente na paragem enquanto os autocarros ainda não chegaram
+    this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
 
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.mapManager.map.closePopup();
