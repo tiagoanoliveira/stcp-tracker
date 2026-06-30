@@ -163,7 +163,6 @@ export class BusMapApp {
     geolocationService.getCurrentPosition()
       .then(position => {
         this.mapManager.updateUserMarker(position);
-        // Só centra na posição GPS se não houver paragem seleccionada
         if (!this._currentStopId) {
           this.mapManager.centerOn(position, 16);
         }
@@ -175,10 +174,9 @@ export class BusMapApp {
     const btn = document.getElementById('refresh-now');
     if (btn) {
       btn.addEventListener('click', () => {
-        // Em modo MQTT, o botão força refresh das chegadas da paragem aberta
-        // (posicões de veículos chegam via MQTT automaticamente)
         if (this._currentStopId) {
-          this._loadStopArrivals(this._currentStopId, false);
+          // Forçar fetch real ignorando cache
+          this._loadStopArrivals(this._currentStopId, false, /* forceRefresh */ true);
         } else {
           autoRefreshManager.forceRefresh('bus-map');
         }
@@ -188,7 +186,6 @@ export class BusMapApp {
 
   startAutoRefresh() {
     autoRefreshManager.startMqtt('bus-map', {
-      // Chamado uma vez no arranque com todos os autocarros (snapshot FIWARE)
       onSnapshot: (vehicles) => {
         const processed = vehicleService.processBusDataBatch(vehicles);
         this._allProcessedBuses = processed;
@@ -196,32 +193,27 @@ export class BusMapApp {
         this.lastUpdateDisplay.update();
       },
 
-      // Chamado individualmente por cada autocarro que atualiza posição via MQTT.
-      //
-      // NÃO usar updateBusMarkers([vehicle]) aqui — removeria todos os outros marcadores.
-      // updateSingleBusMarker garante deduplicação sem afectar os restantes.
       onVehicleUpdate: (vehicle) => {
         // 1. Manter o array global sincronizado
         const idx = this._allProcessedBuses.findIndex(b => b.id === vehicle.id);
         if (idx >= 0) this._allProcessedBuses[idx] = vehicle;
         else          this._allProcessedBuses.push(vehicle);
 
-        // 2. Registar a rota/direção neste veículo (necessário para filterByRoutes)
+        // 2. Registar a rota/direção neste veículo
         this.busMarkerManager.setRouteForMarker(
           vehicle.id,
           vehicle.displayLine || vehicle.line || '',
           vehicle.direction
         );
 
-        // 3. Se houver filtro activo e este veículo não pertencer à rota, não mostrar
+        // 3. Filtro de rota global
         const activeRoutes = routeFilterState.selectedRoutes;
         if (activeRoutes.size > 0 && !activeRoutes.has(String(vehicle.displayLine || vehicle.line || ''))) {
           return;
         }
 
-        // 4. Se há paragem aberta, não mostrar veículos globais — apenas os da paragem
+        // 4. Com paragem aberta: só mostrar veículos relevantes para essa paragem
         if (this._currentStopId) {
-          // Verificar se este veículo tem trip match com alguma chegada em display
           const arrivals = this.nextArrivals?.allArrivals || [];
           const isRelevant = arrivals.some(a =>
             a.is_realtime && (
@@ -229,52 +221,39 @@ export class BusMapApp {
               String(a.route_short_name || '') === String(vehicle.displayLine || vehicle.line || '')
             )
           );
-          if (!isRelevant) return; // veículo não passa nesta paragem, ignorar
+          if (!isRelevant) return;
 
-          // Veículo relevante para a paragem: actualizar o marcador
           this.busMarkerManager.updateSingleBusMarker(vehicle);
           this.lastUpdateDisplay.update();
 
-          // Centrar o mapa uma única vez, na primeira vez que temos veículos reais
           if (!this._busMapCentered) {
             this._tryCenterOnStopBuses();
           }
           return;
         }
 
-        // 5. Actualizar APENAS este marcador no modo global (sem paragem aberta)
+        // 5. Modo global: actualizar marcador individual
         this.busMarkerManager.updateSingleBusMarker(vehicle);
         this.lastUpdateDisplay.update();
       },
     });
   }
 
-  /**
-   * Após o primeiro update MQTT com paragem aberta, calcula os bounds
-   * usando os veículos visíveis no mapa para essa paragem.
-   * Só actua uma vez por abertura de paragem (_busMapCentered = true).
-   */
   async _tryCenterOnStopBuses() {
     if (this._busMapCentered || !this._currentStopId) return;
-
     try {
       const arrivals = this.nextArrivals?.allArrivals || [];
       const vehicles = this._getAllMqttVehiclesAsRaw();
-
       if (arrivals.length === 0 || vehicles.length === 0) return;
 
-      // Tentar centrar via match trip_id/linha
       await this._updateArrivalsOnMap(arrivals, vehicles, /* centerMap */ true);
 
-      // Se _updateArrivalsOnMap não conseguiu centrar (nenhum match de posição),
-      // usar as posições já visíveis no mapa como fallback
       if (!this._busMapCentered) {
         const visiblePositions = this.busMarkerManager.getVisibleMarkerPositions?.() || [];
         if (visiblePositions.length > 0 && this._currentStopPosition) {
           this._fitToPositions([...visiblePositions, this._currentStopPosition]);
           this._busMapCentered = true;
         } else if (this._currentStopPosition) {
-          // Último recurso: centrar na paragem (já foi feito ao abrir, mas garante consistência)
           this.mapManager.centerOn(this._currentStopPosition, 16);
           this._busMapCentered = true;
         }
@@ -429,9 +408,6 @@ export class BusMapApp {
     }
   }
 
-  /**
-   * Chamado quando o utilizador activa/desactiva um chip de linha no painel de chegadas.
-   */
   async _handleArrivalFilterChange(selectedInPanel) {
     const arrivalDirMap = new Map();
 
@@ -439,31 +415,23 @@ export class BusMapApp {
       const arrival = this.nextArrivals.allArrivals.find(
         a => String(a.route_short_name) === String(routeNum)
       );
-
       if (arrival) {
         let dir = 0;
-        if (typeof arrival.directionId === 'number') {
-          dir = arrival.directionId;
-        } else if (typeof arrival.direction_id === 'number') {
-          dir = arrival.direction_id;
-        }
+        if (typeof arrival.directionId === 'number')   dir = arrival.directionId;
+        else if (typeof arrival.direction_id === 'number') dir = arrival.direction_id;
         arrivalDirMap.set(routeNum, dir);
       }
     }
 
-    const effectiveFilter = selectedInPanel.size > 0
-      ? selectedInPanel : routeFilterState.selectedRoutes;
-    const effectiveDirMap = arrivalDirMap.size > 0
-      ? arrivalDirMap : routeFilterState.dirMap;
-
+    const effectiveFilter = selectedInPanel.size > 0 ? selectedInPanel : routeFilterState.selectedRoutes;
+    const effectiveDirMap = arrivalDirMap.size > 0    ? arrivalDirMap  : routeFilterState.dirMap;
     this.busMarkerManager.filterByRoutes(effectiveFilter, effectiveDirMap);
 
     if (selectedInPanel.size > 0) {
       const routesToFetch = [];
       for (const routeNum of selectedInPanel) {
         const dir = arrivalDirMap.get(routeNum) ?? 0;
-        const routeObj = (this.routeFilterBar?.routes || [])
-          .find(r => String(r.number) === String(routeNum));
+        const routeObj = (this.routeFilterBar?.routes || []).find(r => String(r.number) === String(routeNum));
         routesToFetch.push({
           routeId:    String(routeObj?.id || routeNum),
           direction:  dir,
@@ -480,9 +448,6 @@ export class BusMapApp {
 
   async _handleStopClick(stop) {
     this._stopArrivalsRefresh();
-
-    // Ao abrir uma paragem: mostrar apenas os autocarros que chegam a essa paragem.
-    // Esconder todos os marcadores do modo global antes de começar.
     this.busMarkerManager.hideAllMarkers();
 
     this._currentStopId       = stop.stop_id;
@@ -491,9 +456,10 @@ export class BusMapApp {
     this._busMapCentered      = false;
     this._currentBusPositions = [];
 
-    // Centrar imediatamente na paragem enquanto os autocarros ainda não chegaram
-    this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
+    // Limpar cache da paragem anterior para garantir fetch fresco
+    plannedArrivalsService.clearCache(stop.stop_id);
 
+    this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.mapManager.map.closePopup();
 
@@ -507,22 +473,32 @@ export class BusMapApp {
     this._pushStopToURL(stop.stop_id);
   }
 
-  async _loadStopArrivals(stopId, centerMap = false) {
+  /**
+   * Carrega chegadas para a paragem actual.
+   *
+   * @param {string}  stopId       - ID da paragem
+   * @param {boolean} centerMap    - centrar o mapa nos autocarros encontrados
+   * @param {boolean} forceRefresh - ignorar cache e forçar fetch à rede
+   */
+  async _loadStopArrivals(stopId, centerMap = false, forceRefresh = false) {
     try {
-      const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60);
+      const arrivals = await plannedArrivalsService.getNextArrivals(
+        stopId,
+        60,
+        forceRefresh
+      );
+
       if (arrivals.length === 0) {
         this.nextArrivals.setArrivals([], []);
         this.nextArrivals.updateLastUpdate();
         return;
       }
 
-      // Usar snapshot MQTT (já processado) em vez de fazer nova chamada HTTP
-      const vehicles = REALTIME_BUSES_ENABLED
-        ? this._getAllMqttVehiclesAsRaw()
-        : [];
+      const vehicles = REALTIME_BUSES_ENABLED ? this._getAllMqttVehiclesAsRaw() : [];
 
       this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
+
       if (REALTIME_BUSES_ENABLED) {
         await this._updateArrivalsOnMap(arrivals, vehicles, centerMap);
       }
@@ -533,10 +509,6 @@ export class BusMapApp {
     }
   }
 
-  /**
-   * Devolve os veículos já processados do snapshot MQTT.
-   * _allProcessedBuses é sincronizado a cada update recebido pelo broker.
-   */
   _getAllMqttVehiclesAsRaw() {
     if (!mqttVehicleService.hasData()) return [];
     return this._allProcessedBuses;
@@ -551,16 +523,14 @@ export class BusMapApp {
 
       let processedBus = null;
 
-      // 1. Match exacto por trip_id
       if (arrival.trip_id && vehicles.length > 0) {
         processedBus = vehicles.find(v =>
           v.tripId && vehicleService.tripIdsMatch(v.tripId, arrival.trip_id)
         ) || null;
       }
 
-      // 2. Fallback: linha (não usar direcção — pode estar undefined nos veículos processados)
       if (!processedBus && vehicles.length > 0) {
-        const arrLine = String(arrival.route_short_name || '');
+        const arrLine  = String(arrival.route_short_name || '');
         const candidates = vehicles.filter(v =>
           String(v.displayLine || v.line || '') === arrLine
         );
@@ -599,21 +569,22 @@ export class BusMapApp {
     }
     const lats = positions.map(p => Array.isArray(p) ? p[0] : p.lat);
     const lngs = positions.map(p => Array.isArray(p) ? p[1] : p.lng);
-    const bounds = [
-      [Math.min(...lats), Math.min(...lngs)],
-      [Math.max(...lats), Math.max(...lngs)],
-    ];
-    this.mapManager.map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+    this.mapManager.map.fitBounds(
+      [[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]],
+      { padding: [60, 60], maxZoom: 15 }
+    );
   }
 
   // ─── Paragem — refresh periódico ─────────────────────────────────────────────
 
   _startArrivalsRefresh() {
     this._stopArrivalsRefresh();
-    // Usar o mesmo intervalo do MQTT (5s por defeito) para manter os
-    // tempos de chegada OTP sempre frescos. É um fetch leve (só esta paragem).
     this._arrivalsRefreshInterval = setInterval(() => {
-      if (this._currentStopId) this._loadStopArrivals(this._currentStopId, false);
+      if (this._currentStopId) {
+        // Cada tick do intervalo passa forceRefresh=true para ignorar o cache
+        // de 4s e garantir que é feito um fetch real à rede em cada ciclo
+        this._loadStopArrivals(this._currentStopId, false, /* forceRefresh */ true);
+      }
     }, this.refreshInterval);
   }
 
@@ -638,7 +609,6 @@ export class BusMapApp {
     this._currentBusPositions = [];
     this._busMapCentered      = false;
     this.lineOverlayManager.clearAll();
-    // Restaurar todos os marcadores ao fechar a paragem
     this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
     const activeRoutes = routeFilterState.selectedRoutes;
     if (activeRoutes.size > 0) {
@@ -648,7 +618,9 @@ export class BusMapApp {
   }
 
   _handleRefreshArrivals() {
-    if (this._currentStopId) return this._loadStopArrivals(this._currentStopId, false);
+    if (this._currentStopId) {
+      return this._loadStopArrivals(this._currentStopId, false, /* forceRefresh */ true);
+    }
   }
 
   async _toggleFavourite(stopId) {
