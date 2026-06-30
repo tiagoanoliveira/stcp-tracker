@@ -1,17 +1,8 @@
 /* ─── Cores de delay ───────────────────────────────────────────────────────── */
-/* Aplicadas ao texto de status e ao tempo de chegada */
 
-.delay-green {
-  color: #22C55E;
-}
-
-.delay-yellow {
-  color: #F59E0B;
-}
-
-.delay-red {
-  color: #EF4444;
-}
+.delay-green  { color: #22C55E; }
+.delay-yellow { color: #F59E0B; }
+.delay-red    { color: #EF4444; }
 
 .delay-label {
   font-size: var(--text-xs, 0.8rem);
@@ -27,10 +18,43 @@
   letter-spacing: 0.01em;
 }
 
-/* Tempo de chegada colourido conforme estado */
+/* Tempo de chegada colorido conforme estado */
 .arrival-time.delay-green  { color: #22C55E; }
 .arrival-time.delay-yellow { color: #F59E0B; }
 .arrival-time.delay-red    { color: #EF4444; }
-
-/* Estado base (sem realtime) mantém a cor original */
 .arrival-time { transition: color 0.3s ease; }
+
+/* Tempo de chegada em verde quando há dados realtime */
+.arrival-time-realtime { color: #22C55E; }
+
+/* ─── Botão de refresh — animação de rotação ──────────────────────────────── */
+/*
+ * A classe .refreshing é adicionada pelo listener do botão em NextArrivals.js
+ * enquanto a Promise de handleRefreshArrivals() está pendente, e removida
+ * quando a Promise resolve (com ou sem erro).
+ *
+ * O SVG dentro do botão roda 360° em loop; a velocidade pode ser ajustada
+ * alterando a duração em animation (0.7s = rápido, 1.2s = suave).
+ */
+@keyframes spin-refresh {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.next-arrivals-refresh {
+  /* Garantir que o SVG fica centrado para a rotação ser limpa */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.next-arrivals-refresh.refreshing svg {
+  animation: spin-refresh 0.8s linear infinite;
+  transform-origin: center;
+}
+
+/* Estado disabled durante o refresh — impede cliques duplos */
+.next-arrivals-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

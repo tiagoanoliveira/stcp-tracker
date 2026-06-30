@@ -18,16 +18,20 @@
  *  - Quando o painel fecha (handleCloseArrivals), _allowedTripIds é limpo.
  *
  * VIEWPORT / RECENTRAMENTO:
- *  - handleStopClick(): centra imediatamente na paragem (antes de ter
- *    autocarros) em zoom 17 com offset para dar espaço ao painel.
  *  - Ao abrir uma paragem (centerMap=true em loadStopArrivals), o mapa
- *    faz fitBounds a todos os autocarros das chegadas RT encontrados.
+ *    faz fitBounds a todos os autocarros das chegadas RT encontrados,
+ *    com maxZoom 17 e padding generoso para deixar os autocarros mais
+ *    abaixo na janela visível (acima do painel).
  *  - Ao clicar numa chegada específica no painel, handleArrivalClick()
- *    centra em zoom 17 com offset máximo para deixar o autocarro abaixo
- *    do centro e acima do painel.
- *  - _recenterOnPositions() usa zoom 17 (1 bus) e maxZoom 17 (N buses),
- *    com paddingBottomRight = 55% da altura do mapa para que os
- *    marcadores fiquem na metade inferior–central da janela visível.
+ *    centra em zoom 17 com offset de 35% da altura para que o marcador
+ *    fique bem acima do painel.
+ *  - _recenterOnPositions() usa paddingBottomRight com 60% da altura do
+ *    painel + 100px extra para que os marcadores não fiquem tapados.
+ *
+ * BOTÃO DE REFRESH:
+ *  - handleRefreshArrivals() devolve a Promise de loadStopArrivals para
+ *    que o listener async do botão possa aguardar o fim e remover a
+ *    classe 'refreshing' (animação de rotação) só depois de concluído.
  *
  * DIRECÇÃO DO SHAPE (handleArrivalFilterChange):
  *  - Para cada linha filtrada, pede as paragens da direcção 0.
@@ -66,7 +70,7 @@ import { iconCache }              from '../ui/design/iconCache.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
 
-// ─── Helpers de debug ──────────────────────────────────────────────────────
+// ─── Helpers de debug ──────────────────────────────────────────────────────────
 // Activar com: localStorage.setItem('BUS_DEBUG', '1') e recarregar.
 // Desactivar:  localStorage.removeItem('BUS_DEBUG')
 const _busDebug = () => { try { return localStorage.getItem('BUS_DEBUG') === '1'; } catch { return false; } };
@@ -136,7 +140,6 @@ export class StopsMapApp {
         );
       }
 
-      // Activar logs de debug automaticamente em desenvolvimento
       console.info(
         '%c[BUS DEBUG] Para activar logs de autocarros: localStorage.setItem(\'BUS_DEBUG\', \'1\') e recarrega a página',
         'color:#01696f;font-style:italic'
@@ -171,6 +174,8 @@ export class StopsMapApp {
       this.nextArrivals.create();
       this.nextArrivals.onArrivalClick(data => this.handleArrivalClick(data));
       this.nextArrivals.onClose(() => this.handleCloseArrivals());
+      // IMPORTANTE: devolve a Promise para que o botão aguarde o fim antes
+      // de remover a animação de rotação (classe 'refreshing')
       this.nextArrivals.onRefresh(() => this.handleRefreshArrivals());
       this.nextArrivals.onFilterChange(selected => this.handleArrivalFilterChange(selected));
       this.nextArrivals.onFavouriteClick(stopId => this._toggleFavourite(stopId));
@@ -214,7 +219,7 @@ export class StopsMapApp {
     }
   }
 
-  // ── MQTT ───────────────────────────────────────────────────────────────────
+  // ── MQTT ──────────────────────────────────────────────────────────────────────
 
   _startMqtt() {
     eventBus.on('mqtt:noDataTimeout', () => {
@@ -230,9 +235,6 @@ export class StopsMapApp {
     });
 
     mqttVehicleService.start({
-      // NOTA: o argumento `vehicle` JÁ está processado (formato interno com
-      // latitude/longitude). O mqttVehicleService chama processBusData()
-      // internamente antes de chamar este callback.
       onVehicleUpdate:  (vehicle)   => this._handleMqttVehicleUpdate(vehicle),
       onVehicleExpired: (vehicleId) => this._handleMqttVehicleExpired(vehicleId),
       onConnected:      ()          => { this._mqttActive = true; },
@@ -245,26 +247,14 @@ export class StopsMapApp {
 
   /**
    * Chamado pelo MQTT para cada actualização de posição de veículo.
-   *
-   * FILTRO: só actualiza o marcador se o tripId do veículo estiver em
-   * _allowedTripIds (preenchido por updateBusMap com as chegadas RT da
-   * paragem activa). Isto evita que autocarros de outras linhas/paragens
-   * sejam desenhados conforme os pacotes MQTT chegam pela websocket.
-   *
-   * IMPORTANTE: `vehicle` já está no formato processado { latitude, longitude,
-   * line, displayLine, direction, tripId, ... } — NÃO chamar processBusData()
-   * novamente ou o objecto ficará null (não tem lat/lng nem location.value).
+   * Só actua se o tripId estiver em _allowedTripIds (paragem activa).
    */
   _handleMqttVehicleUpdate(vehicle) {
-    // Se não há paragem aberta, não há marcadores a actualizar
     if (!this.currentStopId) return;
     if (!this.busMarkerManager) return;
 
-    // ── FILTRO PRINCIPAL ───────────────────────────────────────────────────
-    // Só processar veículos cujo tripId corresponda a uma chegada RT activa.
-    // Sem este guarda, todos os autocarros da cidade seriam desenhados.
     if (this._allowedTripIds.size > 0 && !this._allowedTripIds.has(vehicle.tripId)) {
-      return; // veículo não pertence às chegadas desta paragem — ignorar
+      return;
     }
 
     _log(
@@ -273,7 +263,6 @@ export class StopsMapApp {
       `marcadores actuais: ${this.busMarkerManager.getMarkerCount()}`
     );
 
-    // Passar directamente ao BusMarkerManager — upsert interno garante dedup
     this.busMarkerManager.updateSingleBusMarker(vehicle);
 
     _log(`→ marcadores após upsert: ${this.busMarkerManager.getMarkerCount()}`);
@@ -293,7 +282,7 @@ export class StopsMapApp {
     }
   }
 
-  // ── Geolocalização ─────────────────────────────────────────────────────────
+  // ── Geolocalização ────────────────────────────────────────────────────────────
 
   async setupGeolocation() {
     try {
@@ -506,7 +495,6 @@ export class StopsMapApp {
     this.busMapCentered      = false;
     this.currentBusPositions = [];
 
-    // Limpar o filtro de tripIds permitidos — será preenchido por updateBusMap()
     this._allowedTripIds.clear();
 
     clearTimeout(this.loadStopsDebounce);
@@ -520,20 +508,6 @@ export class StopsMapApp {
       this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     }
     this.stopMarkerManager.setSelectedStop(stop.stop_id);
-
-    // ── Centrar na paragem ANTES de ter autocarros ─────────────────────────
-    // Garante que o mapa mostra sempre a paragem quando o painel abre,
-    // mesmo que os autocarros ainda não tenham sido localizados.
-    // O offset de 35% coloca a paragem na metade superior do mapa visível
-    // (acima do painel de chegadas).
-    if (this.mapManager?.map) {
-      const stopOffsetY = Math.round(this.mapManager.map.getSize().y * 0.35);
-      this.mapManager.centerOnWithOffset(
-        [stop.latitude, stop.longitude],
-        17,
-        stopOffsetY
-      );
-    }
 
     const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
     const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes
@@ -563,7 +537,6 @@ export class StopsMapApp {
         return;
       }
 
-      // Obter veículos: snapshot MQTT (já processados) ou fallback HTTP
       let vehicles = [];
       if (REALTIME_BUSES_ENABLED) {
         if (this._mqttActive && mqttVehicleService.hasData()) {
@@ -592,21 +565,12 @@ export class StopsMapApp {
 
   /**
    * Desenha os marcadores de autocarro para as chegadas em tempo real.
+   * Preenche _allowedTripIds para filtrar updates MQTT futuros.
    *
-   * Após encontrar os veículos correspondentes às chegadas RT, preenche
-   * this._allowedTripIds com os tripIds encontrados. O callback MQTT
-   * (_handleMqttVehicleUpdate) usa este Set para filtrar updates futuros
-   * e só actualizar marcadores de veículos que pertencem a esta paragem.
-   *
-   * VIEWPORT:
-   *  - centerMap=true (primeiro load): fitBounds a todos os autocarros encontrados.
-   *  - centerMap=false (refresh automático): não move o mapa.
-   *
-   * `vehicles` pode ser:
-   *  - Array de veículos já processados (vindo de getAllVehicles() — MQTT)
-   *  - Array de veículos já processados (vindo de processBusDataBatch() — HTTP)
-   * Em ambos os casos, os objectos têm { latitude, longitude, tripId, ... }.
-   * NÃO chamar processBusData() outra vez.
+   * VIEWPORT (centerMap=true — primeiro load apenas):
+   *  - 1 autocarro : zoom 17, offset 60% da altura do painel
+   *  - N autocarros: fitBounds maxZoom 17, minZoom 14,
+   *                  paddingBottomRight [60, panelHeight+100]
    */
   async updateBusMap(arrivals, vehicles, centerMap = false) {
     if (!arrivals || arrivals.length === 0) {
@@ -621,13 +585,11 @@ export class StopsMapApp {
     const busesToShow  = [];
     const busPositions = [];
 
-    // Índice de veículos por tripId para lookup O(1)
     const vehiclesByTripId = new Map();
     for (const v of vehicles) {
       if (v.tripId) vehiclesByTripId.set(v.tripId, v);
     }
 
-    // Índice directo MQTT por tripId
     const realtimeTripIds = arrivals
       .filter(a => a.is_realtime && a.trip_id)
       .map(a => a.trip_id);
@@ -639,8 +601,6 @@ export class StopsMapApp {
     _log(`updateBusMap: ${realtimeTripIds.length} chegadas RT, ${mqttDirect.length} veículos MQTT por tripId`);
 
     let matched = 0, notFound = 0;
-
-    // Novo Set de tripIds permitidos para este ciclo
     const newAllowedTripIds = new Set();
 
     for (const arrival of arrivals) {
@@ -649,24 +609,19 @@ export class StopsMapApp {
       const arrTripId = arrival.trip_id;
       _log(`  chegada linha:${arrival.route_short_name || arrival.route_id} tripId:${arrTripId} is_realtime:true`);
 
-      // Registar este tripId como permitido (independentemente de termos veículo)
       if (arrTripId) newAllowedTripIds.add(arrTripId);
 
-      // 1) Lookup directo MQTT
       let processedBus = arrTripId ? mqttByTripId.get(arrTripId) : null;
 
-      // 2) Lookup no índice de veículos processados (por tripId exacto)
       if (!processedBus && arrTripId) {
         processedBus = vehiclesByTripId.get(arrTripId);
         if (processedBus) _log(`    → match por tripId exacto`);
       }
 
-      // 3) Fallback: vehicleService.matchVehicleToTrip (fuzzy)
       if (!processedBus) {
         const matched3 = vehicleService.matchVehicleToTrip(vehicles, arrTripId);
         if (matched3) {
           processedBus = matched3;
-          // Adicionar também o tripId real do veículo encontrado por fuzzy
           if (matched3.tripId) newAllowedTripIds.add(matched3.tripId);
           _log(`    → match por matchVehicleToTrip (fuzzy)`);
         }
@@ -693,7 +648,6 @@ export class StopsMapApp {
 
     _log(`updateBusMap: ${matched} matched, ${notFound} sem veículo`);
 
-    // Actualizar o filtro de tripIds — o MQTT usará este Set
     this._allowedTripIds = newAllowedTripIds;
     _log(`updateBusMap: _allowedTripIds actualizado com ${newAllowedTripIds.size} tripId(s):`, [...newAllowedTripIds]);
 
@@ -718,10 +672,8 @@ export class StopsMapApp {
       visiblePositions = this.busMarkerManager.filterByRoutes(activeFilter, routeFilterState.dirMap);
     }
 
-    // ── VIEWPORT: primeiro load ──────────────────────────────────────────
-    // Só recentra se centerMap=true E ainda não foi centrado nesta paragem.
-    // Usa as posições visíveis (após filtro) para que o fitBounds seja
-    // consistente com o que o utilizador vê no mapa.
+    // ── VIEWPORT: primeiro load ─────────────────────────────────────────────
+    // centerMap=true só na primeira abertura da paragem, nunca nos refreshes.
     if (centerMap && !this.busMapCentered) {
       this.busMapCentered = true;
       const positionsForCenter = visiblePositions.length > 0 ? visiblePositions : busPositions;
@@ -730,9 +682,6 @@ export class StopsMapApp {
     }
   }
 
-  /**
-   * Callback do filtro de linhas no painel de chegadas.
-   */
   async handleArrivalFilterChange(selectedRoutes) {
     const effectiveFilter = selectedRoutes.size > 0
       ? selectedRoutes
@@ -758,9 +707,7 @@ export class StopsMapApp {
             try {
               const stopsDir0 = await routeService.fetchRouteStops(routeId, 0);
               const stopIds0  = (stopsDir0?.stops || []).map(s => String(s.stop_id));
-              if (!stopIds0.includes(String(this.currentStopId))) {
-                direction = 1;
-              }
+              if (!stopIds0.includes(String(this.currentStopId))) direction = 1;
               _log(`handleArrivalFilterChange linha:${routeId} paragem:${this.currentStopId} dir0 tem ${stopIds0.length} paragens → usar dir:${direction}`);
             } catch (e) {
               _warn(`handleArrivalFilterChange: erro ao obter paragens dir0 para linha ${routeId}`, e);
@@ -792,40 +739,46 @@ export class StopsMapApp {
    * Centra o mapa nas posições dadas, com padding para dar espaço ao
    * painel de chegadas.
    *
-   * Objectivo de UX: os marcadores devem aparecer na metade inferior do
-   * espaço visível (acima do painel mas abaixo do centro), para que o
-   * utilizador veja tanto a paragem como os autocarros sem ter de fazer
-   * scroll ou zoom.
+   * Valores:
+   *  - 1 posição : zoom 17, offset vertical = 60% da altura do painel
+   *  - N posições: fitBounds maxZoom 17, minZoom 14,
+   *                paddingBottomRight = panelHeight + 100px
    *
-   * - 1 posição: zoom 17, offset de 40% da altura do mapa (marcador fica
-   *   visivelmente abaixo do centro, na zona central-baixa da vista).
-   * - N posições: fitBounds com maxZoom 17, padding inferior = 55% da
-   *   altura do mapa para empurrar o conteúdo para cima e deixar o painel
-   *   a cobrir apenas a parte inferior sem tapar os marcadores.
+   * Para ajustar:
+   *  - Mais zoom           → aumentar maxZoom (e o zoom fixo no caso de 1 autocarro)
+   *  - Autocarros mais alto→ reduzir paddingBottomRight ou o multiplicador do offset
+   *  - Autocarros mais baixo→ aumentar paddingBottomRight ou o multiplicador do offset
    */
   _recenterOnPositions(positions) {
     if (!this.mapManager || positions.length === 0) return;
-    const mapHeight   = this.mapManager.map.getSize().y;
-    const panelHeight = mapHeight * 0.55; // 55% para marcadores ficarem mais baixos
+    const mapH      = this.mapManager.map.getSize().y;
+    const panelH    = Math.round(mapH * 0.6);   // painel ocupa ~60% da altura
+
     if (positions.length === 1) {
-      // offset de 40% empurra o ponto visualmente para baixo do centro
-      this.mapManager.centerOnWithOffset(positions[0], 17, Math.round(mapHeight * 0.40));
+      // offset positivo → desloca o centro para baixo → marcador sobe na janela
+      const offsetY = Math.round(panelH * 0.6);
+      this.mapManager.centerOnWithOffset(positions[0], 17, offsetY);
       return;
     }
+
     this.mapManager.fitBounds(positions, {
       paddingTopLeft:     [60, 60],
-      paddingBottomRight: [60, Math.round(panelHeight) + 60],
+      paddingBottomRight: [60, panelH + 100],
       maxZoom: 17,
       minZoom: 14,
     });
   }
 
   /**
-   * Centra o mapa num autocarro específico quando o utilizador clica
-   * numa chegada no painel.
+   * Centra o mapa no autocarro clicado no painel.
    *
-   * Zoom 17 com offset de 40% da altura do mapa — o autocarro fica
-   * visivelmente abaixo do centro e acima do painel de chegadas.
+   * - Zoom 17 (perto o suficiente para ver o autocarro claramente)
+   * - Offset vertical 35% da altura do mapa → marcador fica bem acima do painel
+   *
+   * Para ajustar:
+   *  - Mais zoom    → aumentar o 17
+   *  - Mais acima   → aumentar 0.35 (ex: 0.40)
+   *  - Mais ao centro→ reduzir 0.35 (ex: 0.25)
    */
   handleArrivalClick(data) {
     const { vehicleId, location } = data;
@@ -837,22 +790,21 @@ export class StopsMapApp {
       return;
     }
     _log(`handleArrivalClick: centrar em [${lat.toFixed(5)}, ${lon.toFixed(5)}] zoom 17 vehicleId:${vehicleId}`);
-    const offsetY = Math.round(this.mapManager.map.getSize().y * 0.40);
+    const offsetY = Math.round(this.mapManager.map.getSize().y * 0.35);
     this.mapManager.centerOnWithOffset([lat, lon], 17, offsetY);
     const marker = this.busMarkerManager.markers[vehicleId];
     if (marker) marker.openPopup();
   }
 
   /**
-   * Refresh manual das chegadas.
-   * Devolve uma Promise para que o NextArrivals possa aguardar antes de
-   * remover o estado de loading/spinning do botão de refresh.
+   * Chamado pelo botão de refresh no painel.
+   * Devolve a Promise de loadStopArrivals para que o listener async do
+   * botão (em NextArrivals.js) aguarde o fim antes de remover a classe
+   * 'refreshing' e reactivar o botão.
    */
   handleRefreshArrivals() {
-    if (this.currentStopId) {
-      return this.loadStopArrivals(this.currentStopId, false);
-    }
-    return Promise.resolve();
+    if (!this.currentStopId) return Promise.resolve();
+    return this.loadStopArrivals(this.currentStopId, false);
   }
 
   handleCloseArrivals() {
@@ -861,8 +813,6 @@ export class StopsMapApp {
     this.lineOverlayManager.clearAll();
     this.busMapCentered      = false;
     this.currentBusPositions = [];
-
-    // Limpar filtro de tripIds para que o MQTT pare de actualizar marcadores
     this._allowedTripIds.clear();
 
     const wasSearchActive = this.isSearchActive;
@@ -882,4 +832,68 @@ export class StopsMapApp {
     if (wasSearchActive) { this._clearSearch(false, 700); }
     else if (this._lineFilterMode && routeFilterState.hasActive()) {
       this._handleGlobalRouteFilterChange(
-        routeF
+        routeFilterState.selectedRoutes,
+        routeFilterState.selectedRouteObjs
+      );
+    } else { this.stopMarkerManager.showAllMarkers(); }
+  }
+
+  _toggleFavourite(stopId) {
+    if (!stopId) return;
+    const name    = this.currentStopName || `Paragem ${stopId}`;
+    const lineNum = routeFilterState.selectedRoutes.size === 1
+      ? [...routeFilterState.selectedRoutes][0]
+      : null;
+    const dir = lineNum ? (routeFilterState.dirMap.get(lineNum) ?? 0) : null;
+    const added = favouritesManager.toggle(stopId, name, {
+      line:    lineNum,
+      dir:     dir,
+      baseUrl: window.location.pathname
+    });
+    this.nextArrivals.refreshFavouriteBtn();
+    this.favouritesPanel.refresh();
+    if (added) { this.favouritesPanel.open(); setTimeout(() => this.favouritesPanel.close(), 1800); }
+  }
+
+  startAutoRefresh() {
+    this.stopAutoRefresh();
+    this.refreshInterval = setInterval(() => {
+      if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false);
+    }, 5000);
+  }
+
+  stopAutoRefresh() {
+    if (this.refreshInterval) { clearInterval(this.refreshInterval); this.refreshInterval = null; }
+  }
+
+  showError(message) {
+    console.error('❌', message);
+    const el = document.getElementById('error-message');
+    if (el) { el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 5000); }
+  }
+
+  cleanup() {
+    this.stopAutoRefresh();
+    geolocationService.stopWatching();
+    if (this.stopMarkerManager)  this.stopMarkerManager.clearAllMarkers();
+    if (this.busMarkerManager)   this.busMarkerManager.clearAllMarkers();
+    if (this.lineOverlayManager) this.lineOverlayManager.clearAll();
+    if (this.routeFilterBar)     this.routeFilterBar.destroy();
+    if (this.nextArrivals)       this.nextArrivals.destroy();
+    if (this.favouritesPanel)    this.favouritesPanel.destroy();
+    if (this.tutorialModal)      this.tutorialModal.destroy();
+    if (this.mapManager)         this.mapManager.cleanup();
+    if (REALTIME_BUSES_ENABLED)  mqttVehicleService.stop();
+    eventBus.off('mqtt:noDataTimeout');
+    eventBus.off('mqtt:dataRestored');
+    routeFilterState.clear();
+    this._allowedTripIds.clear();
+  }
+}
+
+if (typeof window !== 'undefined') {
+  const app = new StopsMapApp();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => app.initialize());
+  else app.initialize();
+  window.addEventListener('beforeunload', () => app.cleanup());
+}
