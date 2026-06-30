@@ -239,6 +239,7 @@
   min-width: 40px;
   max-width: 50px;
   text-align: center;
+  margin-right: 16px;
   font-size: 16px;
   flex-shrink: 0;
 }
@@ -389,7 +390,7 @@
   .next-arrivals-title-text h2 { font-size: 16px; }
   .arrivals-stop-code        { font-size: 11px; }
   .arrival-item              { padding: 10px 12px; }
-  .arrival-line              { min-width: 35px; padding: 6px 10px; font-size: 14px; }
+  .arrival-line              { padding: 6px 10px; font-size: 14px; margin-right: 12px; }
   .arrival-destination       { font-size: 14px; }
   .arrival-time              { font-size: 16px; min-width: 60px; }
   .next-arrivals-footer      { padding: 10px 16px; }
@@ -411,7 +412,7 @@
   .delay-label               { font-weight: 400; gap: 0.2rem }
   .next-arrivals-content     { padding: 0 8px; }
   .arrival-item              { padding: 8px 10px; }
-  .arrival-line              { min-width: 30px; padding: 4px 8px; font-size: 13px; }
+  .arrival-line              { min-width: 35px; padding: 4px 8px; font-size: 13px; margin-right: 10px; }
   .arrival-destination       { font-size: 13px; }
   .arrival-status            { font-size: 12px; }
   .arrival-location-icon     { width: 30px; height: 30px; }
