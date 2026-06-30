@@ -18,10 +18,11 @@
  *  - Quando o painel fecha (handleCloseArrivals), _allowedTripIds é limpo.
  *
  * VIEWPORT / RECENTRAMENTO:
- *  - Ao abrir uma paragem (centerMap=true em loadStopArrivals), o mapa
- *    faz fitBounds a todos os autocarros das chegadas RT encontrados,
- *    com maxZoom 17 e padding generoso para deixar os autocarros mais
- *    abaixo na janela visível (acima do painel).
+ *  - Ao clicar numa paragem (handleStopClick), o mapa centra-se
+ *    imediatamente na localização da paragem (zoom 16), independentemente
+ *    de já existirem autocarros ou não.
+ *  - Quando os autocarros chegam (updateBusMap com centerMap=true),
+ *    o mapa recentra sobre eles.
  *  - Ao clicar numa chegada específica no painel, handleArrivalClick()
  *    centra em zoom 17 com offset de 35% da altura para que o marcador
  *    fique bem acima do painel.
@@ -508,6 +509,13 @@ export class StopsMapApp {
       this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     }
     this.stopMarkerManager.setSelectedStop(stop.stop_id);
+
+    // ── Centrar imediatamente na paragem ──────────────────────────────────
+    // Antes de ter os autocarros, centrar o mapa na paragem para que o
+    // utilizador não fique a ver a sua localização GPS em vez da paragem.
+    // Quando updateBusMap terminar (centerMap=true), recentrará nos autocarros.
+    this.suppressMapChangeUntil = Date.now() + 2000;
+    this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
 
     const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
     const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes

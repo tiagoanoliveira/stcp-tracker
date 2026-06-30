@@ -51,6 +51,15 @@
  *   O processBusData() aceita direction=null (usa 0 como default internamente)
  *   para que veículos sem direction no proto sejam igualmente mostrados no mapa.
  *
+ * ─── PROTOBUFJS CDN ────────────────────────────────────────────────────
+ *
+ *   A lib é carregada dinamicamente de PROTOBUFJS_URLS (por ordem):
+ *   1. unpkg.com (mais fiável, não requer resolução de versão)
+ *   2. cdn.jsdelivr.net com versão explícita (@7.4.0) como fallback
+ *
+ *   Se o primeiro URL falhar, tenta o seguinte automaticamente.
+ *   O erro é registado como warning e não rejeita imediatamente.
+ *
  * ─── DEBUG ─────────────────────────────────────────────────────────────────
  *
  *   localStorage.setItem('MQTT_DEBUG', '1')  → activar logs
@@ -77,11 +86,12 @@ const TIDX_SPEED       = 17;
 const TIDX_PLATE       = 19;
 
 /**
- * URLs de fallback para a lib protobufjs.
- * São tentadas em sequência até uma carregar com sucesso.
+ * URLs de fallback para a lib protobufjs, tentados por ordem.
  *
- * Motivo: cdn.jsdelivr.net/npm/protobufjs@7 pode falhar por razões de
- * resolução de versão ou CDN — o unpkg.com serve como alternativa fiável.
+ * 1. unpkg.com — mais fiável: sem resolução de versão "latest",
+ *    entrega directamente o ficheiro sem redirect.
+ * 2. cdn.jsdelivr.net com versão explícita — evita o problema de
+ *    /npm/protobufjs@7 (sem patch) que pode falhar por range ambíguo.
  */
 const PROTOBUFJS_URLS = [
   'https://unpkg.com/protobufjs@7/dist/protobuf.min.js',
@@ -178,7 +188,7 @@ async function loadMqttLib() {
 
 /**
  * Carrega protobufjs tentando os URLs em PROTOBUFJS_URLS por ordem.
- * Se o primeiro falhar (ex: CDN instável), tenta o seguinte.
+ * Cada falha é registada como warning; só rejeita se TODOS falharem.
  */
 async function loadProtobufLib() {
   if (window.protobuf) return window.protobuf;
@@ -188,19 +198,26 @@ async function loadProtobufLib() {
     try {
       await _loadScript(url);
       if (window.protobuf) {
-        console.info(`%c[MQTT] protobufjs carregado de: ${url}`, 'color:#437a22');
+        console.info(`%c[MQTT] ✅ protobufjs carregado de: ${url}`, 'color:#437a22');
         return window.protobuf;
       }
+      // Script carregou mas window.protobuf não foi definido
+      console.warn(`%c[MQTT] ⚠ ${url} carregou mas window.protobuf não está definido — a tentar próximo...`, 'color:#964219');
     } catch (err) {
-      console.warn(`%c[MQTT] Falha ao carregar protobufjs de ${url} — a tentar próximo...`, 'color:#964219');
+      console.warn(`%c[MQTT] ⚠ Falha ao carregar protobufjs de ${url} — a tentar próximo...`, 'color:#964219', err.message);
       lastError = err;
     }
   }
-  throw lastError || new Error('protobufjs não foi carregado corretamente (todos os CDNs falharam)');
+  throw lastError || new Error('protobufjs: todos os CDNs falharam');
 }
 
 function _loadScript(src) {
   return new Promise((resolve, reject) => {
+    // Se já existe um <script> com este src, não duplicar
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
     const s = document.createElement('script');
     s.src = src;
     s.onload  = resolve;
