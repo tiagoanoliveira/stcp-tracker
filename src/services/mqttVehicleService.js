@@ -76,6 +76,18 @@ const TIDX_VEHICLE_NUM = 13;
 const TIDX_SPEED       = 17;
 const TIDX_PLATE       = 19;
 
+/**
+ * URLs de fallback para a lib protobufjs.
+ * São tentadas em sequência até uma carregar com sucesso.
+ *
+ * Motivo: cdn.jsdelivr.net/npm/protobufjs@7 pode falhar por razões de
+ * resolução de versão ou CDN — o unpkg.com serve como alternativa fiável.
+ */
+const PROTOBUFJS_URLS = [
+  'https://unpkg.com/protobufjs@7/dist/protobuf.min.js',
+  'https://cdn.jsdelivr.net/npm/protobufjs@7.4.0/dist/protobuf.min.js',
+];
+
 // ─── Estado interno ────────────────────────────────────────────────────────────
 let _client           = null;
 let _protoRoot        = null;
@@ -164,11 +176,27 @@ async function loadMqttLib() {
   return window.mqtt;
 }
 
+/**
+ * Carrega protobufjs tentando os URLs em PROTOBUFJS_URLS por ordem.
+ * Se o primeiro falhar (ex: CDN instável), tenta o seguinte.
+ */
 async function loadProtobufLib() {
   if (window.protobuf) return window.protobuf;
-  await _loadScript('https://cdn.jsdelivr.net/npm/protobufjs@7/dist/protobuf.min.js');
-  if (!window.protobuf) throw new Error('protobufjs não foi carregado corretamente');
-  return window.protobuf;
+
+  let lastError;
+  for (const url of PROTOBUFJS_URLS) {
+    try {
+      await _loadScript(url);
+      if (window.protobuf) {
+        console.info(`%c[MQTT] protobufjs carregado de: ${url}`, 'color:#437a22');
+        return window.protobuf;
+      }
+    } catch (err) {
+      console.warn(`%c[MQTT] Falha ao carregar protobufjs de ${url} — a tentar próximo...`, 'color:#964219');
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('protobufjs não foi carregado corretamente (todos os CDNs falharam)');
 }
 
 function _loadScript(src) {

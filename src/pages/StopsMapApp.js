@@ -18,12 +18,16 @@
  *  - Quando o painel fecha (handleCloseArrivals), _allowedTripIds é limpo.
  *
  * VIEWPORT / RECENTRAMENTO:
+ *  - handleStopClick(): centra imediatamente na paragem (antes de ter
+ *    autocarros) em zoom 17 com offset para dar espaço ao painel.
  *  - Ao abrir uma paragem (centerMap=true em loadStopArrivals), o mapa
  *    faz fitBounds a todos os autocarros das chegadas RT encontrados.
  *  - Ao clicar numa chegada específica no painel, handleArrivalClick()
- *    centra em zoom 17 com offset para dar espaço ao painel.
- *  - _recenterOnPositions() usa paddingBottomRight com 60% da altura do
- *    painel para que os marcadores não fiquem tapados.
+ *    centra em zoom 17 com offset máximo para deixar o autocarro abaixo
+ *    do centro e acima do painel.
+ *  - _recenterOnPositions() usa zoom 17 (1 bus) e maxZoom 17 (N buses),
+ *    com paddingBottomRight = 55% da altura do mapa para que os
+ *    marcadores fiquem na metade inferior–central da janela visível.
  *
  * DIRECÇÃO DO SHAPE (handleArrivalFilterChange):
  *  - Para cada linha filtrada, pede as paragens da direcção 0.
@@ -517,6 +521,20 @@ export class StopsMapApp {
     }
     this.stopMarkerManager.setSelectedStop(stop.stop_id);
 
+    // ── Centrar na paragem ANTES de ter autocarros ─────────────────────────
+    // Garante que o mapa mostra sempre a paragem quando o painel abre,
+    // mesmo que os autocarros ainda não tenham sido localizados.
+    // O offset de 35% coloca a paragem na metade superior do mapa visível
+    // (acima do painel de chegadas).
+    if (this.mapManager?.map) {
+      const stopOffsetY = Math.round(this.mapManager.map.getSize().y * 0.35);
+      this.mapManager.centerOnWithOffset(
+        [stop.latitude, stop.longitude],
+        17,
+        stopOffsetY
+      );
+    }
+
     const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
     const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes
       ? stopInfo.value.routes : (stop.routes || []);
@@ -581,8 +599,7 @@ export class StopsMapApp {
    * e só actualizar marcadores de veículos que pertencem a esta paragem.
    *
    * VIEWPORT:
-   *  - centerMap=true (primeiro load): fitBounds a todos os autocarros encontrados,
-   *    com padding inferior para dar espaço ao painel de chegadas.
+   *  - centerMap=true (primeiro load): fitBounds a todos os autocarros encontrados.
    *  - centerMap=false (refresh automático): não move o mapa.
    *
    * `vehicles` pode ser:
@@ -773,23 +790,33 @@ export class StopsMapApp {
 
   /**
    * Centra o mapa nas posições dadas, com padding para dar espaço ao
-   * painel de chegadas (ocupa ~60% da altura do mapa em mobile).
+   * painel de chegadas.
    *
-   * - 1 posição: centerOnWithOffset em zoom 16 com metade do painel de offset
-   * - N posições: fitBounds com padding top/left 60px e bottom = 60% altura painel
+   * Objectivo de UX: os marcadores devem aparecer na metade inferior do
+   * espaço visível (acima do painel mas abaixo do centro), para que o
+   * utilizador veja tanto a paragem como os autocarros sem ter de fazer
+   * scroll ou zoom.
+   *
+   * - 1 posição: zoom 17, offset de 40% da altura do mapa (marcador fica
+   *   visivelmente abaixo do centro, na zona central-baixa da vista).
+   * - N posições: fitBounds com maxZoom 17, padding inferior = 55% da
+   *   altura do mapa para empurrar o conteúdo para cima e deixar o painel
+   *   a cobrir apenas a parte inferior sem tapar os marcadores.
    */
   _recenterOnPositions(positions) {
     if (!this.mapManager || positions.length === 0) return;
-    const panelHeight = this.mapManager.map.getSize().y * 0.6;
+    const mapHeight   = this.mapManager.map.getSize().y;
+    const panelHeight = mapHeight * 0.55; // 55% para marcadores ficarem mais baixos
     if (positions.length === 1) {
-      this.mapManager.centerOnWithOffset(positions[0], 16, Math.round(panelHeight * 0.5));
+      // offset de 40% empurra o ponto visualmente para baixo do centro
+      this.mapManager.centerOnWithOffset(positions[0], 17, Math.round(mapHeight * 0.40));
       return;
     }
     this.mapManager.fitBounds(positions, {
       paddingTopLeft:     [60, 60],
       paddingBottomRight: [60, Math.round(panelHeight) + 60],
-      maxZoom: 16,
-      minZoom: 13,
+      maxZoom: 17,
+      minZoom: 14,
     });
   }
 
@@ -797,8 +824,8 @@ export class StopsMapApp {
    * Centra o mapa num autocarro específico quando o utilizador clica
    * numa chegada no painel.
    *
-   * Zoom 17 com offset vertical de 25% da altura do mapa para que o
-   * marcador fique visível acima do painel de chegadas.
+   * Zoom 17 com offset de 40% da altura do mapa — o autocarro fica
+   * visivelmente abaixo do centro e acima do painel de chegadas.
    */
   handleArrivalClick(data) {
     const { vehicleId, location } = data;
@@ -810,14 +837,22 @@ export class StopsMapApp {
       return;
     }
     _log(`handleArrivalClick: centrar em [${lat.toFixed(5)}, ${lon.toFixed(5)}] zoom 17 vehicleId:${vehicleId}`);
-    const offsetY = Math.round(this.mapManager.map.getSize().y * 0.25);
+    const offsetY = Math.round(this.mapManager.map.getSize().y * 0.40);
     this.mapManager.centerOnWithOffset([lat, lon], 17, offsetY);
     const marker = this.busMarkerManager.markers[vehicleId];
     if (marker) marker.openPopup();
   }
 
+  /**
+   * Refresh manual das chegadas.
+   * Devolve uma Promise para que o NextArrivals possa aguardar antes de
+   * remover o estado de loading/spinning do botão de refresh.
+   */
   handleRefreshArrivals() {
-    if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false);
+    if (this.currentStopId) {
+      return this.loadStopArrivals(this.currentStopId, false);
+    }
+    return Promise.resolve();
   }
 
   handleCloseArrivals() {
@@ -847,68 +882,4 @@ export class StopsMapApp {
     if (wasSearchActive) { this._clearSearch(false, 700); }
     else if (this._lineFilterMode && routeFilterState.hasActive()) {
       this._handleGlobalRouteFilterChange(
-        routeFilterState.selectedRoutes,
-        routeFilterState.selectedRouteObjs
-      );
-    } else { this.stopMarkerManager.showAllMarkers(); }
-  }
-
-  _toggleFavourite(stopId) {
-    if (!stopId) return;
-    const name    = this.currentStopName || `Paragem ${stopId}`;
-    const lineNum = routeFilterState.selectedRoutes.size === 1
-      ? [...routeFilterState.selectedRoutes][0]
-      : null;
-    const dir = lineNum ? (routeFilterState.dirMap.get(lineNum) ?? 0) : null;
-    const added = favouritesManager.toggle(stopId, name, {
-      line:    lineNum,
-      dir:     dir,
-      baseUrl: window.location.pathname
-    });
-    this.nextArrivals.refreshFavouriteBtn();
-    this.favouritesPanel.refresh();
-    if (added) { this.favouritesPanel.open(); setTimeout(() => this.favouritesPanel.close(), 1800); }
-  }
-
-  startAutoRefresh() {
-    this.stopAutoRefresh();
-    this.refreshInterval = setInterval(() => {
-      if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false);
-    }, 5000);
-  }
-
-  stopAutoRefresh() {
-    if (this.refreshInterval) { clearInterval(this.refreshInterval); this.refreshInterval = null; }
-  }
-
-  showError(message) {
-    console.error('❌', message);
-    const el = document.getElementById('error-message');
-    if (el) { el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 5000); }
-  }
-
-  cleanup() {
-    this.stopAutoRefresh();
-    geolocationService.stopWatching();
-    if (this.stopMarkerManager)  this.stopMarkerManager.clearAllMarkers();
-    if (this.busMarkerManager)   this.busMarkerManager.clearAllMarkers();
-    if (this.lineOverlayManager) this.lineOverlayManager.clearAll();
-    if (this.routeFilterBar)     this.routeFilterBar.destroy();
-    if (this.nextArrivals)       this.nextArrivals.destroy();
-    if (this.favouritesPanel)    this.favouritesPanel.destroy();
-    if (this.tutorialModal)      this.tutorialModal.destroy();
-    if (this.mapManager)         this.mapManager.cleanup();
-    if (REALTIME_BUSES_ENABLED)  mqttVehicleService.stop();
-    eventBus.off('mqtt:noDataTimeout');
-    eventBus.off('mqtt:dataRestored');
-    routeFilterState.clear();
-    this._allowedTripIds.clear();
-  }
-}
-
-if (typeof window !== 'undefined') {
-  const app = new StopsMapApp();
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => app.initialize());
-  else app.initialize();
-  window.addEventListener('beforeunload', () => app.cleanup());
-}
+        routeF
