@@ -771,7 +771,7 @@ export class StopsMapApp {
 
     this.mapManager.fitBounds(positions, {
       paddingTopLeft:     [60, 60],
-      paddingBottomRight: [60, panelH + 100],
+      paddingBottomRight: [60, panelH + 20],
       maxZoom: 17,
       minZoom: 14,
     });
@@ -798,8 +798,8 @@ export class StopsMapApp {
       return;
     }
     _log(`handleArrivalClick: centrar em [${lat.toFixed(5)}, ${lon.toFixed(5)}] zoom 17 vehicleId:${vehicleId}`);
-    const offsetY = Math.round(this.mapManager.map.getSize().y * 0.35);
-    this.mapManager.centerOnWithOffset([lat, lon], 17, offsetY);
+    const offsetY = Math.round(this.mapManager.map.getSize().y * 0.20);
+    this.mapManager.centerOnWithOffset([lat, lon], 18, offsetY);
     const marker = this.busMarkerManager.markers[vehicleId];
     if (marker) marker.openPopup();
   }
