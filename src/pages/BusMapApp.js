@@ -361,26 +361,44 @@ export class BusMapApp {
     }
   }
 
-  _handleArrivalFilterChange(selectedInPanel) {
-    // Construir dirMap com a direção inferida das chegadas OTP desta paragem
+  async _handleArrivalFilterChange(selectedInPanel) {
     const arrivalDirMap = new Map();
     for (const routeNum of selectedInPanel) {
       const arrival = this.nextArrivals.allArrivals.find(
           a => String(a.route_short_name) === String(routeNum) && a.trip_id
       );
       if (arrival?.trip_id) {
-        // trip_id: "201_1_1|..." → direção = 2º segmento após o 1º "_"
         const parts = arrival.trip_id.split('_');
         if (parts.length >= 2) arrivalDirMap.set(routeNum, Number(parts[1]));
       }
     }
+
     const effectiveFilter = selectedInPanel.size > 0
-        ? selectedInPanel
-        : routeFilterState.selectedRoutes;
+        ? selectedInPanel : routeFilterState.selectedRoutes;
     const effectiveDirMap = arrivalDirMap.size > 0
-        ? arrivalDirMap
-        : routeFilterState.dirMap;
+        ? arrivalDirMap : routeFilterState.dirMap;
+
     this.busMarkerManager.filterByRoutes(effectiveFilter, effectiveDirMap);
+
+    // ← NOVO: actualizar shape da linha com a direcção correcta da paragem
+    if (selectedInPanel.size > 0) {
+      const routesToFetch = [];
+      for (const routeNum of selectedInPanel) {
+        const dir = arrivalDirMap.get(routeNum) ?? 0;
+        const routeObj = (this.routeFilterBar?.routes || [])
+            .find(r => String(r.number) === String(routeNum));
+        routesToFetch.push({
+          routeId:    String(routeObj?.id || routeNum),
+          direction:  dir,
+          color:      routeObj?.color      || '#187EC2',
+          text_color: routeObj?.text_color || '#FFFFFF',
+        });
+      }
+      const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
+      this.lineOverlayManager.setRoutes(overlayData);
+    } else {
+      this.lineOverlayManager.clearAll();
+    }
   }
 
   async _handleStopClick(stop) {
@@ -388,7 +406,7 @@ export class BusMapApp {
 
     // Ao abrir uma paragem: mostrar apenas os autocarros que chegam a essa paragem.
     // Limpar os marcadores do modo "mapa global" sem apagar o snapshot MQTT.
-    this.busMarkerManager.clearAllMarkers();
+    this.busMarkerManager.hideAllMarkers();
 
     this._currentStopId       = stop.stop_id;
     this._currentStopName     = stop.stop_name;
@@ -462,31 +480,43 @@ export class BusMapApp {
     const busesToShow  = [];
     const busPositions = [];
 
+    // DEPOIS — match por trip_id (exacto → fuzzy) com fallback por linha+dir
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
 
-      // vehicles já está no formato processado (de _allProcessedBuses)
-      // Fazer match por trip_id
-      const processedBus = vehicles.find(v => {
-        if (!v.tripId || !arrival.trip_id) return false;
-        return vehicleService.tripIdsMatch(v.tripId, arrival.trip_id);
-      });
+      let processedBus = null;
+
+      // 1. Match exacto por trip_id
+      if (arrival.trip_id && vehicles.length > 0) {
+        processedBus = vehicles.find(v =>
+            v.tripId && vehicleService.tripIdsMatch(v.tripId, arrival.trip_id)
+        ) || null;
+      }
+
+      // 2. Fallback: linha + direção extraída do trip_id
+      if (!processedBus && arrival.trip_id) {
+        const parts   = arrival.trip_id.split('_');
+        const lineStr = String(arrival.route_short_name || '');
+        const dirNum  = parts.length >= 2 ? Number(parts[1]) : null;
+        const candidates = vehicles.filter(v => {
+          const vLine = String(v.displayLine || v.line || '');
+          if (vLine !== lineStr) return false;
+          if (dirNum !== null && v.direction !== dirNum) return false;
+          return true;
+        });
+        if (candidates.length > 0) processedBus = candidates[0];
+      }
 
       if (!processedBus) continue;
-
       busesToShow.push(processedBus);
       busPositions.push([processedBus.latitude, processedBus.longitude]);
-
-      const routeNum = String(
-        arrival.route_short_name || arrival.route_number ||
-        arrival.route_id || processedBus.displayLine || processedBus.line || ''
-      );
+      const routeNum = String(arrival.route_short_name || processedBus.displayLine || '');
       this.busMarkerManager.setRouteForMarker(processedBus.id, routeNum);
     }
 
     if (busesToShow.length === 0) return;
+    this.busMarkerManager.hideAllMarkers();
     this.busMarkerManager.updateBusMarkers(busesToShow);
-    this._currentBusPositions = busPositions;
 
     const effectiveFilter = this.nextArrivals?.selectedRoutes?.size > 0
       ? this.nextArrivals.selectedRoutes

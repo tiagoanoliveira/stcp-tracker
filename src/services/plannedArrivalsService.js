@@ -67,30 +67,62 @@ class PlannedArrivalsService {
     const cached   = _cache.get(cacheKey);
     if (cached && (Date.now() - cached.ts) < CACHE_TTL) return cached.data;
 
-    // Resolver stop_code alfanumérico para o OTP
     const stopCode = await _resolveStopCode(stopId);
+    let otpArrivals  = [];
+    let otpFailed    = false;
 
-    // Tentar OTP primeiro
     try {
-      const otpArrivals = await otpService.getArrivalsForStop(stopCode, maxMinutes);
-      if (otpArrivals.length > 0) {
-        _cache.set(cacheKey, { data: otpArrivals, ts: Date.now() });
-        return otpArrivals;
+      otpArrivals = await otpService.getArrivalsForStop(stopCode, maxMinutes);
+    } catch (err) {
+      console.warn('[PlannedArrivals] OTP falhou:', err.message);
+      otpFailed = true;
+    }
+
+    // Se OTP devolveu chegadas mas nenhuma com is_realtime,
+    // tentar enriquecer com dados da API legacy
+    const hasRealtime = otpArrivals.some(a => a.is_realtime === true);
+
+    if (!hasRealtime) {
+      try {
+        const legacyArrivals = await this._fetchLegacy(stopId, maxMinutes);
+        // Merge: para cada chegada OTP sem realtime, verificar se a API tem realtime para a mesma linha
+        if (otpArrivals.length > 0 && legacyArrivals.length > 0) {
+          const legacyMap = new Map();
+          legacyArrivals.forEach(a => {
+            if (a.is_realtime) {
+              const key = String(a.route_short_name || a.route_number || a.route_id || '');
+              if (!legacyMap.has(key)) legacyMap.set(key, []);
+              legacyMap.get(key).push(a);
+            }
+          });
+          // Substituir chegadas OTP sem realtime por equivalentes da API com realtime
+          const merged = otpArrivals.map(a => {
+            if (a.is_realtime) return a;
+            const key     = String(a.route_short_name || '');
+            const apiOpts = legacyMap.get(key);
+            if (apiOpts?.length > 0) return { ...a, ...apiOpts.shift(), is_realtime: true };
+            return a;
+          });
+          _cache.set(cacheKey, { data: merged, ts: Date.now() });
+          return merged;
+        }
+        // OTP falhou completamente → usar só a API legacy
+        if (otpFailed || otpArrivals.length === 0) {
+          _cache.set(cacheKey, { data: legacyArrivals, ts: Date.now() });
+          return legacyArrivals;
+        }
+      } catch (err) {
+        console.warn('[PlannedArrivals] API legacy também falhou:', err.message);
       }
-    } catch (err) {
-      console.warn('[PlannedArrivals] OTP falhou, a tentar fallback:', err.message);
     }
 
-    // Fallback: API STCP
-    try {
-      const legacyArrivals = await this._fetchLegacy(stopId, maxMinutes);
-      _cache.set(cacheKey, { data: legacyArrivals, ts: Date.now() });
-      return legacyArrivals;
-    } catch (err) {
-      console.error('[PlannedArrivals] Fallback legacy também falhou:', err.message);
-      if (cached) return cached.data;
-      return [];
+    if (otpArrivals.length > 0) {
+      _cache.set(cacheKey, { data: otpArrivals, ts: Date.now() });
+      return otpArrivals;
     }
+
+    if (cached) return cached.data;
+    return [];
   }
 
   /**

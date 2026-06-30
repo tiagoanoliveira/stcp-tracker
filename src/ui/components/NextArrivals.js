@@ -375,32 +375,26 @@ export class NextArrivals {
       vehicleService.extractVehicleLocation(vehicle) !== null;
     const locationIcon = hasLocation ? this.getActiveLocationIcon() : this.getInactiveLocationIcon();
 
-    // ── Status line ──────────────────────────────────────────────────────────
+    // ── Status line — label SEMPRE a preto, só o delay colorido ──────────
     let statusHtml = '';
     if (!isRealtime) {
-      statusHtml = '<span class="delay-label">Planeado — localização desconhecida</span>';
+      statusHtml = '<span class="delay-label" style="color:#1a1a1a;">Planeado</span>';
+    } else if (status === 'ON_TIME') {
+      statusHtml = '<span class="delay-label" style="color:#1a1a1a;">No horário previsto</span>';
+    } else if (status === 'EARLY') {
+      const colorCls = 'delay-green';
+      const diff     = formatDelay(delayS);
+      statusHtml = `<span class="delay-label" style="color:#1a1a1a;">Adiantado <strong class="${colorCls}">${diff}</strong></span>`;
+    } else if (status === 'DELAYED') {
+      const colorCls = delayColorClass(status, delayS);
+      const diff     = formatDelay(delayS);
+      statusHtml = `<span class="delay-label" style="color:#1a1a1a;">Atrasado <strong class="${colorCls}">${diff}</strong></span>`;
     } else {
-      const colorCls  = delayColorClass(status, delayS);
-      const labelText = statusLabel(status);
-
-      if (status === 'ON_TIME') {
-        // No horário previsto: mostrar só o rótulo em verde
-        statusHtml = `<span class="delay-label ${colorCls}">${labelText}</span>`;
-      } else if (status === 'EARLY') {
-        // Adiantado: rótulo + quanto tempo adiantado (delay é negativo)
-        const diff = formatDelay(delayS);
-        statusHtml = `<span class="delay-label ${colorCls}">${labelText} <strong>${diff}</strong></span>`;
-      } else if (status === 'DELAYED') {
-        // Atrasado: rótulo + atraso em mm:ss
-        const diff = formatDelay(delayS);
-        statusHtml = `<span class="delay-label ${colorCls}">${labelText} <strong>${diff}</strong></span>`;
-      } else {
-        statusHtml = `<span class="delay-label">${labelText}</span>`;
-      }
+      statusHtml = `<span class="delay-label" style="color:#1a1a1a;">${statusLabel(status)}</span>`;
     }
 
-    // ── Tempo de chegada ──────────────────────────────────────────────────────
-    const timeColorCls = isRealtime ? delayColorClass(status, delayS) : '';
+// ── Tempo de chegada — verde=realtime, preto=planeado ────────────────
+    const timeColorCls = isRealtime ? 'arrival-time-realtime' : '';
     const timeHtml     = `<div class="arrival-time ${timeColorCls}">${this._formatArrivalTime(arrival)}</div>`;
 
     // ── Elemento ─────────────────────────────────────────────────────────────
