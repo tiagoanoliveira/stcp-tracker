@@ -35,7 +35,7 @@
 
 const OTP_ENDPOINT = 'https://otp.portodigital.pt/otp/gtfs/v1';
 const OTP_FEED_ID  = '2';   // feedId STCP no broker Porto Digital
-const CACHE_TTL    = 20_000; // ms
+const CACHE_TTL    = 4_000; // ms
 const MAX_RESULTS  = 12;     // máximo de chegadas por pedido
 
 // Cache: cacheKey → { data: TripArrival[], ts: Date.now() }
