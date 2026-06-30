@@ -13,9 +13,11 @@
  * DEDUPLICAÇÃO DE MARCADORES:
  *  - vehicleService.processBusData normaliza o id FIWARE ("urn:ngsi-ld:Vehicle:3261"
  *    → "3261") para que coincida com o id MQTT, evitando marcadores duplicados.
- *  - Adicionalmente, _mqttFirstSnapshot garante que na primeira actualização MQTT
- *    após abrir um painel de paragem, todos os marcadores FIWARE residuais são
- *    limpos antes de renderizar os dados MQTT.
+ *
+ * DIRECÇÃO DO SHAPE (handleArrivalFilterChange):
+ *  - Para cada linha filtrada, pede as paragens da direcção 0.
+ *  - Se a paragem actual (currentStopId) não estiver nessa lista, usa direcção 1.
+ *  - Desta forma o shape desenhado é sempre o que inclui a paragem em causa.
  *
  * BANNER DE SERVIÇO INDISPONÍVEL:
  *  - Se o broker MQTT ligar mas não entregar nenhum veículo em 15 s,
@@ -89,11 +91,6 @@ export class StopsMapApp {
 
     // Flag: indica se o MQTT foi iniciado e está activo
     this._mqttActive = false;
-
-    // Flag: indica se ainda não recebemos o primeiro update MQTT para a paragem
-    // actual. Quando true, o próximo update MQTT limpa todos os marcadores
-    // FIWARE residuais antes de renderizar os dados MQTT.
-    this._mqttFirstSnapshot = false;
 
     // ID do banner de no-data para poder escondê-lo depois
     this._noDataBannerId = 'mqtt-no-data';
@@ -191,7 +188,7 @@ export class StopsMapApp {
     // Banner: broker ligado mas sem dados em 15s
     eventBus.on('mqtt:noDataTimeout', () => {
       AnnouncementBanner.show(
-        '⚠\uFE0F Os dados de localização em tempo real não estão disponíveis de momento. ' +
+        '\u26A0\uFE0F Os dados de localização em tempo real não estão disponíveis de momento. ' +
         'Isto é uma falha no serviço externo — o teu dispositivo e rede estão OK.',
         { type: 'warning', id: this._noDataBannerId, dismissible: true }
       );
@@ -219,32 +216,30 @@ export class StopsMapApp {
   /**
    * Chamado pelo MQTT para cada actualização de posição de veículo.
    *
-   * Na PRIMEIRA actualização após abrir um painel de paragem (_mqttFirstSnapshot
-   * é true), limpa TODOS os marcadores existentes antes de renderizar — isto
-   * garante que eventuais marcadores FIWARE com IDs residuais são removidos,
-   * mesmo que a normalização de ID não os tenha apanhado.
+   * FIX: os veículos do MQTT chegam em formato bruto { lat, lng, routeId... }.
+   * Antes de os passar ao BusMarkerManager (que espera { latitude, longitude... }),
+   * é obrigatório chamá-los através de vehicleService.processBusData().
    *
-   * Nas actualizações seguintes, actualiza apenas o marcador individual.
+   * Além disso, actualiza sempre o marcador (upsert) em vez de só actualizar
+   * os que já existiam — o BusMarkerManager._upsertMarker() garante deduplicação.
    */
   _handleMqttVehicleUpdate(vehicle) {
     if (!this.currentStopId || !this.busMarkerManager) return;
 
-    // Primeira chegada MQTT após abrir a paragem: limpar tudo e redesenhar
-    if (this._mqttFirstSnapshot) {
-      this._mqttFirstSnapshot = false;
-      this.busMarkerManager.clearAllMarkers();
-      // Redesenhar todos os veículos conhecidos pelo MQTT de uma vez
-      const allVehicles = mqttVehicleService.getAllVehicles();
-      if (allVehicles.length > 0) {
-        this.busMarkerManager.updateBusMarkers(allVehicles);
-        this.currentBusPositions = allVehicles.map(v => [v.latitude, v.longitude]);
-      }
-      return;
-    }
+    // Processar o veículo bruto para o formato interno { latitude, longitude... }
+    const processed = vehicleService.processBusData(vehicle);
+    if (!processed) return;
 
-    // Actualizações seguintes: mover/actualizar apenas este marcador
-    if (this.busMarkerManager.markers[vehicle.id]) {
-      this.busMarkerManager.updateSingleBusMarker(vehicle);
+    // Upsert: criar ou mover o marcador (deduplicação interna no BusMarkerManager)
+    this.busMarkerManager.updateSingleBusMarker(processed);
+
+    // Manter lista de posições visíveis actualizada
+    const ll = this.busMarkerManager.markers[processed.id]?.getLatLng();
+    if (ll) {
+      const idx = this.currentBusPositions.findIndex(
+        p => p[0] === ll.lat && p[1] === ll.lng
+      );
+      if (idx === -1) this.currentBusPositions.push([ll.lat, ll.lng]);
     }
   }
 
@@ -479,11 +474,6 @@ export class StopsMapApp {
     this.busMapCentered      = false;
     this.currentBusPositions = [];
 
-    // Armar a flag de primeiro snapshot MQTT para esta paragem.
-    // Quando o MQTT entregar o próximo update, os marcadores FIWARE
-    // residuais serão limpos antes de renderizar os dados MQTT.
-    this._mqttFirstSnapshot = REALTIME_BUSES_ENABLED && this._mqttActive;
-
     clearTimeout(this.loadStopsDebounce);
     this.loadStopsDebounce = null;
 
@@ -616,6 +606,16 @@ export class StopsMapApp {
     }
   }
 
+  /**
+   * Callback do filtro de linhas no painel de chegadas.
+   *
+   * FIX — direcção do shape:
+   *  Para cada linha seleccionada, determina qual a direcção correcta a desenhar:
+   *  1. Pede as paragens da direcção 0 para essa linha.
+   *  2. Verifica se a paragem actual (currentStopId) está na lista.
+   *  3. Se não estiver → usa direcção 1 (que é onde a paragem deve estar).
+   *  Desta forma o shape desenhado inclui sempre a paragem em causa.
+   */
   async handleArrivalFilterChange(selectedRoutes) {
     const effectiveFilter = selectedRoutes.size > 0
       ? selectedRoutes
@@ -629,9 +629,38 @@ export class StopsMapApp {
       this.lineOverlayManager.clearAll();
     } else {
       const sourceRoutes = selectedRoutes.size > 0 ? selectedRoutes : routeFilterState.selectedRoutes;
-      const routeObjs = (this.nextArrivals?.availableRoutes || [])
+      const availableRoutes = this.nextArrivals?.availableRoutes || [];
+
+      // Determinar a direcção correcta para cada linha verificando se a
+      // paragem actual existe nas paragens da direcção 0.
+      const routeObjsPromises = availableRoutes
         .filter(r => sourceRoutes.has(r.number))
-        .map(r => ({ routeId: String(r.id || r.number), direction: 0, color: r.color || '#187EC2', text_color: r.text_color || '#FFFFFF' }));
+        .map(async r => {
+          const routeId = String(r.id || r.number);
+          let direction = 0;
+
+          if (this.currentStopId) {
+            try {
+              const stopsDir0 = await routeService.fetchRouteStops(routeId, 0);
+              const stopIds0  = (stopsDir0?.stops || []).map(s => String(s.stop_id));
+              if (!stopIds0.includes(String(this.currentStopId))) {
+                direction = 1;
+              }
+            } catch {
+              // em caso de erro mantém direcção 0
+            }
+          }
+
+          return {
+            routeId,
+            direction,
+            color:      r.color      || '#187EC2',
+            text_color: r.text_color || '#FFFFFF'
+          };
+        });
+
+      const routeObjs = await Promise.all(routeObjsPromises);
+
       if (routeObjs.length > 0) {
         const overlayData = await routeService.fetchMultipleRoutesOverlay(routeObjs);
         this.lineOverlayManager.setRoutes(overlayData);
@@ -672,7 +701,6 @@ export class StopsMapApp {
     this.lineOverlayManager.clearAll();
     this.busMapCentered      = false;
     this.currentBusPositions = [];
-    this._mqttFirstSnapshot  = false;
     const wasSearchActive = this.isSearchActive;
     const returnPosition  = this.currentStopPosition;
     this.currentStopId       = null;
