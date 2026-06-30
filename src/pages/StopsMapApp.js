@@ -3,26 +3,19 @@
  *
  * Integração MQTT:
  *  - Quando REALTIME_BUSES_ENABLED, o MQTT é iniciado no initialize().
- *  - onVehicleUpdate: actualiza o marcador individual em tempo real.
- *  - onVehicleExpired: remove o marcador do veículo expirado (TTL 30 s).
- *  - loadStopArrivals usa mqttVehicleService.getAllVehicles() em vez de
- *    apiService.fetchBusData(), eliminando o polling HTTP.
- *  - O intervalo de autoRefresh mantém-se para refrescar as chegadas previstas
- *    (plannedArrivalsService), mas a posição dos veículos é sempre em tempo real.
- *
- * DEDUPLICAÇÃO DE MARCADORES:
- *  - vehicleService.processBusData normaliza o id FIWARE ("urn:ngsi-ld:Vehicle:3261"
- *    → "3261") para que coincida com o id MQTT, evitando marcadores duplicados.
+ *  - onVehicleUpdate recebe veículos JÁ PROCESSADOS (formato { latitude,
+ *    longitude, line, displayLine, direction, tripId, ... }) porque
+ *    mqttVehicleService.start() chama vehicleService.processBusData()
+ *    internamente antes de chamar o callback.
+ *  - Não chamar processBusData() uma segunda vez sobre estes objectos.
  *
  * DIRECÇÃO DO SHAPE (handleArrivalFilterChange):
  *  - Para cada linha filtrada, pede as paragens da direcção 0.
  *  - Se a paragem actual (currentStopId) não estiver nessa lista, usa direcção 1.
- *  - Desta forma o shape desenhado é sempre o que inclui a paragem em causa.
  *
  * BANNER DE SERVIÇO INDISPONÍVEL:
- *  - Se o broker MQTT ligar mas não entregar nenhum veículo em 15 s,
- *    é emitido mqtt:noDataTimeout → mostra AnnouncementBanner.
- *  - Quando o primeiro veículo chegar, mqtt:dataRestored → esconde o banner.
+ *  - mqtt:noDataTimeout (15 s sem dados) → mostra AnnouncementBanner.
+ *  - mqtt:dataRestored → esconde o banner.
  */
 
 import { geolocationService }    from '../core/geolocationService.js';
@@ -52,6 +45,13 @@ import { favouritesManager }      from '../services/FavouritesManager.js';
 import { iconCache }              from '../ui/design/iconCache.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
+
+// ─── Helpers de debug ──────────────────────────────────────────────────────
+// Activar com: localStorage.setItem('BUS_DEBUG', '1') e recarregar.
+// Desactivar:  localStorage.removeItem('BUS_DEBUG')
+const _busDebug = () => { try { return localStorage.getItem('BUS_DEBUG') === '1'; } catch { return false; } };
+const _log  = (...a) => { if (_busDebug()) console.log  ('%c[BUS DEBUG]', 'color:#01696f;font-weight:bold', ...a); };
+const _warn = (...a) => { if (_busDebug()) console.warn ('%c[BUS DEBUG]', 'color:#964219;font-weight:bold', ...a); };
 
 export class StopsMapApp {
   constructor(options = {}) {
@@ -89,10 +89,7 @@ export class StopsMapApp {
     this._globalSelectedRouteObjs = [];
     this._lineFilterMode          = false;
 
-    // Flag: indica se o MQTT foi iniciado e está activo
-    this._mqttActive = false;
-
-    // ID do banner de no-data para poder escondê-lo depois
+    this._mqttActive     = false;
     this._noDataBannerId = 'mqtt-no-data';
   }
 
@@ -106,6 +103,12 @@ export class StopsMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
+
+      // Activar logs de debug automaticamente em desenvolvimento
+      console.info(
+        '%c[BUS DEBUG] Para activar logs de autocarros: localStorage.setItem(\'BUS_DEBUG\', \'1\') e recarrega a página',
+        'color:#01696f;font-style:italic'
+      );
 
       await scheduleService.loadScheduleData();
 
@@ -129,7 +132,6 @@ export class StopsMapApp {
       this.busMarkerManager   = new BusMarkerManager(this.mapManager.map);
       this.lineOverlayManager = new LineOverlayManager(this.mapManager.map);
 
-      // Tutorial
       this.tutorialModal = new TutorialModal({ page: 'stopsmap' });
       this.tutorialModal.mount();
 
@@ -161,7 +163,6 @@ export class StopsMapApp {
       this.setupEventListeners();
       this.setupMapListeners();
 
-      // ── Iniciar MQTT ────────────────────────────────────────────────────────
       if (REALTIME_BUSES_ENABLED) {
         this._startMqtt();
       }
@@ -172,23 +173,21 @@ export class StopsMapApp {
       this.loadingOverlay.remove();
       this.loadingOverlay = null;
 
-      // Mostrar tutorial na primeira visita
       this.tutorialModal.showIfFirstVisit();
 
     } catch (error) {
-      console.error('\u274C Erro na inicializa\u00e7\u00e3o:', error);
+      console.error('❌ Erro na inicialização:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();
-      this.showError('Erro ao inicializar aplica\u00e7\u00e3o');
+      this.showError('Erro ao inicializar aplicação');
     }
   }
 
   // ── MQTT ───────────────────────────────────────────────────────────────────
 
   _startMqtt() {
-    // Banner: broker ligado mas sem dados em 15s
     eventBus.on('mqtt:noDataTimeout', () => {
       AnnouncementBanner.show(
-        '\u26A0\uFE0F Os dados de localização em tempo real não estão disponíveis de momento. ' +
+        '⚠️ Os dados de localização em tempo real não estão disponíveis de momento. ' +
         'Isto é uma falha no serviço externo — o teu dispositivo e rede estão OK.',
         { type: 'warning', id: this._noDataBannerId, dismissible: true }
       );
@@ -199,14 +198,13 @@ export class StopsMapApp {
     });
 
     mqttVehicleService.start({
-      onVehicleUpdate: (vehicle) => this._handleMqttVehicleUpdate(vehicle),
+      // NOTA: o argumento `vehicle` JÁ está processado (formato interno com
+      // latitude/longitude). O mqttVehicleService chama processBusData()
+      // internamente antes de chamar este callback.
+      onVehicleUpdate:  (vehicle)   => this._handleMqttVehicleUpdate(vehicle),
       onVehicleExpired: (vehicleId) => this._handleMqttVehicleExpired(vehicleId),
-      onConnected: () => {
-        this._mqttActive = true;
-      },
-      onDisconnected: () => {
-        this._mqttActive = false;
-      },
+      onConnected:      ()          => { this._mqttActive = true; },
+      onDisconnected:   ()          => { this._mqttActive = false; },
     }).catch(err => {
       console.error('❌ Falha ao iniciar MQTT:', err);
       this._mqttActive = false;
@@ -216,42 +214,41 @@ export class StopsMapApp {
   /**
    * Chamado pelo MQTT para cada actualização de posição de veículo.
    *
-   * FIX: os veículos do MQTT chegam em formato bruto { lat, lng, routeId... }.
-   * Antes de os passar ao BusMarkerManager (que espera { latitude, longitude... }),
-   * é obrigatório chamá-los através de vehicleService.processBusData().
-   *
-   * Além disso, actualiza sempre o marcador (upsert) em vez de só actualizar
-   * os que já existiam — o BusMarkerManager._upsertMarker() garante deduplicação.
+   * IMPORTANTE: `vehicle` já está no formato processado { latitude, longitude,
+   * line, displayLine, direction, tripId, ... } — NÃO chamar processBusData()
+   * novamente ou o objecto ficará null (não tem lat/lng nem location.value).
    */
   _handleMqttVehicleUpdate(vehicle) {
-    if (!this.currentStopId || !this.busMarkerManager) return;
-
-    // Processar o veículo bruto para o formato interno { latitude, longitude... }
-    const processed = vehicleService.processBusData(vehicle);
-    if (!processed) return;
-
-    // Upsert: criar ou mover o marcador (deduplicação interna no BusMarkerManager)
-    this.busMarkerManager.updateSingleBusMarker(processed);
-
-    // Manter lista de posições visíveis actualizada
-    const ll = this.busMarkerManager.markers[processed.id]?.getLatLng();
-    if (ll) {
-      const idx = this.currentBusPositions.findIndex(
-        p => p[0] === ll.lat && p[1] === ll.lng
-      );
-      if (idx === -1) this.currentBusPositions.push([ll.lat, ll.lng]);
+    // Se não há paragem aberta, não há marcadores a actualizar
+    if (!this.currentStopId) {
+      _log(`onVehicleUpdate id:${vehicle.id} linha:${vehicle.displayLine} — sem paragem aberta, ignorado`);
+      return;
     }
+    if (!this.busMarkerManager) {
+      _warn(`onVehicleUpdate id:${vehicle.id} — busMarkerManager ainda não existe`);
+      return;
+    }
+
+    _log(
+      `onVehicleUpdate id:${vehicle.id} linha:${vehicle.displayLine}`,
+      `dir:${vehicle.direction} lat:${vehicle.latitude?.toFixed(5)} lng:${vehicle.longitude?.toFixed(5)}`,
+      `marcadores actuais: ${this.busMarkerManager.getMarkerCount()}`
+    );
+
+    // Passar directamente ao BusMarkerManager — upsert interno garante dedup
+    this.busMarkerManager.updateSingleBusMarker(vehicle);
+
+    _log(`→ marcadores após upsert: ${this.busMarkerManager.getMarkerCount()}`);
   }
 
   /**
    * Chamado pelo TTL do MQTT quando um veículo expira (sem update há 30 s).
-   * Remove o marcador do mapa.
    */
   _handleMqttVehicleExpired(vehicleId) {
     if (!this.busMarkerManager) return;
     if (this.busMarkerManager.markers[vehicleId]) {
+      _log(`TTL expirado: remover marcador id:${vehicleId}`);
       this.busMarkerManager.removeBusMarker(vehicleId);
-      // Remover também da lista de posições visíveis
       this.currentBusPositions = this.busMarkerManager
         .getAllPositions()
         .map(ll => [ll.lat, ll.lng]);
@@ -266,7 +263,7 @@ export class StopsMapApp {
       this.mapManager.updateUserMarker(position);
       this.mapManager.centerOn(position, 15);
     } catch (error) {
-      console.warn('\u26A0\uFE0F N\u00e3o foi poss\u00edvel obter localiza\u00e7\u00e3o:', error.message);
+      console.warn('⚠️ Não foi possível obter localização:', error.message);
       this.mapManager.centerOn([41.1579, -8.6291], 13);
     }
   }
@@ -326,7 +323,7 @@ export class StopsMapApp {
       if (stops.length === 0) { this.stopMarkerManager.clearAllMarkers(); return; }
       this.stopMarkerManager.updateStopMarkers(stops, false, stop => this.handleStopClick(stop));
     } catch (error) {
-      console.error('\u274C Erro ao carregar paragens:', error);
+      console.error('❌ Erro ao carregar paragens:', error);
     } finally {
       this.isLoadingStops = false;
     }
@@ -361,12 +358,10 @@ export class StopsMapApp {
           routes:    stopInfo?.routes    || []
         };
         this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
-        if (!this._lineFilterMode) {
-          await this.loadNearbyStops();
-        }
+        if (!this._lineFilterMode) await this.loadNearbyStops();
         await this.handleStopClick(stop);
       } catch (e) {
-        console.warn('Deep-link: paragem n\u00e3o encontrada', stopId, e);
+        console.warn('Deep-link: paragem não encontrada', stopId, e);
       }
     }
     return true;
@@ -392,7 +387,6 @@ export class StopsMapApp {
       this.lineOverlayManager.clearAll();
       this.stopMarkerManager.clearAllMarkers();
       this._setGlobalFilterBarDisabled(false);
-
       if (this.nextArrivals?.isVisible) {
         this.nextArrivals._renderArrivals();
         this.busMarkerManager.filterByRoutes(new Set());
@@ -504,7 +498,6 @@ export class StopsMapApp {
 
   async loadStopArrivals(stopId, centerMap = false) {
     try {
-      // getNextArrivals devolve sempre um Array simples
       const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60);
 
       if (!arrivals || arrivals.length === 0) {
@@ -514,25 +507,42 @@ export class StopsMapApp {
         return;
       }
 
-      // Usar snapshot MQTT se disponível; caso contrário, fallback ao HTTP
-      const vehicles = REALTIME_BUSES_ENABLED
-        ? (this._mqttActive
-            ? mqttVehicleService.getAllVehicles()
-            : await apiService.fetchBusData())
-        : [];
+      // Obter veículos: snapshot MQTT (já processados) ou fallback HTTP
+      let vehicles = [];
+      if (REALTIME_BUSES_ENABLED) {
+        if (this._mqttActive && mqttVehicleService.hasData()) {
+          vehicles = mqttVehicleService.getAllVehicles();
+          _log(`loadStopArrivals: usando MQTT — ${vehicles.length} veículos em memória`);
+        } else {
+          _log('loadStopArrivals: MQTT sem dados ainda — fallback HTTP');
+          const raw = await apiService.fetchBusData();
+          vehicles = vehicleService.processBusDataBatch(raw);
+          _log(`loadStopArrivals: HTTP devolveu ${vehicles.length} veículos processados`);
+        }
+      }
 
       this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
+
       if (REALTIME_BUSES_ENABLED) {
         await this.updateBusMap(arrivals, vehicles, centerMap);
       }
     } catch (error) {
-      console.error('\u274C Erro ao carregar chegadas:', error);
+      console.error('❌ Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
-      this.showError('Erro ao carregar informa\u00e7\u00f5es da paragem');
+      this.showError('Erro ao carregar informações da paragem');
     }
   }
 
+  /**
+   * Desenha os marcadores de autocarro para as chegadas em tempo real.
+   *
+   * `vehicles` pode ser:
+   *  - Array de veículos já processados (vindo de getAllVehicles() — MQTT)
+   *  - Array de veículos já processados (vindo de processBusDataBatch() — HTTP)
+   * Em ambos os casos, os objectos têm { latitude, longitude, tripId, ... }.
+   * NÃO chamar processBusData() outra vez.
+   */
   async updateBusMap(arrivals, vehicles, centerMap = false) {
     if (!arrivals || arrivals.length === 0) {
       this.busMarkerManager.clearAllMarkers();
@@ -540,35 +550,63 @@ export class StopsMapApp {
       return;
     }
 
+    _log(`updateBusMap: ${arrivals.length} chegadas, ${vehicles.length} veículos disponíveis`);
+
     const busesToShow  = [];
     const busPositions = [];
 
-    // Recolher tripIds de chegadas com is_realtime para lookup directo via MQTT
+    // Índice de veículos por tripId para lookup O(1)
+    // Os veículos já processados têm o campo `tripId` directamente.
+    const vehiclesByTripId = new Map();
+    for (const v of vehicles) {
+      if (v.tripId) vehiclesByTripId.set(v.tripId, v);
+    }
+
+    // Índice directo MQTT por tripId (mais fiável — usa scheduleService para match)
     const realtimeTripIds = arrivals
       .filter(a => a.is_realtime && a.trip_id)
       .map(a => a.trip_id);
+    const mqttDirect = REALTIME_BUSES_ENABLED
+      ? mqttVehicleService.getVehiclesByTripIds(realtimeTripIds)
+      : [];
+    const mqttByTripId = new Map(mqttDirect.map(v => [v.tripId, v]));
 
-    // Mapa tripId → veículo MQTT para lookup O(1)
-    const mqttByTripId = new Map(
-      mqttVehicleService.getVehiclesByTripIds(realtimeTripIds)
-        .map(v => [v.tripId, v])
-    );
+    _log(`updateBusMap: ${realtimeTripIds.length} chegadas RT, ${mqttDirect.length} veículos MQTT por tripId`);
+
+    let matched = 0, notFound = 0;
 
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
 
-      // Tentar primeiro lookup directo por tripId no MQTT (mais fiável)
-      let rawVehicle = arrival.trip_id ? mqttByTripId.get(arrival.trip_id) : null;
+      const arrTripId = arrival.trip_id;
+      _log(`  chegada linha:${arrival.route_short_name || arrival.route_id} tripId:${arrTripId} is_realtime:true`);
 
-      // Fallback: procura no array vehicles (HTTP ou MQTT getAllVehicles)
-      if (!rawVehicle) {
-        rawVehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
+      // 1) Lookup directo MQTT
+      let processedBus = arrTripId ? mqttByTripId.get(arrTripId) : null;
+
+      // 2) Lookup no índice de veículos processados (por tripId exacto)
+      if (!processedBus && arrTripId) {
+        processedBus = vehiclesByTripId.get(arrTripId);
+        if (processedBus) _log(`    → match por tripId exacto`);
       }
 
-      if (!rawVehicle) continue;
+      // 3) Fallback: vehicleService.matchVehicleToTrip (ignora nr_viagem)
+      if (!processedBus) {
+        const matched3 = vehicleService.matchVehicleToTrip(vehicles, arrTripId);
+        if (matched3) {
+          processedBus = matched3;
+          _log(`    → match por matchVehicleToTrip (fuzzy)`);
+        }
+      }
 
-      const processedBus = vehicleService.processBusData(rawVehicle);
-      if (!processedBus) continue;
+      if (!processedBus) {
+        _warn(`    → sem veículo para tripId:${arrTripId} linha:${arrival.route_short_name || arrival.route_id}`);
+        notFound++;
+        continue;
+      }
+
+      matched++;
+      _log(`    → veículo encontrado id:${processedBus.id} lat:${processedBus.latitude?.toFixed(5)} lng:${processedBus.longitude?.toFixed(5)}`);
 
       busesToShow.push(processedBus);
       busPositions.push([processedBus.latitude, processedBus.longitude]);
@@ -580,12 +618,16 @@ export class StopsMapApp {
       this.busMarkerManager.setRouteForMarker(processedBus.id, routeNum);
     }
 
+    _log(`updateBusMap: ${matched} matched, ${notFound} sem veículo`);
+
     if (busesToShow.length === 0) {
+      _warn('updateBusMap: nenhum veículo para mostrar — marcadores limpos');
       this.busMarkerManager.clearAllMarkers();
       this.currentBusPositions = [];
       return;
     }
 
+    _log(`updateBusMap: a chamar updateBusMarkers com ${busesToShow.length} veículo(s)`);
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this.currentBusPositions = busPositions;
 
@@ -609,12 +651,8 @@ export class StopsMapApp {
   /**
    * Callback do filtro de linhas no painel de chegadas.
    *
-   * FIX — direcção do shape:
-   *  Para cada linha seleccionada, determina qual a direcção correcta a desenhar:
-   *  1. Pede as paragens da direcção 0 para essa linha.
-   *  2. Verifica se a paragem actual (currentStopId) está na lista.
-   *  3. Se não estiver → usa direcção 1 (que é onde a paragem deve estar).
-   *  Desta forma o shape desenhado inclui sempre a paragem em causa.
+   * Determina a direcção correcta verificando se currentStopId existe nas
+   * paragens da direcção 0 — se não existir, usa direcção 1.
    */
   async handleArrivalFilterChange(selectedRoutes) {
     const effectiveFilter = selectedRoutes.size > 0
@@ -628,11 +666,9 @@ export class StopsMapApp {
     if (selectedRoutes.size === 0 && !routeFilterState.hasActive()) {
       this.lineOverlayManager.clearAll();
     } else {
-      const sourceRoutes = selectedRoutes.size > 0 ? selectedRoutes : routeFilterState.selectedRoutes;
+      const sourceRoutes    = selectedRoutes.size > 0 ? selectedRoutes : routeFilterState.selectedRoutes;
       const availableRoutes = this.nextArrivals?.availableRoutes || [];
 
-      // Determinar a direcção correcta para cada linha verificando se a
-      // paragem actual existe nas paragens da direcção 0.
       const routeObjsPromises = availableRoutes
         .filter(r => sourceRoutes.has(r.number))
         .map(async r => {
@@ -646,8 +682,9 @@ export class StopsMapApp {
               if (!stopIds0.includes(String(this.currentStopId))) {
                 direction = 1;
               }
-            } catch {
-              // em caso de erro mantém direcção 0
+              _log(`handleArrivalFilterChange linha:${routeId} paragem:${this.currentStopId} dir0 tem ${stopIds0.length} paragens → usar dir:${direction}`);
+            } catch (e) {
+              _warn(`handleArrivalFilterChange: erro ao obter paragens dir0 para linha ${routeId}`, e);
             }
           }
 
@@ -753,7 +790,7 @@ export class StopsMapApp {
   }
 
   showError(message) {
-    console.error('\u274C', message);
+    console.error('❌', message);
     const el = document.getElementById('error-message');
     if (el) { el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 5000); }
   }
