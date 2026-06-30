@@ -378,19 +378,19 @@ export class NextArrivals {
     // ── Status line — label SEMPRE a preto, só o delay colorido ──────────
     let statusHtml = '';
     if (!isRealtime) {
-      statusHtml = '<span class="delay-label" style="color:#1a1a1a;">Planeado</span>';
+      statusHtml = '<span class="delay-label" style="color:#424242;">Planeado - localização desconhecida</span>';
     } else if (status === 'ON_TIME') {
-      statusHtml = '<span class="delay-label" style="color:#1a1a1a;">No horário previsto</span>';
+      statusHtml = '<span class="delay-label" style="color:#424242;">No horário previsto</span>';
     } else if (status === 'EARLY') {
       const colorCls = 'delay-green';
       const diff     = formatDelay(delayS);
-      statusHtml = `<span class="delay-label" style="color:#1a1a1a;">Adiantado <strong class="${colorCls}">${diff}</strong></span>`;
+      statusHtml = `<span class="delay-label" style="color:#424242;">Adiantado <strong class="${colorCls}">${diff}</strong></span>`;
     } else if (status === 'DELAYED') {
       const colorCls = delayColorClass(status, delayS);
       const diff     = formatDelay(delayS);
-      statusHtml = `<span class="delay-label" style="color:#1a1a1a;">Atrasado <strong class="${colorCls}">${diff}</strong></span>`;
+      statusHtml = `<span class="delay-label" style="color:#424242;">Atrasado <strong class="${colorCls}">${diff}</strong></span>`;
     } else {
-      statusHtml = `<span class="delay-label" style="color:#1a1a1a;">${statusLabel(status)}</span>`;
+      statusHtml = `<span class="delay-label" style="color:#424242;">${statusLabel(status)}</span>`;
     }
 
 // ── Tempo de chegada — verde=realtime, preto=planeado ────────────────

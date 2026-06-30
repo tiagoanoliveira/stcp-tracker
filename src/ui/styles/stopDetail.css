@@ -325,7 +325,10 @@
 
 /* ── Delay colours ── */
 .delay-green  { color: #22C55E; }
-.delay-yellow { color: #F59E0B; }
+.delay-yellow {
+  background-color: #ffcb71;
+  color: #F59E0B;
+}
 .delay-red    { color: #EF4444; }
 
 .delay-label {
