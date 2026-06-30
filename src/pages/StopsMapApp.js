@@ -764,7 +764,7 @@ export class StopsMapApp {
 
     if (positions.length === 1) {
       // offset positivo → desloca o centro para baixo → marcador sobe na janela
-      const offsetY = Math.round(panelH * 0.6);
+      const offsetY = Math.round(panelH * 0.4);
       this.mapManager.centerOnWithOffset(positions[0], 17, offsetY);
       return;
     }
