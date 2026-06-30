@@ -323,7 +323,7 @@ export class NextArrivals {
    * Estratégia (por ordem de precisão):
    *   1. trip_id exacto
    *   2. trip_id sem prefixo feed ("2:LINE_..." → "LINE_...")
-   *   3. Match por linha + direcção (fallback quando os trip_ids divergem)
+   *   3. Match por linha (fallback quando os trip_ids divergem)
    *
    * Os veículos em allVehicles já estão no formato processado
    * (têm .tripId directamente) e têm .latitude/.longitude.
@@ -349,16 +349,14 @@ export class NextArrivals {
       if (byTrip) return byTrip;
     }
 
-    // 3. Fallback: linha + direcção (vários veículos podem corresponder — pegar o mais próximo)
+    // 3. Fallback: apenas por linha (vários veículos podem corresponder — pegar o primeiro)
+    //    Não usar direcção aqui: a direcção dos veículos processados pode estar undefined.
     if (arrLine) {
       const byLine = this.allVehicles.filter(v => {
         const vLine = String(v.displayLine || v.line || '');
         return vLine === arrLine;
       });
-      if (byLine.length === 1) return byLine[0];
-      // Se há vários veículos da mesma linha, escolher o que tem arrival_seconds mais baixo
-      // como heurística de "mais próximo" — não é perfeito mas é melhor que nada
-      if (byLine.length > 1) return byLine[0];
+      if (byLine.length >= 1) return byLine[0];
     }
 
     return null;
@@ -375,25 +373,25 @@ export class NextArrivals {
       vehicleService.extractVehicleLocation(vehicle) !== null;
     const locationIcon = hasLocation ? this.getActiveLocationIcon() : this.getInactiveLocationIcon();
 
-    // ── Status line — label SEMPRE a preto, só o delay colorido ──────────
+    // ── Status line — label SEMPRE a preto, só o delay como badge colorido ───
     let statusHtml = '';
     if (!isRealtime) {
-      statusHtml = '<span class="delay-label" style="color:#424242;">Planeado - localização desconhecida</span>';
+      statusHtml = '<span class="delay-label">Planeado - localização desconhecida</span>';
     } else if (status === 'ON_TIME') {
-      statusHtml = '<span class="delay-label" style="color:#424242;">No horário previsto</span>';
+      statusHtml = '<span class="delay-label">No horário previsto</span>';
     } else if (status === 'EARLY') {
       const colorCls = 'delay-green';
       const diff     = formatDelay(delayS);
-      statusHtml = `<span class="delay-label" style="color:#424242;">Adiantado <strong class="${colorCls}">${diff}</strong></span>`;
+      statusHtml = `<span class="delay-label">Adiantado <span class="delay-badge ${colorCls}">${diff}</span></span>`;
     } else if (status === 'DELAYED') {
       const colorCls = delayColorClass(status, delayS);
       const diff     = formatDelay(delayS);
-      statusHtml = `<span class="delay-label" style="color:#424242;">Atrasado <strong class="${colorCls}">${diff}</strong></span>`;
+      statusHtml = `<span class="delay-label">Atrasado <span class="delay-badge ${colorCls}">${diff}</span></span>`;
     } else {
-      statusHtml = `<span class="delay-label" style="color:#424242;">${statusLabel(status)}</span>`;
+      statusHtml = `<span class="delay-label">${statusLabel(status)}</span>`;
     }
 
-// ── Tempo de chegada — verde=realtime, preto=planeado ────────────────
+    // ── Tempo de chegada — verde=realtime, preto=planeado ─────────────────────
     const timeColorCls = isRealtime ? 'arrival-time-realtime' : '';
     const timeHtml     = `<div class="arrival-time ${timeColorCls}">${this._formatArrivalTime(arrival)}</div>`;
 
@@ -403,7 +401,7 @@ export class NextArrivals {
 
     if (hasLocation) {
       const location = vehicleService.extractVehicleLocation(vehicle);
-      div.style.cursor = 'pointer';
+      div.classList.add('arrival-item--clickable');
       div.setAttribute('data-vehicle-id', vehicle.id);
       div.addEventListener('click', () => {
         if (this.onArrivalClickCallback) this.onArrivalClickCallback({ vehicleId: vehicle.id, location, arrival });

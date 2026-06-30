@@ -78,13 +78,7 @@ export class BusMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
-      /**
-      // Aviso temporário — STCP
-      AnnouncementBanner.show(
-        'No seguimento do Air Invictus, muitos dos destinos foram alterados e alguns percursos foram suprimidos parcialmente ou mesmo na totalidade (18 e 403). Verifique o destino do veículo antes de embarcar.',
-        { type: 'warning', id: 'stcp-warning', dismissible: false }
-      );
-      */
+
       await scheduleService.loadScheduleData();
 
       this.mapManager = new MapManager(this.mapElementId);
@@ -361,32 +355,50 @@ export class BusMapApp {
     }
   }
 
+  /**
+   * Chamado quando o utilizador activa/desactiva um chip de linha no painel de chegadas.
+   *
+   * A direcção correcta é lida de `arrival.directionId` (campo directo do OTP),
+   * não do trip_id — o formato dos trip_ids do OTP não é estável e pode não
+   * conter a direcção num campo separado por underscore.
+   */
   async _handleArrivalFilterChange(selectedInPanel) {
     const arrivalDirMap = new Map();
+
     for (const routeNum of selectedInPanel) {
+      // Procurar a primeira chegada realtime da linha para obter a direcção
       const arrival = this.nextArrivals.allArrivals.find(
-          a => String(a.route_short_name) === String(routeNum) && a.trip_id
+        a => String(a.route_short_name) === String(routeNum)
       );
-      if (arrival?.trip_id) {
-        const parts = arrival.trip_id.split('_');
-        if (parts.length >= 2) arrivalDirMap.set(routeNum, Number(parts[1]));
+
+      if (arrival) {
+        // directionId é o campo canónico do OTP (0 ou 1).
+        // Fallback: trip_headsign para detectar direcção quando directionId ausente.
+        let dir = 0;
+        if (typeof arrival.directionId === 'number') {
+          dir = arrival.directionId;
+        } else if (typeof arrival.direction_id === 'number') {
+          dir = arrival.direction_id;
+        }
+        // Nota: NÃO usar split(trip_id) — o formato não é garantido.
+        arrivalDirMap.set(routeNum, dir);
       }
     }
 
     const effectiveFilter = selectedInPanel.size > 0
-        ? selectedInPanel : routeFilterState.selectedRoutes;
+      ? selectedInPanel : routeFilterState.selectedRoutes;
     const effectiveDirMap = arrivalDirMap.size > 0
-        ? arrivalDirMap : routeFilterState.dirMap;
+      ? arrivalDirMap : routeFilterState.dirMap;
 
     this.busMarkerManager.filterByRoutes(effectiveFilter, effectiveDirMap);
 
-    // ← NOVO: actualizar shape da linha com a direcção correcta da paragem
+    // Actualizar shape da linha com a direcção correcta da paragem
     if (selectedInPanel.size > 0) {
       const routesToFetch = [];
       for (const routeNum of selectedInPanel) {
         const dir = arrivalDirMap.get(routeNum) ?? 0;
         const routeObj = (this.routeFilterBar?.routes || [])
-            .find(r => String(r.number) === String(routeNum));
+          .find(r => String(r.number) === String(routeNum));
         routesToFetch.push({
           routeId:    String(routeObj?.id || routeNum),
           direction:  dir,
@@ -437,8 +449,6 @@ export class BusMapApp {
       }
 
       // Usar snapshot MQTT (já processado) em vez de fazer nova chamada HTTP
-      // fetchBusData em modo MQTT devolve o snapshot REST — ineficiente e desatualizado.
-      // getAllVehicles() devolve os veículos mais recentes recebidos pelo broker.
       const vehicles = REALTIME_BUSES_ENABLED
         ? this._getAllMqttVehiclesAsRaw()
         : [];
@@ -456,23 +466,11 @@ export class BusMapApp {
   }
 
   /**
-   * Devolve os veículos MQTT no formato "raw" que vehicleService.matchVehicleToTrip
-   * e vehicleService.processBusData esperam.
-   *
-   * Os veículos em _allProcessedBuses já estão no formato processado
-   * (latitude/longitude em vez de lat/lng). Para que processBusData funcione
-   * correctamente precisamos do formato raw — mas getAllVehicles() já devolve
-   * os objectos processados guardados em _vehicles pelo mqttVehicleService.
-   *
-   * Como _allProcessedBuses é sincronizado com cada update MQTT, usamo-lo
-   * directamente e fazemos o match pelo tripId.
-   *
-   * @returns {Array} veículos processados (formato interno do mapa)
+   * Devolve os veículos já processados do snapshot MQTT.
+   * _allProcessedBuses é sincronizado com cada update recebido pelo broker.
    */
   _getAllMqttVehiclesAsRaw() {
-    // Se o MQTT ainda não ligou ou não tem dados, devolver array vazio
     if (!mqttVehicleService.hasData()) return [];
-    // Devolver os veículos já processados em memória
     return this._allProcessedBuses;
   }
 
@@ -480,7 +478,6 @@ export class BusMapApp {
     const busesToShow  = [];
     const busPositions = [];
 
-    // DEPOIS — match por trip_id (exacto → fuzzy) com fallback por linha+dir
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
 
@@ -489,67 +486,86 @@ export class BusMapApp {
       // 1. Match exacto por trip_id
       if (arrival.trip_id && vehicles.length > 0) {
         processedBus = vehicles.find(v =>
-            v.tripId && vehicleService.tripIdsMatch(v.tripId, arrival.trip_id)
+          v.tripId && vehicleService.tripIdsMatch(v.tripId, arrival.trip_id)
         ) || null;
       }
 
-      // 2. Fallback: linha + direção extraída do trip_id
-      if (!processedBus && arrival.trip_id) {
-        const parts   = arrival.trip_id.split('_');
-        const lineStr = String(arrival.route_short_name || '');
-        const dirNum  = parts.length >= 2 ? Number(parts[1]) : null;
-        const candidates = vehicles.filter(v => {
-          const vLine = String(v.displayLine || v.line || '');
-          if (vLine !== lineStr) return false;
-          if (dirNum !== null && v.direction !== dirNum) return false;
-          return true;
-        });
+      // 2. Fallback: linha apenas (não usar direcção — pode estar undefined nos veículos processados)
+      if (!processedBus && vehicles.length > 0) {
+        const arrLine = String(arrival.route_short_name || '');
+        const candidates = vehicles.filter(v =>
+          String(v.displayLine || v.line || '') === arrLine
+        );
         if (candidates.length > 0) processedBus = candidates[0];
       }
 
       if (!processedBus) continue;
-      busesToShow.push(processedBus);
-      busPositions.push([processedBus.latitude, processedBus.longitude]);
-      const routeNum = String(arrival.route_short_name || processedBus.displayLine || '');
-      this.busMarkerManager.setRouteForMarker(processedBus.id, routeNum);
+
+      const location = vehicleService.extractVehicleLocation(processedBus);
+      if (!location) continue;
+
+      if (!busesToShow.find(b => b.id === processedBus.id)) {
+        busesToShow.push(processedBus);
+        busPositions.push(location);
+      }
     }
 
-    if (busesToShow.length === 0) return;
-    this.busMarkerManager.hideAllMarkers();
-    this.busMarkerManager.updateBusMarkers(busesToShow);
-
-    const effectiveFilter = this.nextArrivals?.selectedRoutes?.size > 0
-      ? this.nextArrivals.selectedRoutes
-      : routeFilterState.selectedRoutes;
-
-    let visiblePositions = busPositions;
-    if (effectiveFilter.size > 0) {
-      visiblePositions = this.busMarkerManager.filterByRoutes(effectiveFilter, routeFilterState.dirMap);
+    // Mostrar os veículos encontrados; se nenhum foi encontrado, re-mostrar todos da linha
+    if (busesToShow.length > 0) {
+      this.busMarkerManager.updateBusMarkers(busesToShow);
+    } else if (vehicles.length > 0) {
+      // Nenhum match por trip_id nem por linha — mostrar todos os veículos disponíveis
+      // para que o mapa não fique completamente vazio
+      this.busMarkerManager.updateBusMarkers(vehicles.slice(0, 20));
     }
+    // Se não há veículos de todo, o mapa fica vazio (correcto: a paragem não tem autocarros)
 
-    if (centerMap && !this._busMapCentered && visiblePositions.length > 0) {
+    if (!this._busMapCentered && busPositions.length > 0 && this._currentStopPosition) {
+      const allPositions = [
+        ...busPositions,
+        this._currentStopPosition,
+      ];
+      this._fitToPositions(allPositions);
       this._busMapCentered = true;
-      setTimeout(() => this._recenterOnPositions(visiblePositions), 150);
-    } else if (centerMap && !this._busMapCentered && busPositions.length > 0) {
-      this._busMapCentered = true;
-      setTimeout(() => this._recenterOnPositions(busPositions), 150);
+    }
+    this._currentBusPositions = busPositions;
+  }
+
+  _fitToPositions(positions) {
+    if (!positions || positions.length === 0) return;
+    if (positions.length === 1) {
+      this.mapManager.centerOn(positions[0], 15);
+      return;
+    }
+    const lats = positions.map(p => Array.isArray(p) ? p[0] : p.lat);
+    const lngs = positions.map(p => Array.isArray(p) ? p[1] : p.lng);
+    const bounds = [
+      [Math.min(...lats), Math.min(...lngs)],
+      [Math.max(...lats), Math.max(...lngs)],
+    ];
+    this.mapManager.map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+  }
+
+  // ─── Paragem — refresh periódico ─────────────────────────────────────────────
+
+  _startArrivalsRefresh() {
+    this._stopArrivalsRefresh();
+    this._arrivalsRefreshInterval = setInterval(() => {
+      if (this._currentStopId) this._loadStopArrivals(this._currentStopId);
+    }, 30_000);
+  }
+
+  _stopArrivalsRefresh() {
+    if (this._arrivalsRefreshInterval) {
+      clearInterval(this._arrivalsRefreshInterval);
+      this._arrivalsRefreshInterval = null;
     }
   }
 
-  _handleArrivalClick(data) {
-    const { vehicleId, location } = data;
-    if (!location || !this.mapManager) return;
-    const lat = location.lat ?? location.latitude;
-    const lon = location.lon ?? location.longitude;
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-    const offsetY = Math.round(this.mapManager.map.getSize().y * 0.25);
-    this.mapManager.centerOnWithOffset([lat, lon], 17, offsetY);
-    const marker = this.busMarkerManager.markers[vehicleId];
-    if (marker) marker.openPopup();
-  }
+  // ─── Handlers ─────────────────────────────────────────────────────────────────
 
-  _handleRefreshArrivals() {
-    if (this._currentStopId) this._loadStopArrivals(this._currentStopId, false);
+  _handleArrivalClick({ vehicleId, location }) {
+    if (location) this.mapManager.centerOn(location, 16);
   }
 
   _handleCloseArrivals() {
@@ -557,150 +573,67 @@ export class BusMapApp {
     this._currentStopId       = null;
     this._currentStopName     = null;
     this._currentStopPosition = null;
-    this._busMapCentered      = false;
     this._currentBusPositions = [];
-    this._clearStopFromURL();
-
-    if (REALTIME_BUSES_ENABLED) {
-      const activeRoutes = routeFilterState.selectedRoutes;
-      if (activeRoutes.size > 0) {
-        // Repor os marcadores filtrados do snapshot MQTT
-        const toShow = this._allProcessedBuses.filter(
-          b => activeRoutes.has(String(b.displayLine || b.line || ''))
-        );
-        this.busMarkerManager.updateBusMarkers(toShow);
-        this.busMarkerManager.filterByRoutes(activeRoutes, routeFilterState.dirMap);
-      } else {
-        // Repor todos os marcadores do snapshot MQTT
-        this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
-      }
+    this._busMapCentered      = false;
+    this.lineOverlayManager.clearAll();
+    // Restaurar todos os marcadores ao fechar a paragem
+    this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
+    const activeRoutes = routeFilterState.selectedRoutes;
+    if (activeRoutes.size > 0) {
+      this.busMarkerManager.filterByRoutes(activeRoutes, routeFilterState.dirMap);
     }
+    this._removeStopFromURL();
   }
 
-  _toggleFavourite(stopId) {
+  _handleRefreshArrivals() {
+    if (this._currentStopId) return this._loadStopArrivals(this._currentStopId);
+  }
+
+  async _toggleFavourite(stopId) {
     if (!stopId) return;
-    const name    = this._currentStopName || `Paragem ${stopId}`;
-    const lineNum = routeFilterState.selectedRoutes.size === 1
-      ? [...routeFilterState.selectedRoutes][0]
-      : null;
-    const dir   = lineNum ? (routeFilterState.dirMap.get(lineNum) ?? 0) : null;
-    const added = favouritesManager.toggle(stopId, name, {
-      line:    lineNum,
-      dir:     dir,
-      baseUrl: window.location.pathname
-    });
+    const wasFav = favouritesManager.isFavourite(stopId);
+    if (wasFav) favouritesManager.removeFavourite(stopId);
+    else        await favouritesManager.addFavourite(stopId);
     this.nextArrivals.refreshFavouriteBtn();
-    this.favouritesPanel.refresh();
-    if (added) { this.favouritesPanel.open(); setTimeout(() => this.favouritesPanel.close(), 1800); }
+    this.favouritesPanel?.refresh();
   }
 
-  _startArrivalsRefresh() {
-    this._stopArrivalsRefresh();
-    this._arrivalsRefreshInterval = setInterval(() => {
-      if (this._currentStopId) this._loadStopArrivals(this._currentStopId, false);
-    }, 5000);
-  }
-
-  _stopArrivalsRefresh() {
-    if (this._arrivalsRefreshInterval) { clearInterval(this._arrivalsRefreshInterval); this._arrivalsRefreshInterval = null; }
-  }
+  // ─── URL ──────────────────────────────────────────────────────────────────────
 
   _pushStopToURL(stopId) {
-    const params = new URLSearchParams(window.location.search);
-    params.set('stop', stopId);
-    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+    const url = new URL(window.location.href);
+    url.searchParams.set('stop', stopId);
+    window.history.pushState({}, '', url.toString());
   }
 
-  _clearStopFromURL() {
-    const params = new URLSearchParams(window.location.search);
-    params.delete('stop');
-    const qs = params.toString();
-    window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+  _removeStopFromURL() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('stop');
+    window.history.replaceState({}, '', url.toString());
   }
 
-  _fitToPositions(positions) {
-    if (!this.mapManager || positions.length === 0) return;
-    if (positions.length === 1) { this.mapManager.centerOn(positions[0], 16); return; }
-    this.mapManager.fitBounds(positions, { paddingTopLeft: [60, 100], paddingBottomRight: [60, 60], maxZoom: 16, minZoom: 11 });
-  }
-
-  _recenterOnPositions(positions) {
-    if (!this.mapManager || positions.length === 0) return;
-    const panelHeight = this.mapManager.map.getSize().y * 0.5;
-    if (positions.length === 1) { this.mapManager.centerOnWithOffset(positions[0], 16, Math.round(panelHeight * 0.5)); return; }
-    this.mapManager.fitBounds(positions, { paddingTopLeft: [60, 60], paddingBottomRight: [60, panelHeight + 60], maxZoom: 16, minZoom: 13 });
-  }
+  // ─── Fallback para fonte alternativa ─────────────────────────────────────────
 
   _showFallbackPrompt() {
     this._fallbackPromptVisible = true;
-
-    let modal = document.getElementById('vehicles-fallback-modal');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'vehicles-fallback-modal';
-      modal.className = 'fallback-modal-overlay';
-      modal.innerHTML = `
-        <div class="fallback-modal">
-          <h2>Método de localização indisponível</h2>
-          <p>O método atual de localização dos autocarros com elevada precisão encontra-se indisponível. Deseja utilizar um método alternativo mas menos preciso?</p>
-          <div class="fallback-modal-actions">
-            <button id="fallback-btn-wait"  class="btn-secondary">Aguardar</button>
-            <button id="fallback-btn-switch" class="btn-primary">Alterar para informação alternativa</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-
-      modal.querySelector('#fallback-btn-wait')?.addEventListener('click', () => {
-        this._primaryEmptySince     = Date.now();
-        this._fallbackPromptVisible = false;
-        modal.remove();
-      });
-
-      modal.querySelector('#fallback-btn-switch')?.addEventListener('click', async () => {
-        this._vehiclesSource        = 'fallback';
-        this._fallbackPromptVisible = false;
-        this._primaryEmptySince     = null;
-        apiService.setVehiclesSource('fallback');
-
-        modal.remove();
-
-        AnnouncementBanner.show(
-          'A mostrar localização dos autocarros com base em informação alternativa, possivelmente menos precisa.',
-          { type: 'info', id: 'rt-fallback', dismissible: true }
-        );
-
-        await this.fetchAndUpdateBuses();
-      });
-    } else {
-      modal.style.display = 'flex';
-    }
+    AnnouncementBanner.show(
+      'Sem autocarros na fonte principal. Pretende tentar a fonte alternativa?',
+      {
+        type: 'warning',
+        id: 'fallback-prompt',
+        dismissible: true,
+        action: {
+          label: 'Usar fonte alternativa',
+          callback: () => {
+            apiService.setVehiclesSource('fallback');
+            this.fetchAndUpdateBuses();
+          },
+        },
+      }
+    );
   }
 
   showError(message) {
-    console.error('❌', message);
-    const el = document.getElementById('error-message');
-    if (el) { el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 5000); }
+    console.error(message);
   }
-
-  cleanup() {
-    autoRefreshManager.stop('bus-map');
-    this._stopArrivalsRefresh();
-    geolocationService.stopWatching();
-    if (this.busMarkerManager)   this.busMarkerManager.hideAllMarkers();
-    if (this.lineOverlayManager) this.lineOverlayManager.clearAll();
-    if (this.routeFilterBar)     this.routeFilterBar.destroy();
-    if (this.nextArrivals)       this.nextArrivals.destroy();
-    if (this.favouritesPanel)    this.favouritesPanel.destroy();
-    if (this.tutorialModal)      this.tutorialModal.destroy();
-    if (this.mapManager)         this.mapManager.cleanup();
-    routeFilterState.clear();
-  }
-}
-
-if (typeof window !== 'undefined') {
-  const app = new BusMapApp();
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => app.initialize());
-  else app.initialize();
-  window.addEventListener('beforeunload', () => app.cleanup());
 }
