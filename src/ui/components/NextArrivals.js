@@ -409,11 +409,12 @@ export class NextArrivals {
     }
 
     div.innerHTML = `
-      <div class="arrival-line" style="background-color:${busColor};color:${textColor};">
-        ${arrival.route_short_name}
-      </div>
       <div class="arrival-info">
-        <div class="arrival-destination">${arrival.trip_headsign}</div>
+        <div class="arrival-destination">
+            <div class="arrival-line" style="background-color:${busColor};color:${textColor};">
+              ${arrival.route_short_name}
+            </div>
+            ${arrival.trip_headsign}</div>
         <div class="arrival-status">${statusHtml}</div>
       </div>
       <div class="arrival-time-container">
