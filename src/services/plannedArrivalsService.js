@@ -6,39 +6,42 @@
  *   OTP Porto Digital (GraphQL) e API Realtime STCP são chamados SEMPRE em
  *   paralelo. O resultado é cruzado para obter o máximo de tempos reais:
  *
- *     - Se apenas o OTP responde  → usar dados OTP.
- *     - Se apenas a realtime responde  → usar dados realtime.
- *     - Se ambos respondem  → merge por route_short_name:
+ *     - Se apenas o OTP responde         → usar dados OTP.
+ *     - Se apenas a realtime responde    → usar dados realtime.
+ *     - Se ambos respondem               → merge por route_short_name ±2 min:
  *         · Estrutura base vem do OTP (trip_id, headsign, etc.).
- *         · delay e tempo real (is_realtime, realtime_arrival) são
- *           substituídos pelos da API realtime quando disponíveis
- *           (geralmente mais frescos/precisos).
+ *         · delay e realtime_arrival substituídos pelos da API.
+ *     - Chegadas realtime sem match OTP  → SEMPRE adicionadas (veículos que
+ *         a API conhece mas o OTP ainda não tem posição).
  *
- *   A API realtime tem um timeout de 3 segundos; se demorar mais,
- *   usa-se apenas o OTP.
+ *   A API realtime tem timeout de 3 s; se demorar mais, usa-se apenas OTP.
  *
  * Cache:
- *   TTL de 4s — ligeiramente inferior ao intervalo de refresh (5s) para
- *   garantir que cada ciclo faz um fetch real à rede.
- *   O botão de refresh chama getNextArrivals() com forceRefresh=true
- *   para forçar fetch imediato independentemente do TTL.
+ *   TTL de 4 s — ligeiramente inferior ao intervalo de refresh (5 s).
+ *   forceRefresh=true ignora o cache completamente (botão + intervalo de 5 s).
  *
- * Mapeamento de IDs:
- *   stop_id   (ex: "200012") — ID numérico interno (FIWARE / API STCP)
- *   stop_code (ex: "BS1")   — código alfanumérico exigido pelo OTP Porto Digital
+ * Debug:
+ *   Activar: localStorage.setItem('ARRIVALS_DEBUG', '1') + recarregar
+ *   Desactivar: localStorage.removeItem('ARRIVALS_DEBUG')
  */
 
 import { otpService }  from './otpService.js';
 import { stopService } from './stopService.js';
 import { apiService }  from '../core/apiService.js';
 
-const _cache               = new Map();
-const CACHE_TTL            = 4_000;   // ms — < intervalo de refresh (5s)
-const REALTIME_TIMEOUT_MS  = 3_000;   // ms — timeout da API realtime
+const _cache              = new Map();
+const CACHE_TTL           = 4_000;  // ms
+const REALTIME_TIMEOUT_MS = 3_000;  // ms
 
-/**
- * Resolve o stop_code alfanumérico necessário pelo OTP.
- */
+// ── Debug ────────────────────────────────────────────────────────────────────
+const _dbg  = () => { try { return localStorage.getItem('ARRIVALS_DEBUG') === '1'; } catch { return false; } };
+const _log  = (...a) => { if (_dbg()) console.log ('%c[ARRIVALS]', 'color:#006494;font-weight:bold', ...a); };
+const _warn = (...a) => { if (_dbg()) console.warn('%c[ARRIVALS]', 'color:#964219;font-weight:bold', ...a); };
+// Sempre visível (erros e avisos críticos)
+const _info = (...a) => console.info('%c[ARRIVALS]', 'color:#437a22;font-weight:bold', ...a);
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 async function _resolveStopCode(stopId) {
   const cached = stopService.getStopById(stopId);
   if (cached?.stop_code) return cached.stop_code;
@@ -49,9 +52,6 @@ async function _resolveStopCode(stopId) {
   return stopId;
 }
 
-/**
- * Wraps uma promise com timeout.
- */
 function _withTimeout(promise, ms) {
   return Promise.race([
     promise,
@@ -62,27 +62,30 @@ function _withTimeout(promise, ms) {
 }
 
 /**
- * Normaliza um array de chegadas.
+ * Normaliza uma chegada para campos canónicos.
+ * O spread dos campos originais vem PRIMEIRO para que os overrides
+ * explícitos abaixo tenham prioridade sobre valores do objecto original.
  */
-function _normalize(arrivals) {
-  if (!Array.isArray(arrivals)) return [];
-  return arrivals.map(a => ({
+function _normalizeOne(a) {
+  return {
+    ...a,                              // preservar campos extra (e.g. trip_id da api)
     route_short_name:  a.route_short_name  || a.route_number || '',
     trip_id:           a.trip_id           || null,
     headsign:          a.headsign          || a.trip_headsign || '',
     scheduled_arrival: a.scheduled_arrival || a.arrival_time  || null,
     realtime_arrival:  a.realtime_arrival  || null,
     delay:             a.delay             ?? null,
-    is_realtime:       a.is_realtime        || false,
-    directionId:       a.directionId        ?? a.direction_id ?? null,
-    ...a,
-  }));
+    is_realtime:       Boolean(a.is_realtime),
+    directionId:       a.directionId       ?? a.direction_id  ?? null,
+    _source:           a._source           || 'unknown',
+  };
 }
 
-/**
- * Extrai o array de chegadas da resposta da API realtime.
- * Aceita { arrivals: [...] } ou um array directo.
- */
+function _normalize(arrivals) {
+  if (!Array.isArray(arrivals)) return [];
+  return arrivals.map(_normalizeOne);
+}
+
 function _extractRealtimeArrivals(response) {
   if (!response) return [];
   if (Array.isArray(response))          return response;
@@ -90,17 +93,30 @@ function _extractRealtimeArrivals(response) {
   return [];
 }
 
+function _toEpoch(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number')             return value;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
+
 /**
- * Merge das chegadas OTP com as da API realtime.
+ * Merge de chegadas OTP com chegadas da API realtime.
  *
- * Para cada chegada OTP, procura match na realtime pela mesma linha e
- * tempo ±2 min. Se encontrado, substitui delay e realtime_arrival.
- * Chegadas realtime sem match OTP são adicionadas no fim.
+ * Passos:
+ *  1. Para cada chegada OTP tenta match com uma chegada RT da mesma linha ±2 min.
+ *     Se encontrado → substitui delay/realtime_arrival/is_realtime pela RT.
+ *  2. Chegadas RT sem match OTP → adicionadas SEMPRE (podem ser veículos que o
+ *     OTP ainda não tem posição mas a API já reportou).
+ *  3. Resultado ordenado por tempo de chegada.
  */
 function _merge(otpArr, realtimeArr) {
+  // Se uma das fontes está vazia, devolver a outra directamente
+  if (!otpArr.length && !realtimeArr.length) return [];
   if (!otpArr.length)      return realtimeArr;
   if (!realtimeArr.length) return otpArr;
 
+  // Indexar RT por linha para lookup O(1)
   const rtByLine = new Map();
   for (const a of realtimeArr) {
     const key = String(a.route_short_name || '');
@@ -108,36 +124,53 @@ function _merge(otpArr, realtimeArr) {
     rtByLine.get(key).push(a);
   }
 
-  const usedRt = new Set();
+  const usedRtKeys = new Set(); // "lineKey:index"
+
+  // 1. Iterar chegadas OTP e tentar enriquecer com RT
   const merged = otpArr.map(otp => {
-    const key       = String(otp.route_short_name || '');
-    const rtOptions = rtByLine.get(key) || [];
+    const lineKey   = String(otp.route_short_name || '');
+    const rtOptions = rtByLine.get(lineKey) || [];
     const otpEpoch  = _toEpoch(otp.realtime_arrival || otp.scheduled_arrival);
 
-    const match = rtOptions.find((rt, i) => {
-      if (usedRt.has(i + ':' + key)) return false;
+    const matchIdx = rtOptions.findIndex((rt, i) => {
+      if (usedRtKeys.has(lineKey + ':' + i)) return false;
       const rtEpoch = _toEpoch(rt.realtime_arrival || rt.scheduled_arrival);
       return otpEpoch !== null && rtEpoch !== null && Math.abs(otpEpoch - rtEpoch) <= 120_000;
     });
 
-    if (match) {
-      usedRt.add(rtOptions.indexOf(match) + ':' + key);
+    if (matchIdx !== -1) {
+      const rt = rtOptions[matchIdx];
+      usedRtKeys.add(lineKey + ':' + matchIdx);
+      _log(`  merge MATCH linha:${lineKey} OTP→RT delay:${rt.delay} is_realtime:${rt.is_realtime}`);
       return {
         ...otp,
-        delay:            match.delay            ?? otp.delay,
-        realtime_arrival: match.realtime_arrival  || otp.realtime_arrival,
-        is_realtime:      match.is_realtime       || otp.is_realtime,
+        delay:            rt.delay            ?? otp.delay,
+        realtime_arrival: rt.realtime_arrival  || otp.realtime_arrival,
+        is_realtime:      rt.is_realtime       || otp.is_realtime,
+        _source:          'otp+rt',
       };
     }
-    return otp;
+
+    return { ...otp, _source: otp._source || 'otp' };
   });
 
-  for (const [key, rtOptions] of rtByLine.entries()) {
+  // 2. Chegadas RT sem match OTP → incluir sempre
+  let rtOnlyCount = 0;
+  for (const [lineKey, rtOptions] of rtByLine.entries()) {
     rtOptions.forEach((rt, i) => {
-      if (!usedRt.has(i + ':' + key)) merged.push(rt);
+      if (!usedRtKeys.has(lineKey + ':' + i)) {
+        _log(`  merge RT-ONLY linha:${lineKey} is_realtime:${rt.is_realtime} delay:${rt.delay}`);
+        merged.push({ ...rt, _source: 'rt-only' });
+        rtOnlyCount++;
+      }
     });
   }
 
+  if (rtOnlyCount > 0) {
+    _info(`merge: ${rtOnlyCount} chegada(s) RT sem match OTP adicionada(s) ao resultado`);
+  }
+
+  // 3. Ordenar por tempo de chegada
   merged.sort((a, b) => {
     const tA = _toEpoch(a.realtime_arrival || a.scheduled_arrival);
     const tB = _toEpoch(b.realtime_arrival || b.scheduled_arrival);
@@ -150,12 +183,7 @@ function _merge(otpArr, realtimeArr) {
   return merged;
 }
 
-function _toEpoch(value) {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'number')             return value;
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? null : d.getTime();
-}
+// ── Serviço ──────────────────────────────────────────────────────────────────
 
 class PlannedArrivalsService {
 
@@ -163,7 +191,7 @@ class PlannedArrivalsService {
    * Obtém próximas chegadas para uma paragem, cruzando OTP e API realtime.
    *
    * @param {string}  stopId       - ID da paragem
-   * @param {number}  maxMinutes   - janela de tempo em minutos
+   * @param {number}  maxMinutes   - janela de tempo em minutos (default 60)
    * @param {boolean} forceRefresh - ignorar cache e forçar fetch à rede
    * @returns {Promise<Array>}
    */
@@ -172,47 +200,83 @@ class PlannedArrivalsService {
 
     if (!forceRefresh) {
       const cached = _cache.get(cacheKey);
-      if (cached && (Date.now() - cached.ts) < CACHE_TTL) return cached.data;
+      if (cached && (Date.now() - cached.ts) < CACHE_TTL) {
+        _log(`cache HIT stopId:${stopId} idade:${Date.now() - cached.ts}ms`);
+        return cached.data;
+      }
+    } else {
+      _log(`forceRefresh=true — ignorar cache para stopId:${stopId}`);
     }
 
     const stopCode = await _resolveStopCode(stopId);
+    _log(`getNextArrivals stopId:${stopId} stopCode:${stopCode} maxMinutes:${maxMinutes}`);
 
-    // OTP e API realtime sempre em paralelo
+    // Lançar OTP e API realtime em paralelo
+    const t0 = performance.now();
     const [otpResult, rtResult] = await Promise.allSettled([
       otpService.getArrivalsForStop(stopCode, maxMinutes),
-      _withTimeout(
-        apiService.fetchStopRealtime(stopId),  // endpoint correcto: /{stopId}/realtime
-        REALTIME_TIMEOUT_MS
-      ),
+      _withTimeout(apiService.fetchStopRealtime(stopId), REALTIME_TIMEOUT_MS),
     ]);
+    const elapsed = Math.round(performance.now() - t0);
 
+    // ── OTP ──
     const otpArrivals = otpResult.status === 'fulfilled'
-      ? _normalize(otpResult.value || [])
-      : [];
-
-    const rtArrivals = rtResult.status === 'fulfilled'
-      ? _normalize(_extractRealtimeArrivals(rtResult.value))
+      ? _normalize((otpResult.value || []).map(a => ({ ...a, _source: 'otp' })))
       : [];
 
     if (otpResult.status === 'rejected') {
-      console.warn('[PlannedArrivals] OTP falhou:', otpResult.reason?.message);
-    }
-    if (rtResult.status === 'rejected') {
-      const msg = rtResult.reason?.message || '';
-      console.warn(
-        msg.includes('timeout')
-          ? `[PlannedArrivals] API realtime timeout (>${REALTIME_TIMEOUT_MS}ms) — usar apenas OTP`
-          : `[PlannedArrivals] API realtime falhou: ${msg}`
-      );
+      console.warn('[ARRIVALS] OTP falhou:', otpResult.reason?.message);
+    } else {
+      _log(`OTP: ${otpArrivals.length} chegadas (${elapsed}ms)`);
+      if (_dbg()) {
+        const rtCount = otpArrivals.filter(a => a.is_realtime).length;
+        _log(`  OTP realtime: ${rtCount}/${otpArrivals.length}`);
+        otpArrivals.forEach(a =>
+          _log(`  OTP linha:${a.route_short_name} trip:${a.trip_id} rt:${a.is_realtime} delay:${a.delay} sched:${a.scheduled_arrival} rt_arr:${a.realtime_arrival}`)
+        );
+      }
     }
 
+    // ── API Realtime ──
+    const rtArrivals = rtResult.status === 'fulfilled'
+      ? _normalize(_extractRealtimeArrivals(rtResult.value).map(a => ({ ...a, _source: 'rt' })))
+      : [];
+
+    if (rtResult.status === 'rejected') {
+      const msg = rtResult.reason?.message || '';
+      if (msg.includes('timeout')) {
+        console.warn(`[ARRIVALS] API realtime timeout (>${REALTIME_TIMEOUT_MS}ms) — usar apenas OTP`);
+      } else {
+        console.warn('[ARRIVALS] API realtime falhou:', msg);
+      }
+    } else {
+      _log(`API Realtime: ${rtArrivals.length} chegadas (${elapsed}ms)`);
+      if (_dbg()) {
+        const rtCount = rtArrivals.filter(a => a.is_realtime).length;
+        _log(`  RT realtime: ${rtCount}/${rtArrivals.length}`);
+        rtArrivals.forEach(a =>
+          _log(`  RT  linha:${a.route_short_name} trip:${a.trip_id} rt:${a.is_realtime} delay:${a.delay} sched:${a.scheduled_arrival} rt_arr:${a.realtime_arrival}`)
+        );
+      }
+    }
+
+    // ── Merge ──
+    _log(`merge: OTP=${otpArrivals.length} RT=${rtArrivals.length}`);
     const result = _merge(otpArrivals, rtArrivals);
+    _log(`merge resultado: ${result.length} chegadas`);
+    if (_dbg()) {
+      const bySource = result.reduce((acc, a) => { acc[a._source] = (acc[a._source] || 0) + 1; return acc; }, {});
+      _log('  por fonte:', bySource);
+    }
 
     if (result.length > 0) {
       _cache.set(cacheKey, { data: result, ts: Date.now() });
     } else if (!forceRefresh) {
       const stale = _cache.get(cacheKey);
-      if (stale) return stale.data;
+      if (stale) {
+        _warn(`resultado vazio — devolver cache stale (${Date.now() - stale.ts}ms antigo)`);
+        return stale.data;
+      }
     }
 
     return result;

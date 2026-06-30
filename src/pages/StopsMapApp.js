@@ -30,9 +30,9 @@
  *    painel + 100px extra para que os marcadores não fiquem tapados.
  *
  * BOTÃO DE REFRESH:
- *  - handleRefreshArrivals() devolve a Promise de loadStopArrivals para
- *    que o listener async do botão possa aguardar o fim e remover a
- *    classe 'refreshing' (animação de rotação) só depois de concluído.
+ *  - handleRefreshArrivals() passa forceRefresh=true para que o cache
+ *    seja ignorado e os dados sejam sempre buscados à rede.
+ *  - O intervalo de 5 s também passa forceRefresh=true pelo mesmo motivo.
  *
  * DIRECÇÃO DO SHAPE (handleArrivalFilterChange):
  *  - Para cada linha filtrada, pede as paragens da direcção 0.
@@ -120,12 +120,6 @@ export class StopsMapApp {
     /**
      * Set de tripIds das chegadas em tempo real da paragem activa.
      * Preenchido por updateBusMap(); limpo ao fechar o painel.
-     *
-     * PORQUÊ: o MQTT envia updates de TODOS os autocarros da cidade.
-     * Sem este filtro, _handleMqttVehicleUpdate() desenharia um marcador
-     * para cada autocarro que passasse pela websocket, mesmo que não
-     * tivesse nada a ver com a paragem aberta. Os marcadores acumulavam
-     * até ao próximo ciclo de updateBusMap() que os limpava.
      */
     this._allowedTripIds = new Set();
   }
@@ -144,6 +138,10 @@ export class StopsMapApp {
       console.info(
         '%c[BUS DEBUG] Para activar logs de autocarros: localStorage.setItem(\'BUS_DEBUG\', \'1\') e recarrega a página',
         'color:#01696f;font-style:italic'
+      );
+      console.info(
+        '%c[ARRIVALS DEBUG] Para activar logs de chegadas: localStorage.setItem(\'ARRIVALS_DEBUG\', \'1\') e recarrega a página',
+        'color:#006494;font-style:italic'
       );
 
       await scheduleService.loadScheduleData();
@@ -246,10 +244,6 @@ export class StopsMapApp {
     });
   }
 
-  /**
-   * Chamado pelo MQTT para cada actualização de posição de veículo.
-   * Só actua se o tripId estiver em _allowedTripIds (paragem activa).
-   */
   _handleMqttVehicleUpdate(vehicle) {
     if (!this.currentStopId) return;
     if (!this.busMarkerManager) return;
@@ -269,9 +263,6 @@ export class StopsMapApp {
     _log(`→ marcadores após upsert: ${this.busMarkerManager.getMarkerCount()}`);
   }
 
-  /**
-   * Chamado pelo TTL do MQTT quando um veículo expira (sem update há 30 s).
-   */
   _handleMqttVehicleExpired(vehicleId) {
     if (!this.busMarkerManager) return;
     if (this.busMarkerManager.markers[vehicleId]) {
@@ -510,19 +501,19 @@ export class StopsMapApp {
     }
     this.stopMarkerManager.setSelectedStop(stop.stop_id);
 
-    // ── Centrar imediatamente na paragem ──────────────────────────────────
-    // Antes de ter os autocarros, centrar o mapa na paragem para que o
-    // utilizador não fique a ver a sua localização GPS em vez da paragem.
-    // Quando updateBusMap terminar (centerMap=true), recentrará nos autocarros.
     this.suppressMapChangeUntil = Date.now() + 2000;
     this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
+
+    // Limpar cache da paragem para garantir fetch fresco na primeira abertura
+    plannedArrivalsService.clearCache(stop.stop_id);
 
     const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
     const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes
       ? stopInfo.value.routes : (stop.routes || []);
     this.nextArrivals.setRoutes(routes);
 
-    await this.loadStopArrivals(stop.stop_id, true);
+    // Primeiro load: forceRefresh=true para garantir dados frescos
+    await this.loadStopArrivals(stop.stop_id, true, true);
     this.startAutoRefresh();
     this._pushStopToURL(stop.stop_id);
   }
@@ -533,9 +524,17 @@ export class StopsMapApp {
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
   }
 
-  async loadStopArrivals(stopId, centerMap = false) {
+  /**
+   * Carrega chegadas para a paragem activa.
+   *
+   * @param {string}  stopId       - ID da paragem
+   * @param {boolean} centerMap    - recentrar o mapa nos autocarros (só 1.º load)
+   * @param {boolean} forceRefresh - ignorar cache e forçar fetch à rede
+   */
+  async loadStopArrivals(stopId, centerMap = false, forceRefresh = false) {
     try {
-      const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60);
+      // forceRefresh=true: botão de refresh e intervalo de 5 s
+      const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60, forceRefresh);
 
       if (!arrivals || arrivals.length === 0) {
         this.nextArrivals.setArrivals([], []);
@@ -571,15 +570,6 @@ export class StopsMapApp {
     }
   }
 
-  /**
-   * Desenha os marcadores de autocarro para as chegadas em tempo real.
-   * Preenche _allowedTripIds para filtrar updates MQTT futuros.
-   *
-   * VIEWPORT (centerMap=true — primeiro load apenas):
-   *  - 1 autocarro : zoom 17, offset 60% da altura do painel
-   *  - N autocarros: fitBounds maxZoom 17, minZoom 14,
-   *                  paddingBottomRight [60, panelHeight+100]
-   */
   async updateBusMap(arrivals, vehicles, centerMap = false) {
     if (!arrivals || arrivals.length === 0) {
       this.busMarkerManager.clearAllMarkers();
@@ -680,8 +670,6 @@ export class StopsMapApp {
       visiblePositions = this.busMarkerManager.filterByRoutes(activeFilter, routeFilterState.dirMap);
     }
 
-    // ── VIEWPORT: primeiro load ─────────────────────────────────────────────
-    // centerMap=true só na primeira abertura da paragem, nunca nos refreshes.
     if (centerMap && !this.busMapCentered) {
       this.busMapCentered = true;
       const positionsForCenter = visiblePositions.length > 0 ? visiblePositions : busPositions;
@@ -743,28 +731,12 @@ export class StopsMapApp {
 
   recenterOnBuses() { this._recenterOnPositions(this.currentBusPositions); }
 
-  /**
-   * Centra o mapa nas posições dadas, com padding para dar espaço ao
-   * painel de chegadas.
-   *
-   * Valores:
-   *  - 1 posição : zoom 17, offset vertical = 60% da altura do painel
-   *  - N posições: fitBounds maxZoom 17, minZoom 14,
-   *                paddingBottomRight = panelHeight + 100px
-   *
-   * Para ajustar:
-   *  - Mais zoom           → aumentar maxZoom (e o zoom fixo no caso de 1 autocarro)
-   *  - Autocarros mais alto→ reduzir paddingBottomRight ou o multiplicador do offset
-   *  - Autocarros mais baixo→ aumentar paddingBottomRight ou o multiplicador do offset
-   */
   _recenterOnPositions(positions) {
     if (!this.mapManager || positions.length === 0) return;
-    const mapH      = this.mapManager.map.getSize().y;
-    const panelH    = Math.round(mapH * 0.6);   // painel ocupa ~60% da altura
+    const mapH   = this.mapManager.map.getSize().y;
+    const panelH = Math.round(mapH * 0.6);
 
     if (positions.length === 1) {
-      // offset positivo → desloca o centro para baixo → marcador sobe na janela
-      const offsetY = Math.round(panelH * 0.2);
       this.mapManager.centerOnWithOffset(positions[0], 17, panelH);
       return;
     }
@@ -777,17 +749,6 @@ export class StopsMapApp {
     });
   }
 
-  /**
-   * Centra o mapa no autocarro clicado no painel.
-   *
-   * - Zoom 17 (perto o suficiente para ver o autocarro claramente)
-   * - Offset vertical 35% da altura do mapa → marcador fica bem acima do painel
-   *
-   * Para ajustar:
-   *  - Mais zoom    → aumentar o 17
-   *  - Mais acima   → aumentar 0.35 (ex: 0.40)
-   *  - Mais ao centro→ reduzir 0.35 (ex: 0.25)
-   */
   handleArrivalClick(data) {
     const { vehicleId, location } = data;
     if (!location || !this.mapManager) return;
@@ -806,13 +767,13 @@ export class StopsMapApp {
 
   /**
    * Chamado pelo botão de refresh no painel.
-   * Devolve a Promise de loadStopArrivals para que o listener async do
-   * botão (em NextArrivals.js) aguarde o fim antes de remover a classe
-   * 'refreshing' e reactivar o botão.
+   * Passa forceRefresh=true para ignorar o cache e buscar dados frescos.
+   * Devolve a Promise para que o listener do botão aguarde o fim antes
+   * de remover a animação de rotação.
    */
   handleRefreshArrivals() {
     if (!this.currentStopId) return Promise.resolve();
-    return this.loadStopArrivals(this.currentStopId, false);
+    return this.loadStopArrivals(this.currentStopId, false, true);
   }
 
   handleCloseArrivals() {
@@ -863,10 +824,14 @@ export class StopsMapApp {
     if (added) { this.favouritesPanel.open(); setTimeout(() => this.favouritesPanel.close(), 1800); }
   }
 
+  /**
+   * Inicia o intervalo de refresh automático a cada 5 s.
+   * Passa forceRefresh=true para garantir que o cache é ignorado.
+   */
   startAutoRefresh() {
     this.stopAutoRefresh();
     this.refreshInterval = setInterval(() => {
-      if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false);
+      if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false, true);
     }, 5000);
   }
 
