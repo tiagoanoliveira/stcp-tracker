@@ -11,6 +11,7 @@ import { scheduleService }        from '../services/scheduleService.js';
 import { plannedArrivalsService } from '../services/plannedArrivalsService.js';
 import { routeFilterState }       from '../services/routeFilterState.js';
 import { mqttVehicleService }     from '../services/mqttVehicleService.js';
+import { iconCache }              from '../ui/design/iconCache.js';
 import { MapManager }             from '../map/MapManager.js';
 import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
 import { LineOverlayManager }     from '../map/LineOverlayManager.js';
@@ -57,6 +58,9 @@ export class BusMapApp {
     this._currentStopPosition     = null;
     this._currentBusPositions     = [];
     this._busMapCentered          = false;
+
+    // ID do veículo actualmente seguido (selecionado via clique numa chegada)
+    this._trackedVehicleId = null;
 
     // Controlo de fonte de veículos e fallback
     this._vehiclesSource        = 'mqtt';
@@ -129,8 +133,11 @@ export class BusMapApp {
       this.routeFilterBar.onFilterChange((selected, routeObjs) =>
         this._handleRouteFilterChange(selected, routeObjs)
       );
+      // FIX: registar as cores das rotas no iconCache logo que a lista chegar,
+      // para que _lineColors() as encontre em cascata nos popups dos marcadores.
       routeService.fetchRoutesList().then(routes => {
         this.routeFilterBar.setRoutes(routes);
+        iconCache.registerRouteColors(routes);
       }).catch(() => this.routeFilterBar.setLoading(false));
 
       this.setupEventListeners();
@@ -225,6 +232,20 @@ export class BusMapApp {
 
           this.busMarkerManager.updateSingleBusMarker(vehicle);
           this.lastUpdateDisplay.update();
+
+          // FIX: se este for o veículo actualmente seguido (selecionado via
+          // clique numa chegada), recentrar o mapa na nova posição.
+          // paddingTopLeft compensa a barra de filtros + campo de pesquisa no topo.
+          if (this._trackedVehicleId && this._trackedVehicleId === vehicle.id) {
+            const location = vehicleService.extractVehicleLocation(vehicle);
+            if (location) {
+              this.mapManager.map.setView(location, this.mapManager.map.getZoom(), {
+                animate: true,
+                paddingTopLeft: [0, 120],
+              });
+            }
+            return;
+          }
 
           if (!this._busMapCentered) {
             this._tryCenterOnStopBuses();
@@ -455,6 +476,8 @@ export class BusMapApp {
     this._currentStopPosition = [stop.latitude, stop.longitude];
     this._busMapCentered      = false;
     this._currentBusPositions = [];
+    // Limpar qualquer seguimento de veículo anterior ao mudar de paragem
+    this._trackedVehicleId    = null;
 
     // Limpar cache da paragem anterior para garantir fetch fresco
     plannedArrivalsService.clearCache(stop.stop_id);
@@ -597,8 +620,22 @@ export class BusMapApp {
 
   // ─── Handlers ─────────────────────────────────────────────────────────────────
 
+  /**
+   * Clique numa chegada específica: centrar no autocarro e ativar seguimento
+   * contínuo — em cada update MQTT o mapa recentrará automaticamente nele.
+   * paddingTopLeft=[0,120] garante que o marcador aparece abaixo dos overlays
+   * superiores (barra de filtros + campo de pesquisa).
+   */
   _handleArrivalClick({ vehicleId, location }) {
-    if (location) this.mapManager.centerOn(location, 16);
+    if (!location) return;
+
+    // Guardar o ID para seguimento contínuo via onVehicleUpdate
+    this._trackedVehicleId = vehicleId || null;
+
+    this.mapManager.map.setView(location, 16, {
+      animate: true,
+      paddingTopLeft: [0, 120],
+    });
   }
 
   _handleCloseArrivals() {
@@ -608,6 +645,7 @@ export class BusMapApp {
     this._currentStopPosition = null;
     this._currentBusPositions = [];
     this._busMapCentered      = false;
+    this._trackedVehicleId    = null;
     this.lineOverlayManager.clearAll();
     this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
     const activeRoutes = routeFilterState.selectedRoutes;
@@ -653,13 +691,14 @@ export class BusMapApp {
     AnnouncementBanner.show(
       'Sem autocarros na fonte principal. Pretende tentar a fonte alternativa?',
       {
-        type: 'warning',
-        id: 'fallback-prompt',
+        type: 'info',
+        id:   'fallback-prompt',
         dismissible: true,
         action: {
-          label: 'Usar fonte alternativa',
+          label: 'Tentar alternativa',
           callback: () => {
             apiService.setVehiclesSource('fallback');
+            this._fallbackPromptVisible = false;
             this.fetchAndUpdateBuses();
           },
         },
@@ -668,6 +707,6 @@ export class BusMapApp {
   }
 
   showError(message) {
-    console.error(message);
+    AnnouncementBanner.show(message, { type: 'error', dismissible: true });
   }
 }
