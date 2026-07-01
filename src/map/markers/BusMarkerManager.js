@@ -8,47 +8,42 @@
  *   Antes de criar qualquer marcador, o método _upsertMarker() verifica se já
  *   existe um marcador com o mesmo id (independentemente da origem — FIWARE
  *   bootstrap ou MQTT). Se existir, o marcador é movido e actualizado em vez
- *   de se criar um duplicado. Isto garante que cada veículo tem exactamente
- *   um marcador no mapa em qualquer momento.
- *
- *   updateBusMarkers()     — actualiza o conjunto completo de marcadores;
- *                            remove os que já não constam na lista.
- *   updateSingleBusMarker()— actualiza (ou cria) um único marcador;
- *                            usado pelo callback onVehicleUpdate do MQTT.
+ *   de se criar um duplicado.
  *
  * COR DO POPUP:
- *   _createPopupContent() e _createLoadingPopup() recebem a cor da linha
- *   via iconCache.getRouteColor(). Isso garante que o cabeçalho do popup
- *   usa a cor real da linha em vez do azul STCP fixo.
+ *   _lineColors() consulta iconCache.getRouteColor() que verifica em cascata:
+ *     1. Cores registadas via iconCache.registerRouteColors() (vindas da API)
+ *     2. BUS_COLORS hardcoded (busColors.js)
+ *     3. Fallback azul STCP #0072c6
+ *   Para que as cores da API estejam disponíveis, o código que chama
+ *   routeService.fetchRoutesList() deve passar o resultado a
+ *   iconCache.registerRouteColors() logo a seguir.
  */
 
 import { iconCache }      from '../../ui/design/iconCache.js';
 import { vehicleService } from '../../services/vehicleService.js';
 
-// SVGs inline para os ícones do popup (evita dependências externas)
 const _ICON_SPEED = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0"/><path d="M16.95 7.05a7 7 0 1 0 0 9.9"/><path d="m12 12 3-4"/></svg>`;
 
-/** Devolve a cor de fundo e a cor de texto de uma linha, com fallback seguro. */
+/**
+ * Devolve { bg, text } para o cabeçalho do popup.
+ * Lê as cores registadas pela API; fallback para azul STCP.
+ */
 function _lineColors(line) {
-  const color = iconCache.getRouteColor?.(line);
-  if (color && /^#[0-9a-fA-F]{6}$/.test(color)) {
-    // Calcular luminância para decidir se o texto é branco ou escuro
-    const r = parseInt(color.slice(1,3), 16);
-    const g = parseInt(color.slice(3,5), 16);
-    const b = parseInt(color.slice(5,7), 16);
-    const lum = (0.299*r + 0.587*g + 0.114*b) / 255;
-    return { bg: color, text: lum > 0.55 ? '#1a1a1a' : '#ffffff' };
+  const colors = iconCache.getRouteColor(String(line ?? '').trim());
+  if (colors?.busColor) {
+    return { bg: colors.busColor, text: colors.textColor || '#fff' };
   }
-  return { bg: '#0072c6', text: '#ffffff' };
+  return { bg: '#0072c6', text: '#fff' };
 }
 
 export class BusMarkerManager {
   constructor(map) {
     this.map = map;
-    this.markers       = {};   // busId -> L.Marker
-    this._busData      = {};   // busId -> objecto processado
-    this._markerRoutes = {};   // busId -> displayLine string
-    this._markerDirs   = {};   // busId -> direction number (0|1)
+    this.markers       = {};
+    this._busData      = {};
+    this._markerRoutes = {};
+    this._markerDirs   = {};
   }
 
   setRouteForMarker(busId, routeNumber, direction) {
@@ -56,9 +51,6 @@ export class BusMarkerManager {
     this._markerDirs[busId]   = direction != null ? Number(direction) : null;
   }
 
-  /**
-   * Filtra marcadores por linha e, opcionalmente, por direção.
-   */
   filterByRoutes(selectedRoutes, routeDirMap) {
     const showAll = !selectedRoutes || selectedRoutes.size === 0;
     const visiblePositions = [];
@@ -85,7 +77,7 @@ export class BusMarkerManager {
     return visiblePositions;
   }
 
-  // ─── Método central de upsert ──────────────────────────────────────────────
+  // ─── Upsert central ──────────────────────────────────────────────────────
 
   _upsertMarker(bus) {
     this._busData[bus.id] = bus;
@@ -104,7 +96,7 @@ export class BusMarkerManager {
     return this._createBusMarker(bus);
   }
 
-  // ─── API pública ───────────────────────────────────────────────────────────
+  // ─── API pública ─────────────────────────────────────────────────────────
 
   updateBusMarkers(busData) {
     const validIDs = new Set();
@@ -121,7 +113,7 @@ export class BusMarkerManager {
     this._upsertMarker(bus);
   }
 
-  // ─── Criação de marcador ───────────────────────────────────────────────────
+  // ─── Criação de marcador ─────────────────────────────────────────────────
 
   _createBusMarker(bus) {
     const icon         = iconCache.getBusIcon(bus.line);
@@ -148,7 +140,7 @@ export class BusMarkerManager {
     marker.setPopupContent(this._createPopupContent(bus));
   }
 
-  // ─── Templates dos popups ─────────────────────────────────────────────────
+  // ─── Templates dos popups ────────────────────────────────────────────────
 
   _createLoadingPopup(bus) {
     const line   = bus.displayLine ?? bus.line ?? '?';
@@ -157,7 +149,7 @@ export class BusMarkerManager {
       <div>
         <div class="bus-popup__header" style="background:${colors.bg};">
           <span class="bus-popup__badge" style="color:${colors.bg};">${line}</span>
-          <span class="bus-popup__destination">A carregar…</span>
+          <span class="bus-popup__destination" style="color:${colors.text};">A carregar…</span>
         </div>
         <div class="bus-popup__body">
           <div class="bus-popup__row" style="--popup-accent:${colors.bg}">
@@ -191,7 +183,7 @@ export class BusMarkerManager {
       </div>`;
   }
 
-  // ─── Utilitários ──────────────────────────────────────────────────────────
+  // ─── Utilitários ─────────────────────────────────────────────────────────
 
   removeBusMarker(id) {
     if (this.markers[id]) {
