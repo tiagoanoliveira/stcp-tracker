@@ -112,7 +112,7 @@ export class BusMarkerManager {
       ? this._createPopupContent(bus)
       : this._createLoadingPopup(bus);
     const marker = L.marker([bus.latitude, bus.longitude], { icon }).addTo(this.map);
-    marker.bindPopup(popupContent, { maxWidth: 260, className: 'bus-popup-wrapper' });
+    marker.bindPopup(popupContent, { maxWidth: 220, className: 'bus-popup-wrapper' });
     marker.on('popupopen', () => this._resolvePopupHeadsign(bus.id, marker));
     this.markers[bus.id] = marker;
     return marker;

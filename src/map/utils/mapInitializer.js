@@ -8,7 +8,7 @@
  * adiciona o anel de pulse animado via ::before.
  */
 export function createUserMarker(map, position) {
-  const size = 22; // diâmetro do ponto central em px
+  const size = 15; // diâmetro do ponto central em px
 
   const svgIcon = `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
