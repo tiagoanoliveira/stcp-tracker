@@ -8,11 +8,13 @@
  *
  *     - Se apenas o OTP responde         → usar dados OTP.
  *     - Se apenas a realtime responde    → usar dados realtime.
- *     - Se ambos respondem               → merge por route_short_name ±2 min:
+ *     - Se ambos respondem               → merge por route_short_name ±5 min:
  *         · Estrutura base vem do OTP (trip_id, headsign, etc.).
  *         · delay e realtime_arrival substituídos pelos da API.
- *     - Chegadas realtime sem match OTP  → SEMPRE adicionadas (veículos que
- *         a API conhece mas o OTP ainda não tem posição).
+ *     - Chegadas RT sem match OTP        → só adicionadas se a linha NÃO tiver
+ *         NENHUMA chegada OTP (veículos que o OTP genuinamente não conhece).
+ *         Chegadas RT de linhas que o OTP já tem → descartadas para evitar
+ *         duplicados que aparecem como "planeados" no fundo da lista.
  *
  *   A API realtime tem timeout de 3 s; se demorar mais, usa-se apenas OTP.
  *
@@ -32,6 +34,9 @@ import { apiService }  from '../core/apiService.js';
 const _cache              = new Map();
 const CACHE_TTL           = 4_000;  // ms
 const REALTIME_TIMEOUT_MS = 3_000;  // ms
+// Janela de match entre chegadas OTP e RT (em ms). Alargada de 2 min para
+// 5 min para cobrir casos onde o atraso causa desvio superior a 2 min.
+const MATCH_WINDOW_MS     = 5 * 60_000;
 
 // ── Debug ────────────────────────────────────────────────────────────────────
 const _dbg  = () => { try { return localStorage.getItem('ARRIVALS_DEBUG') === '1'; } catch { return false; } };
@@ -63,12 +68,10 @@ function _withTimeout(promise, ms) {
 
 /**
  * Normaliza uma chegada para campos canónicos.
- * O spread dos campos originais vem PRIMEIRO para que os overrides
- * explícitos abaixo tenham prioridade sobre valores do objecto original.
  */
 function _normalizeOne(a) {
   return {
-    ...a,                              // preservar campos extra (e.g. trip_id da api)
+    ...a,
     route_short_name:  a.route_short_name  || a.route_number || '',
     trip_id:           a.trip_id           || null,
     headsign:          a.headsign          || a.trip_headsign || '',
@@ -104,19 +107,21 @@ function _toEpoch(value) {
  * Merge de chegadas OTP com chegadas da API realtime.
  *
  * Passos:
- *  1. Para cada chegada OTP tenta match com uma chegada RT da mesma linha ±2 min.
+ *  1. Para cada chegada OTP tenta match com uma chegada RT da mesma linha
+ *     dentro da janela MATCH_WINDOW_MS (5 min).
  *     Se encontrado → substitui delay/realtime_arrival/is_realtime pela RT.
- *  2. Chegadas RT sem match OTP → adicionadas SEMPRE (podem ser veículos que o
- *     OTP ainda não tem posição mas a API já reportou).
+ *  2. Chegadas RT sem match OTP → só adicionadas se a linha NÃO tiver
+ *     NENHUMA chegada OTP. Isto evita duplicados quando o OTP já conhece
+ *     a linha mas a timestamp RT difere ligeiramente (apareciam como
+ *     entradas «planeadas» no fundo da lista).
  *  3. Resultado ordenado por tempo de chegada.
  */
 function _merge(otpArr, realtimeArr) {
-  // Se uma das fontes está vazia, devolver a outra directamente
   if (!otpArr.length && !realtimeArr.length) return [];
   if (!otpArr.length)      return realtimeArr;
   if (!realtimeArr.length) return otpArr;
 
-  // Indexar RT por linha para lookup O(1)
+  // Indexar RT por linha
   const rtByLine = new Map();
   for (const a of realtimeArr) {
     const key = String(a.route_short_name || '');
@@ -124,19 +129,34 @@ function _merge(otpArr, realtimeArr) {
     rtByLine.get(key).push(a);
   }
 
-  const usedRtKeys = new Set(); // "lineKey:index"
+  // Linhas que o OTP já conhece
+  const otpLines = new Set(otpArr.map(a => String(a.route_short_name || '')));
 
-  // 1. Iterar chegadas OTP e tentar enriquecer com RT
+  const usedRtKeys = new Set();
+
+  // 1. Enriquecer chegadas OTP com dados RT
   const merged = otpArr.map(otp => {
     const lineKey   = String(otp.route_short_name || '');
     const rtOptions = rtByLine.get(lineKey) || [];
     const otpEpoch  = _toEpoch(otp.realtime_arrival || otp.scheduled_arrival);
 
-    const matchIdx = rtOptions.findIndex((rt, i) => {
+    // Tentar match temporal (±MATCH_WINDOW_MS)
+    let matchIdx = rtOptions.findIndex((rt, i) => {
       if (usedRtKeys.has(lineKey + ':' + i)) return false;
       const rtEpoch = _toEpoch(rt.realtime_arrival || rt.scheduled_arrival);
-      return otpEpoch !== null && rtEpoch !== null && Math.abs(otpEpoch - rtEpoch) <= 120_000;
+      return otpEpoch !== null && rtEpoch !== null &&
+             Math.abs(otpEpoch - rtEpoch) <= MATCH_WINDOW_MS;
     });
+
+    // Fallback: match apenas por linha (sem restrição temporal) para o
+    // primeiro item RT ainda não utilizado — previne que chegadas com
+    // timestamps muito diferentes deixem de ser mergeadas.
+    if (matchIdx === -1) {
+      matchIdx = rtOptions.findIndex((_, i) => !usedRtKeys.has(lineKey + ':' + i));
+      if (matchIdx !== -1) {
+        _log(`  merge FALLBACK-LINE linha:${lineKey} (sem match temporal)`);
+      }
+    }
 
     if (matchIdx !== -1) {
       const rt = rtOptions[matchIdx];
@@ -154,9 +174,20 @@ function _merge(otpArr, realtimeArr) {
     return { ...otp, _source: otp._source || 'otp' };
   });
 
-  // 2. Chegadas RT sem match OTP → incluir sempre
+  // 2. Chegadas RT sem match → só adicionar se a linha não existir no OTP
   let rtOnlyCount = 0;
   for (const [lineKey, rtOptions] of rtByLine.entries()) {
+    // Se o OTP já tem pelo menos uma chegada desta linha, ignorar as RT
+    // que não fizeram match — são simplesmente chegadas que o OTP
+    // também conhece mas com timestamp ligeiramente diferente.
+    if (otpLines.has(lineKey)) {
+      const skipped = rtOptions.filter((_, i) => !usedRtKeys.has(lineKey + ':' + i)).length;
+      if (skipped > 0) {
+        _log(`  merge SKIP ${skipped}x rt-only linha:${lineKey} (OTP já tem esta linha)`);
+      }
+      continue;
+    }
+
     rtOptions.forEach((rt, i) => {
       if (!usedRtKeys.has(lineKey + ':' + i)) {
         _log(`  merge RT-ONLY linha:${lineKey} is_realtime:${rt.is_realtime} delay:${rt.delay}`);
@@ -167,7 +198,7 @@ function _merge(otpArr, realtimeArr) {
   }
 
   if (rtOnlyCount > 0) {
-    _info(`merge: ${rtOnlyCount} chegada(s) RT sem match OTP adicionada(s) ao resultado`);
+    _info(`merge: ${rtOnlyCount} chegada(s) RT de linha(s) desconhecidas pelo OTP adicionada(s)`);
   }
 
   // 3. Ordenar por tempo de chegada
@@ -187,14 +218,6 @@ function _merge(otpArr, realtimeArr) {
 
 class PlannedArrivalsService {
 
-  /**
-   * Obtém próximas chegadas para uma paragem, cruzando OTP e API realtime.
-   *
-   * @param {string}  stopId       - ID da paragem
-   * @param {number}  maxMinutes   - janela de tempo em minutos (default 60)
-   * @param {boolean} forceRefresh - ignorar cache e forçar fetch à rede
-   * @returns {Promise<Array>}
-   */
   async getNextArrivals(stopId, maxMinutes = 60, forceRefresh = false) {
     const cacheKey = `${stopId}:${maxMinutes}`;
 
@@ -211,7 +234,6 @@ class PlannedArrivalsService {
     const stopCode = await _resolveStopCode(stopId);
     _log(`getNextArrivals stopId:${stopId} stopCode:${stopCode} maxMinutes:${maxMinutes}`);
 
-    // Lançar OTP e API realtime em paralelo
     const t0 = performance.now();
     const [otpResult, rtResult] = await Promise.allSettled([
       otpService.getArrivalsForStop(stopCode, maxMinutes),
@@ -229,10 +251,8 @@ class PlannedArrivalsService {
     } else {
       _log(`OTP: ${otpArrivals.length} chegadas (${elapsed}ms)`);
       if (_dbg()) {
-        const rtCount = otpArrivals.filter(a => a.is_realtime).length;
-        _log(`  OTP realtime: ${rtCount}/${otpArrivals.length}`);
         otpArrivals.forEach(a =>
-          _log(`  OTP linha:${a.route_short_name} trip:${a.trip_id} rt:${a.is_realtime} delay:${a.delay} sched:${a.scheduled_arrival} rt_arr:${a.realtime_arrival}`)
+          _log(`  OTP linha:${a.route_short_name} trip:${a.trip_id} rt:${a.is_realtime} delay:${a.delay}`)
         );
       }
     }
@@ -252,10 +272,8 @@ class PlannedArrivalsService {
     } else {
       _log(`API Realtime: ${rtArrivals.length} chegadas (${elapsed}ms)`);
       if (_dbg()) {
-        const rtCount = rtArrivals.filter(a => a.is_realtime).length;
-        _log(`  RT realtime: ${rtCount}/${rtArrivals.length}`);
         rtArrivals.forEach(a =>
-          _log(`  RT  linha:${a.route_short_name} trip:${a.trip_id} rt:${a.is_realtime} delay:${a.delay} sched:${a.scheduled_arrival} rt_arr:${a.realtime_arrival}`)
+          _log(`  RT  linha:${a.route_short_name} trip:${a.trip_id} rt:${a.is_realtime} delay:${a.delay}`)
         );
       }
     }
@@ -282,10 +300,6 @@ class PlannedArrivalsService {
     return result;
   }
 
-  /**
-   * Limpa o cache para uma paragem específica (ou todo o cache).
-   * @param {string} [stopId] - se omitido, limpa todo o cache
-   */
   clearCache(stopId) {
     if (stopId) {
       for (const key of _cache.keys()) {

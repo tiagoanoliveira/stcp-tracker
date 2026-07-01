@@ -193,20 +193,22 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   POPUP DO AUTOCARRO — card moderno com cabeçalho colorido
+   POPUP DO AUTOCARRO — card com cor dinâmica da linha
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Wrapper do Leaflet: sem padding, cantos arredondados maiores */
+/* Wrapper do Leaflet: sem padding, cantos arredondados, largura compacta */
 .leaflet-popup-content-wrapper {
-  border-radius: 16px !important;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.18) !important;
   padding: 0 !important;
   overflow: hidden;
   border: none !important;
-  min-width: 200px;
+  min-width: 170px;
+  max-width: 200px !important;
+  width: 200px !important;
 }
 
-/* Seta do popup: transparente para combinar com o fundo branco */
+/* Seta do popup: branca */
 .leaflet-popup-tip-container .leaflet-popup-tip {
   background: #fff !important;
   box-shadow: none !important;
@@ -219,62 +221,62 @@ html, body {
   width: auto !important;
 }
 
-/* Faixa de cabeçalho azul STCP */
+/* Faixa de cabeçalho — a cor é injectada via style= inline */
 .bus-popup__header {
-  background: linear-gradient(135deg, #0072c6 0%, #005fa3 100%);
-  padding: 10px 14px 9px;
+  padding: 8px 12px 7px;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
 }
 
-/* Badge da linha (retângulo arredondado branco sobre azul) */
+/* Badge da linha (branco sobre cor da linha) */
 .bus-popup__badge {
-  background: #fff;
-  color: #0058a0;
-  font-size: 13px;
+  background: rgba(255,255,255,0.95);
+  font-size: 12px;
   font-weight: 800;
   line-height: 1;
-  padding: 4px 8px;
-  border-radius: 7px;
+  padding: 3px 7px;
+  border-radius: 6px;
   letter-spacing: 0.02em;
   white-space: nowrap;
   flex-shrink: 0;
+  /* a cor do texto é injectada via style= inline */
 }
 
 /* Destino no cabeçalho */
 .bus-popup__destination {
-  color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   opacity: 0.92;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 160px;
+  max-width: 130px;
+  /* cor injectada via style= inline */
 }
 
 /* Corpo do popup */
 .bus-popup__body {
   background: #fff;
-  padding: 10px 14px 12px;
+  padding: 8px 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 /* Linha de detalhe (ícone + texto) */
 .bus-popup__row {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 12px;
   color: #333;
 }
 
 .bus-popup__row svg {
   flex-shrink: 0;
-  color: #0072c6;
+  /* usa a cor da linha injectada como CSS custom property */
+  color: var(--popup-accent, #0072c6);
   opacity: 0.85;
 }
 
@@ -282,18 +284,12 @@ html, body {
   white-space: nowrap;
 }
 
-.bus-popup__row .label {
-  color: #888;
-  font-size: 11.5px;
-  margin-right: 2px;
-}
-
 /* Número do veículo em destaque subtil */
 .bus-popup__vehicle {
-  font-size: 11px;
-  color: #aaa;
+  font-size: 10.5px;
+  color: #bbb;
   text-align: right;
-  margin-top: 2px;
+  margin-top: 1px;
   letter-spacing: 0.03em;
 }
 
@@ -301,7 +297,6 @@ html, body {
    MARCADOR DA LOCALIZAÇÃO DO UTILIZADOR
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Anel de pulse animado em torno do marcador do utilizador */
 @keyframes user-pulse {
   0%   { transform: scale(1);   opacity: 0.55; }
   70%  { transform: scale(2.6); opacity: 0; }
