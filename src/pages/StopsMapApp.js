@@ -191,8 +191,14 @@ export class StopsMapApp {
       this.routeFilterBar.onFilterChange((selected, routeObjs) =>
         this._handleGlobalRouteFilterChange(selected, routeObjs)
       );
+      // FIX Bug 2: registar cores da API no iconCache para que o
+      // BusMarkerManager._lineColors() encontre as cores corretas em
+      // qualquer contexto (página inicial E página de paragens).
       routeService.fetchRoutesList()
-        .then(routes => this.routeFilterBar.setRoutes(routes))
+        .then(routes => {
+          this.routeFilterBar.setRoutes(routes);
+          iconCache.registerRouteColors(routes);
+        })
         .catch(() => this.routeFilterBar.setLoading(false));
 
       await this.setupGeolocation();
@@ -731,13 +737,25 @@ export class StopsMapApp {
 
   recenterOnBuses() { this._recenterOnPositions(this.currentBusPositions); }
 
+  /**
+   * Recentra o mapa sobre um conjunto de posições, deixando o marcador
+   * visível acima do painel inferior.
+   *
+   * Bug 1 FIX: quando há apenas 1 posição, o offset anterior era +panelH
+   * (60% da altura), deslocando o centro para baixo e empurrando o marcador
+   * para cima do viewport. Corrigido para +panelH/2, que posiciona o ponto
+   * no centro da área visível acima do painel.
+   */
   _recenterOnPositions(positions) {
     if (!this.mapManager || positions.length === 0) return;
     const mapH   = this.mapManager.map.getSize().y;
     const panelH = Math.round(mapH * 0.6);
 
     if (positions.length === 1) {
-      this.mapManager.centerOnWithOffset(positions[0], 17, panelH);
+      // Offset positivo = desloca o ponto de referência para baixo no ecrã,
+      // o que faz o marcador aparecer mais acima (centrado na zona visível).
+      // Usar metade da altura do painel para ficar centrado na área livre.
+      this.mapManager.centerOnWithOffset(positions[0], 17, Math.round(panelH / 2));
       return;
     }
 

@@ -196,6 +196,13 @@ html, body {
    POPUP DO AUTOCARRO — card com cor dinâmica da linha
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/*
+ * Bug 3 FIX: o Leaflet por vezes calcula width:0 para .leaflet-popup-content
+ * antes de o conteúdo ser renderizado, colapsando o wrapper.
+ * width:fit-content garante que o wrapper cresce com o conteúdo;
+ * os limites min/max-width no wrapper controlam o tamanho final.
+ */
+
 /* Wrapper Leaflet: sem padding, cantos arredondados, largura compacta */
 .leaflet-popup-content-wrapper {
   border-radius: 14px !important;
@@ -204,8 +211,8 @@ html, body {
   overflow: hidden;
   border: none !important;
   min-width: 120px;
-  max-width: 150px !important;
-  width: 150px !important;
+  max-width: 200px !important;
+  width: auto !important;
 }
 
 /* Seta do popup: branca */
@@ -214,11 +221,14 @@ html, body {
   box-shadow: none !important;
 }
 
-/* Remover padding interno padrão do Leaflet */
+/* Remover margin interno padrão do Leaflet; deixar a largura crescer com
+   o conteúdo para que os paddings dos filhos não sejam colapsados. */
 .leaflet-popup-content {
   margin: 0 !important;
+  padding: 0 !important;
   line-height: 1.4 !important;
-  width: auto !important;
+  width: fit-content !important;
+  min-width: 120px !important;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
