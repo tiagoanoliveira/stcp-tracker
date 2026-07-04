@@ -254,8 +254,10 @@ export class StopsMapApp {
     if (!this.currentStopId) return;
     if (!this.busMarkerManager) return;
 
-    if (this._allowedTripIds.size > 0 && !this._allowedTripIds.has(vehicle.tripId)) {
-      return;
+    if (this._restrictToAllowedTrips) {
+      if (!vehicle.tripId || !this._allowedTripIds.has(vehicle.tripId)) {
+        return;
+      }
     }
 
     _log(
@@ -494,6 +496,7 @@ export class StopsMapApp {
     this.currentBusPositions = [];
 
     this._allowedTripIds.clear();
+    this._restrictToAllowedTrips = false;
 
     clearTimeout(this.loadStopsDebounce);
     this.loadStopsDebounce = null;
@@ -547,6 +550,7 @@ export class StopsMapApp {
         this.busMarkerManager.clearAllMarkers();
         this.nextArrivals.updateLastUpdate();
         this._allowedTripIds.clear();
+        this._restrictToAllowedTrips = false;
         return;
       }
 
@@ -659,6 +663,7 @@ export class StopsMapApp {
       _warn('updateBusMap: nenhum veículo para mostrar — marcadores limpos');
       this.busMarkerManager.clearAllMarkers();
       this.currentBusPositions = [];
+      this._restrictToAllowedTrips = true;
       return;
     }
 
@@ -801,6 +806,7 @@ export class StopsMapApp {
     this.busMapCentered      = false;
     this.currentBusPositions = [];
     this._allowedTripIds.clear();
+    this._restrictToAllowedTrips = false;
 
     const wasSearchActive = this.isSearchActive;
     const returnPosition  = this.currentStopPosition;
