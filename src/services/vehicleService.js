@@ -48,9 +48,9 @@ function _normalizeFiwareId(rawId) {
   return parts[parts.length - 1] || String(rawId);
 }
 
-const _KEEP_LOWERCASE = new Set(['de', 'da', 'do']);
+export const KEEP_LOWERCASE_DEST_WORDS = new Set(['de', 'da', 'do']);
 
-function _normalizeDestinationText(value) {
+export function normalizeDestinationText(value) {
   if (!value || typeof value !== 'string') return value;
 
   const trimmed = value.trim();
@@ -68,7 +68,7 @@ function _normalizeDestinationText(value) {
       .split(/\s+/)
       .map(word => {
         if (!word) return word;
-        if (_KEEP_LOWERCASE.has(word)) return word;
+        if (KEEP_LOWERCASE_DEST_WORDS.has(word)) return word;
         return word.charAt(0).toUpperCase() + word.slice(1);
       })
       .join(' ');
@@ -208,7 +208,7 @@ class VehicleService {
 
       // Destino: usar o valor do tópico se disponível, senão resolver preguiçosamente
       const destination = (bus.destination != null && bus.destination !== '')
-          ? _normalizeDestinationText(bus.destination)
+          ? normalizeDestinationText(bus.destination)
           : null;
 
       // busNumber: do tópico MQTT se disponível, senão do campo id
@@ -274,12 +274,12 @@ class VehicleService {
    */
   async resolveHeadsign(bus) {
     // Se o destino já foi resolvido (ex: via tópico MQTT), devolver directamente
-    if (bus.destination) return _normalizeDestinationText(bus.destination);
+    if (bus.destination) return normalizeDestinationText(bus.destination);
     if (!bus.tripId || !bus.line || bus.direction == null) return 'Destino desconhecido';
     try {
       const serviceId = await scheduleService.getServiceIdAtual();
       const headsign = await scheduleService.getHeadsignForTrip(bus.tripId, bus.line, bus.direction, serviceId);
-      return _normalizeDestinationText(headsign);
+      return normalizeDestinationText(headsign);
     } catch {
       return 'Destino desconhecido';
     }

@@ -7,7 +7,7 @@
  *     Nota: linhas como MB1 começam com M mas não são nocturnas.
  */
 
-import { vehicleService }    from '../../services/vehicleService.js';
+import { vehicleService, normalizeDestinationText } from '../../services/vehicleService.js';
 import { LoadingSpinner }    from './LoadingSpinner.js';
 import { routeFilterState }  from '../../services/routeFilterState.js';
 
@@ -407,13 +407,14 @@ export class NextArrivals {
         if (this.onArrivalClickCallback) this.onArrivalClickCallback({ vehicleId: vehicle.id, location, arrival });
       });
     }
+    const normalizedDestination = normalizeDestinationText(arrival.trip_headsign);
 
     div.innerHTML = `
       <div class="arrival-line" style="background-color:${busColor};color:${textColor};">
         ${arrival.route_short_name}
       </div>
       <div class="arrival-info">
-        <div class="arrival-destination">${arrival.trip_headsign}</div>
+        <div class="arrival-destination">${normalizedDestination}</div>
         <div class="arrival-status">${statusHtml}</div>
       </div>
       <div class="arrival-time-container">
