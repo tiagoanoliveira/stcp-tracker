@@ -123,7 +123,7 @@
 
 .fav-line-badge {
   display: inline-block;
-  background: #0072C6;
+  background: var(--color-primary);
   color: #fff;
   font-size: .7rem;
   font-weight: 700;

@@ -63,8 +63,8 @@ a.logo-overlay:hover { opacity: 0.85; }
 
 /* Popup */
 .stop-popup { font-family: inherit; padding: 4px 0; }
-.stop-popup strong { color: #0072c6; font-size: 15px; }
-.stop-popup a { color: #0072c6; text-decoration: none; font-weight: 500; }
+.stop-popup strong { color: var(--color-primary); font-size: 15px; }
+.stop-popup a { color: var(--color-primary); text-decoration: none; font-weight: 500; }
 .stop-popup a:hover { text-decoration: underline; }
 
 /* Tablet */

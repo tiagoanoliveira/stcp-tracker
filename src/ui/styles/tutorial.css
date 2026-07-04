@@ -14,7 +14,7 @@
   border-radius: 50%;
   border: 2px solid rgba(0,0,0,.2);
   background: #fff;
-  color: #0072C6;
+  color: var(--color-primary);
   font-size: 1.1rem;
   font-weight: 800;
   cursor: pointer;
@@ -26,7 +26,7 @@
   line-height: 1;
 }
 .tutorial-map-btn:hover {
-  background: #0072C6;
+  background: var(--color-primary);
   color: #fff;
 }
 
@@ -133,7 +133,7 @@
   transition: background .2s, transform .2s;
 }
 .tut-dot.active {
-  background: #0072C6;
+  background: var(--color-primary);
   transform: scale(1.3);
 }
 
@@ -162,10 +162,10 @@
 .tutorial-btn-secondary:hover { background: #e2e8f0; }
 
 .tutorial-btn-primary {
-  background: #0072C6;
+  background: var(--color-primary);
   color: #fff;
 }
-.tutorial-btn-primary:hover  { background: #005fa3; }
+.tutorial-btn-primary:hover  { background: var(--color-primary-dark); }
 .tutorial-btn-finish         { background: #22c55e; }
 .tutorial-btn-finish:hover   { background: #16a34a; }
 
