@@ -21,10 +21,14 @@ POPUP DO AUTOCARRO — card com cor dinâmica da linha
 
 .leaflet-popup-content {
     margin: 0 !important;
-    padding: 6px !important;
+    padding: 0 !important;
     line-height: 1.4 !important;
     width: fit-content !important;
     min-width: 120px !important;
+}
+
+.popup-line-stop {
+    padding: 6px !important;
 }
 
 .bus-popup__header {
