@@ -3,11 +3,8 @@
  *
  * FONTES DE VEÍCULOS:
  *   'mqtt'     - Porto Digital MQTT/WebSocket (event-driven, sem polling) — ÚNICA fonte activa
- *   'primary'  - stcp.live via Cloudflare Worker (polling HTTP) — desactivado
- *   'fallback' - FIWARE Broker via Cloudflare Worker (polling HTTP) — desactivado
  *
- * O FIWARE foi removido como fonte de dados. A WebSocket liga sempre antes
- * do site acabar de carregar, por isso não é necessário bootstrap via REST.
+ * A WebSocket liga sempre antes do site acabar de carregar, por isso não é necessário bootstrap via REST.
  * Se o MQTT demorar, o mqttVehicleService emite 'mqtt:noDataTimeout' e o
  * UI mostra um banner de aviso.
  */
