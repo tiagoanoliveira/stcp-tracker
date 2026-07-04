@@ -133,9 +133,6 @@ export class LineOverlayManager {
           justify-content:center;
           gap:4px;
         ">
-          <svg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5'>
-            <circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/>
-          </svg>
           Próximos autocarros
         </button>
       </div>`;

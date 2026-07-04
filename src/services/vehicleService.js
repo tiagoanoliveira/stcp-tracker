@@ -48,6 +48,32 @@ function _normalizeFiwareId(rawId) {
   return parts[parts.length - 1] || String(rawId);
 }
 
+const _KEEP_LOWERCASE = new Set(['de', 'da', 'do']);
+
+function _normalizeDestinationText(value) {
+  if (!value || typeof value !== 'string') return value;
+
+  const trimmed = value.trim();
+  const withoutAsterisk = trimmed.replace(/^\*+\s*/, '').trim();
+  if (!withoutAsterisk) return withoutAsterisk;
+
+  const lettersOnly = withoutAsterisk.replace(/[^A-Za-zÀ-ÿ]/g, '');
+  const isAllCaps = lettersOnly.length > 0 && lettersOnly === lettersOnly.toUpperCase();
+  const startedWithAsterisk = trimmed.startsWith('*');
+
+  if (!isAllCaps && !startedWithAsterisk) return withoutAsterisk;
+
+  return withoutAsterisk
+      .toLowerCase()
+      .split(/\s+/)
+      .map(word => {
+        if (!word) return word;
+        if (_KEEP_LOWERCASE.has(word)) return word;
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      })
+      .join(' ');
+}
+
 class VehicleService {
   extractAnnotation(bus, prefix) {
     if (!bus.annotations?.value) return null;
@@ -182,8 +208,8 @@ class VehicleService {
 
       // Destino: usar o valor do tópico se disponível, senão resolver preguiçosamente
       const destination = (bus.destination != null && bus.destination !== '')
-        ? bus.destination
-        : null;
+          ? _normalizeDestinationText(bus.destination)
+          : null;
 
       // busNumber: do tópico MQTT se disponível, senão do campo id
       const busNumber = bus.busNumber || bus.id || 'N/A';
@@ -248,11 +274,12 @@ class VehicleService {
    */
   async resolveHeadsign(bus) {
     // Se o destino já foi resolvido (ex: via tópico MQTT), devolver directamente
-    if (bus.destination) return bus.destination;
+    if (bus.destination) return _normalizeDestinationText(bus.destination);
     if (!bus.tripId || !bus.line || bus.direction == null) return 'Destino desconhecido';
     try {
       const serviceId = await scheduleService.getServiceIdAtual();
-      return await scheduleService.getHeadsignForTrip(bus.tripId, bus.line, bus.direction, serviceId);
+      const headsign = await scheduleService.getHeadsignForTrip(bus.tripId, bus.line, bus.direction, serviceId);
+      return _normalizeDestinationText(headsign);
     } catch {
       return 'Destino desconhecido';
     }
