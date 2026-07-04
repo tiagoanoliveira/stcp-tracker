@@ -586,16 +586,30 @@ export class BusMapApp {
 
   _fitToPositions(positions) {
     if (!positions || positions.length === 0) return;
-    if (positions.length === 1) {
-      this.mapManager.centerOn(positions[0], 15);
+    const normalized = positions
+        .map(p => {
+          if (Array.isArray(p)) {
+            return [Number(p[0]), Number(p[1])];
+          }
+          const lat = Number(p?.lat ?? p?.latitude);
+          const lng = Number(p?.lng ?? p?.lon ?? p?.longitude);
+          return [lat, lng];
+        })
+        .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+    if (normalized.length === 0) return;
+    if (normalized.length === 1) {
+      this.mapManager.centerOn(normalized[0], 15);
       return;
     }
-    const lats = positions.map(p => Array.isArray(p) ? p[0] : p.lat);
-    const lngs = positions.map(p => Array.isArray(p) ? p[1] : p.lng);
-    this.mapManager.map.fitBounds(
-      [[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]],
-      { padding: [60, 60], maxZoom: 15 }
-    );
+    const lats = normalized.map(([lat]) => lat);
+    const lngs = normalized.map(([, lng]) => lng);
+    this.mapManager.map.fitBounds([
+      [Math.min(...lats), Math.min(...lngs)],
+      [Math.max(...lats), Math.max(...lngs)]
+    ], {
+      padding: [60, 60],
+      maxZoom: 15
+    });
   }
 
   // ─── Paragem — refresh periódico ─────────────────────────────────────────────
