@@ -115,6 +115,38 @@ const _debug = () => {
   try { return localStorage.getItem('MQTT_DEBUG') === '1'; } catch { return false; }
 };
 
+function _safeJson(value) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return value;
+  }
+}
+
+function _debugGroupRawMqtt({ topic, meta, payload, feed, entity, vp, raw, vehicle }) {
+  if (!_debug()) return;
+
+  const payloadBytes = payload instanceof Uint8Array
+      ? Array.from(payload)
+      : Array.from(new Uint8Array(payload));
+
+  console.groupCollapsed(
+      `%c[MQTT RAW] ${topic}`,
+      'color:#7c3aed;font-weight:bold'
+  );
+
+  console.log('topic:', topic);
+  console.log('topic meta:', meta);
+  console.log('payload bytes:', payloadBytes);
+  console.log('feed decoded:', _safeJson(feed));
+  console.log('entity vehicle:', _safeJson(entity));
+  console.log('vehiclePosition:', _safeJson(vp));
+  console.log('raw before processBusData:', _safeJson(raw));
+  console.log('vehicle after processBusData:', _safeJson(vehicle));
+
+  console.groupEnd();
+}
+
 let _stats = { received: 0, decoded: 0, processed: 0, skipped: 0 };
 let _statsInterval = null;
 
@@ -309,16 +341,7 @@ function _decodeMessage(payload, topic) {
         tripId,
       };
 
-      if (_debug()) {
-        console.log(
-          `%c[MQTT PROTO→RAW] id:${raw.id} linha:${raw.routeId} dir:${raw.directionId} ` +
-          `lat:${raw.lat?.toFixed(5)} lng:${raw.lng?.toFixed(5)} ` +
-          `speed:${raw.speed}km/h destino:"${raw.destination}" trip:${raw.tripId}`,
-          'color:#006494', raw
-        );
-      }
-
-      return raw;
+      return { raw, meta, feed, entity, vp };
     }
     return null;
   } catch (err) {
@@ -390,24 +413,51 @@ export const mqttVehicleService = {
       });
 
       _client.on('message', (topic, payload) => {
-        const raw = _decodeMessage(payload, topic);
-        if (!raw) return;
+        const decoded = decodeMessage(payload, topic);
+        if (!decoded) return;
 
-        // processBusData exige routeId (line) e tolera directionId=null
-        // Se não há routeId no tópico nem no proto, descartar
+        const { raw, meta, feed, entity, vp } = decoded;
+
         if (!raw.routeId) {
           _stats.skipped++;
+          if (_debug()) {
+            console.groupCollapsed('%c[MQTT SKIP] sem routeId', 'color:#b07a00;font-weight:bold');
+            console.log('topic:', topic);
+            console.log('topic meta:', meta);
+            console.log('feed decoded:', _safeJson(feed));
+            console.log('entity vehicle:', _safeJson(entity));
+            console.log('vehiclePosition:', _safeJson(vp));
+            console.log('raw:', _safeJson(raw));
+            console.groupEnd();
+          }
           return;
         }
 
-        // directionId=null é aceite — usar 0 como default no processamento
         if (raw.directionId == null) raw.directionId = 0;
 
         const vehicle = vehicleService.processBusData(raw);
 
+        _debugGroupRawMqtt({
+          topic,
+          meta,
+          payload,
+          feed,
+          entity,
+          vp,
+          raw,
+          vehicle
+        });
+
         if (!vehicle) {
           _stats.skipped++;
-          if (_debug()) console.warn('%c[MQTT SKIP] processBusData=null', 'color:#b07a00', raw);
+          if (_debug()) {
+            console.groupCollapsed('%c[MQTT SKIP] processBusData=null', 'color:#b07a00;font-weight:bold');
+            console.log('topic:', topic);
+            console.log('topic meta:', meta);
+            console.log('raw before processBusData:', _safeJson(raw));
+            console.log('vehicle after processBusData:', vehicle);
+            console.groupEnd();
+          }
           return;
         }
 
@@ -416,23 +466,14 @@ export const mqttVehicleService = {
           _clearNoDataTimer();
           eventBus.emit('mqtt:dataRestored');
           console.info(
-            `%c🚌 MQTT: primeiro veículo recebido (id:${vehicle.id} linha:${vehicle.displayLine})`,
-            'color:#437a22;font-weight:bold'
+              `%c[MQTT] ✅ primeiro veículo recebido: id=${vehicle.id} linha=${vehicle.displayLine}`,
+              'color:#437a22;font-weight:bold'
           );
         }
 
         _stats.processed++;
-        _vehicles[vehicle.id]         = vehicle;
+        _vehicles[vehicle.id] = vehicle;
         _vehicleTimestamp[vehicle.id] = Date.now();
-
-        if (_debug()) {
-          console.log(
-            `%c[MQTT VEHICLE] ✔ id:${vehicle.id} linha:${vehicle.displayLine} ` +
-            `dir:${vehicle.direction} lat:${vehicle.latitude?.toFixed(5)} ` +
-            `lng:${vehicle.longitude?.toFixed(5)} speed:${vehicle.speed}km/h`,
-            'color:#437a22', vehicle
-          );
-        }
 
         onVehicleUpdate?.(vehicle);
         eventBus.emit('mqtt:vehicleUpdate', vehicle);
