@@ -362,7 +362,7 @@ function parseTopicMeta(topic) {
 function decodeMessage(payload, topic) {
   _stats.received++;
 
-  const meta = _parseTopicMeta(topic);
+  const meta = parseTopicMeta(topic);
 
   try {
     const FeedMessage = _protoRoot.lookupType('transit_realtime.FeedMessage');
