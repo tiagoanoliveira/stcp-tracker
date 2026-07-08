@@ -359,7 +359,7 @@ function parseTopicMeta(topic) {
 
 // ─── Descodificação de mensagens ───────────────────────────────────────────────
 
-function _decodeMessage(payload, topic) {
+function decodeMessage(payload, topic) {
   _stats.received++;
 
   const meta = _parseTopicMeta(topic);
