@@ -78,12 +78,28 @@ const TTL_CHECK_MS       = 5_000;  // ms
 const NO_DATA_TIMEOUT_MS = 15_000; // ms
 
 // Índices do tópico Digitransit (0-based após split '/')
-const TIDX_ROUTE_ID    = 7;
-const TIDX_DIR_ID      = 8;
-const TIDX_HEADSIGN    = 9;
-const TIDX_VEHICLE_NUM = 13;
-const TIDX_SPEED       = 17;
-const TIDX_PLATE       = 19;
+const TOPIC_IDX = {
+  ROOT_EMPTY: 0,
+  FAMILY: 1,
+  ENTITY: 2,
+  FEED_ID: 3,
+  AGENCY_ID: 4,
+  AGENCY_NAME: 5,
+  MODE: 6,
+  ROUTE_ID: 7,
+  DIRECTION_ID: 8,
+  HEADSIGN: 9,
+  TRIP_DESCRIPTOR: 10,
+  NEXT_STOP: 11,
+  START_TIME: 12,
+  VEHICLE_ID: 13,
+  GEOHASH_COORDS: 14,
+  BEARING: 15,
+  EXTRA_16: 16,
+  SPEED: 17,
+  ROUTE_ID_2: 18,
+  PLATE: 19,
+};
 
 /**
  * URLs de fallback para a lib protobufjs, tentados por ordem.
@@ -123,7 +139,7 @@ function _safeJson(value) {
   }
 }
 
-function _debugGroupRawMqtt({ topic, meta, payload, feed, entity, vp, raw, vehicle }) {
+function _debugFullMqttMessage({ topic, meta, payload, feed, entity, vp, raw, vehicle }) {
   if (!_debug()) return;
 
   const payloadBytes = payload instanceof Uint8Array
@@ -131,18 +147,40 @@ function _debugGroupRawMqtt({ topic, meta, payload, feed, entity, vp, raw, vehic
       : Array.from(new Uint8Array(payload));
 
   console.groupCollapsed(
-      `%c[MQTT RAW] ${topic}`,
+      `%c[MQTT FULL] ${meta.routeId || '-'} ${meta.vehicleNumber || '-'} ${meta.headsign || ''}`,
       'color:#7c3aed;font-weight:bold'
   );
 
   console.log('topic:', topic);
-  console.log('topic meta:', meta);
+  console.log('topic meta (all fields):', _safeJson(meta));
+  console.log('topic parts:', meta.parts);
   console.log('payload bytes:', payloadBytes);
   console.log('feed decoded:', _safeJson(feed));
-  console.log('entity vehicle:', _safeJson(entity));
+  console.log('entity:', _safeJson(entity));
   console.log('vehiclePosition:', _safeJson(vp));
   console.log('raw before processBusData:', _safeJson(raw));
   console.log('vehicle after processBusData:', _safeJson(vehicle));
+
+  const protoHints = {
+    tripId: vp?.trip?.trip_id ?? vp?.trip?.tripId ?? null,
+    routeId: vp?.trip?.route_id ?? vp?.trip?.routeId ?? null,
+    directionId: vp?.trip?.direction_id ?? vp?.trip?.directionId ?? null,
+    startTime: vp?.trip?.start_time ?? vp?.trip?.startTime ?? null,
+    startDate: vp?.trip?.start_date ?? vp?.trip?.startDate ?? null,
+    scheduleRelationship: vp?.trip?.schedule_relationship ?? vp?.trip?.scheduleRelationship ?? null,
+    currentStopSequence: vp?.current_stop_sequence ?? vp?.currentStopSequence ?? null,
+    stopId: vp?.stop_id ?? vp?.stopId ?? null,
+    currentStatus: vp?.current_status ?? vp?.currentStatus ?? null,
+    timestamp: vp?.timestamp ?? null,
+    bearing: vp?.position?.bearing ?? null,
+    speed: vp?.position?.speed ?? null,
+    odometer: vp?.position?.odometer ?? null,
+    uncertainty: vp?.position?.uncertainty ?? null,
+    occupancyStatus: vp?.occupancy_status ?? vp?.occupancyStatus ?? null,
+    congestionLevel: vp?.congestion_level ?? vp?.congestionLevel ?? null,
+  };
+
+  console.log('proto hints:', _safeJson(protoHints));
 
   console.groupEnd();
 }
@@ -270,28 +308,52 @@ async function loadProtoSchema() {
 
 // ─── Parsing do tópico MQTT ─────────────────────────────────────────────────
 
-function _parseTopicMeta(topic) {
-  const parts = topic.split('/');
+function parseTopicMeta(topic) {
+  const parts = String(topic || '').split('/');
+
   const seg = (idx) => {
     const s = parts[idx];
-    return (s && s.trim() !== '') ? decodeURIComponent(s.trim()) : null;
+    return s && s.trim() !== '' ? decodeURIComponent(s.trim()) : null;
   };
 
-  const speedRaw = seg(TIDX_SPEED);
+  const speedRaw = seg(TOPIC_IDX.SPEED);
   let speed = null;
-  if (speedRaw && !isNaN(Number(speedRaw))) {
-    const ms = Number(speedRaw);
-    const kmh = ms < 35 ? Math.round(ms * 3.6) : Math.round(ms);
+  if (speedRaw != null && !isNaN(Number(speedRaw))) {
+    const raw = Number(speedRaw);
+    const kmh = raw < 35 ? Math.round(raw * 3.6) : Math.round(raw);
     speed = Math.min(kmh, 90);
   }
 
+  const bearingRaw = seg(TOPIC_IDX.BEARING);
+  const bearing = bearingRaw != null && !isNaN(Number(bearingRaw))
+      ? Number(bearingRaw)
+      : null;
+
   return {
-    routeId:       seg(TIDX_ROUTE_ID),
-    directionId:   seg(TIDX_DIR_ID) != null ? Number(seg(TIDX_DIR_ID)) : null,
-    headsign:      seg(TIDX_HEADSIGN),
-    vehicleNumber: seg(TIDX_VEHICLE_NUM),
+    rawTopic: topic,
+    parts,
+
+    feedId: seg(TOPIC_IDX.FEED_ID),
+    agencyId: seg(TOPIC_IDX.AGENCY_ID),
+    agencyName: seg(TOPIC_IDX.AGENCY_NAME),
+    mode: seg(TOPIC_IDX.MODE),
+
+    routeId: seg(TOPIC_IDX.ROUTE_ID),
+    directionId: seg(TOPIC_IDX.DIRECTION_ID) != null
+        ? Number(seg(TOPIC_IDX.DIRECTION_ID))
+        : null,
+    headsign: seg(TOPIC_IDX.HEADSIGN),
+    tripDescriptor: seg(TOPIC_IDX.TRIP_DESCRIPTOR),
+    nextStop: seg(TOPIC_IDX.NEXT_STOP),
+    startTime: seg(TOPIC_IDX.START_TIME),
+    vehicleNumber: seg(TOPIC_IDX.VEHICLE_ID),
+    geohashCoords: seg(TOPIC_IDX.GEOHASH_COORDS),
+    bearing,
+    extra16: seg(TOPIC_IDX.EXTRA_16),
+    speedRaw,
     speed,
-    plate:         seg(TIDX_PLATE),
+    routeId2: seg(TOPIC_IDX.ROUTE_ID_2),
+    plate: seg(TOPIC_IDX.PLATE),
   };
 }
 
@@ -412,7 +474,7 @@ export const mqttVehicleService = {
         eventBus.emit('mqtt:error', err);
       });
 
-      _client.on('message', (topic, payload) => {
+      client.on('message', (topic, payload) => {
         const decoded = decodeMessage(payload, topic);
         if (!decoded) return;
 
@@ -423,9 +485,9 @@ export const mqttVehicleService = {
           if (_debug()) {
             console.groupCollapsed('%c[MQTT SKIP] sem routeId', 'color:#b07a00;font-weight:bold');
             console.log('topic:', topic);
-            console.log('topic meta:', meta);
-            console.log('feed decoded:', _safeJson(feed));
-            console.log('entity vehicle:', _safeJson(entity));
+            console.log('meta:', _safeJson(meta));
+            console.log('feed:', _safeJson(feed));
+            console.log('entity:', _safeJson(entity));
             console.log('vehiclePosition:', _safeJson(vp));
             console.log('raw:', _safeJson(raw));
             console.groupEnd();
@@ -437,7 +499,7 @@ export const mqttVehicleService = {
 
         const vehicle = vehicleService.processBusData(raw);
 
-        _debugGroupRawMqtt({
+        _debugFullMqttMessage({
           topic,
           meta,
           payload,
@@ -450,14 +512,6 @@ export const mqttVehicleService = {
 
         if (!vehicle) {
           _stats.skipped++;
-          if (_debug()) {
-            console.groupCollapsed('%c[MQTT SKIP] processBusData=null', 'color:#b07a00;font-weight:bold');
-            console.log('topic:', topic);
-            console.log('topic meta:', meta);
-            console.log('raw before processBusData:', _safeJson(raw));
-            console.log('vehicle after processBusData:', vehicle);
-            console.groupEnd();
-          }
           return;
         }
 
