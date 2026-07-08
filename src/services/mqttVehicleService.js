@@ -115,7 +115,7 @@ const PROTOBUFJS_URLS = [
 ];
 
 // ─── Estado interno ────────────────────────────────────────────────────────────
-let _client           = null;
+let client           = null;
 let _protoRoot        = null;
 let _vehicles         = {};
 let _vehicleTimestamp = {};
@@ -434,17 +434,17 @@ export const mqttVehicleService = {
     try {
       await Promise.all([loadMqttLib(), loadProtoSchema()]);
 
-      _client = window.mqtt.connect(BROKER_URL, {
+      client = window.mqtt.connect(BROKER_URL, {
         clean:           true,
         reconnectPeriod: 3000,
         connectTimeout:  8000,
       });
 
-      _client.on('connect', () => {
+      client.on('connect', () => {
         _isConnected = true;
         console.info('✅ MQTT ligado ao broker Porto Digital');
 
-        _client.subscribe(TOPIC, { qos: 0 }, (err) => {
+        client.subscribe(TOPIC, { qos: 0 }, (err) => {
           if (err) console.error('❌ Erro ao subscrever tópico MQTT:', err);
           else     console.info(`📡 Subscrito: ${TOPIC}`);
         });
@@ -456,12 +456,12 @@ export const mqttVehicleService = {
         onConnected?.();
       });
 
-      _client.on('reconnect', () => {
+      client.on('reconnect', () => {
         console.info('🔄 MQTT a reconectar…');
         eventBus.emit('mqtt:reconnecting');
       });
 
-      _client.on('disconnect', () => {
+      client.on('disconnect', () => {
         _isConnected = false;
         _stopStats();
         _clearNoDataTimer();
@@ -469,7 +469,7 @@ export const mqttVehicleService = {
         onDisconnected?.();
       });
 
-      _client.on('error', (err) => {
+      client.on('error', (err) => {
         console.error('❌ Erro MQTT:', err);
         eventBus.emit('mqtt:error', err);
       });
@@ -542,7 +542,7 @@ export const mqttVehicleService = {
   },
 
   stop() {
-    if (_client) { _client.end(true); _client = null; }
+    if (client) { client.end(true); client = null; }
     _isConnected      = false;
     _isStarted        = false;
     _hasReceivedData  = false;
