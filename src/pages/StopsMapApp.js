@@ -75,13 +75,13 @@ export class StopsMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
-      /**
+      
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'No seguimento do Air Invictus, muitos dos destinos foram alterados e alguns percursos foram suprimidos parcialmente ou mesmo na totalidade (18 e 403). Verifique o destino do veículo antes de embarcar.',
+        'Desvio de viaturas no metro da Casa da Música por condicionante de trânsito em vigor. Última atualização: 16:05',
         { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
-     */ 
+     
       await scheduleService.loadScheduleData();
 
       this.mapManager = new MapManager(this.mapElementId);
