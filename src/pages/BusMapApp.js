@@ -79,13 +79,13 @@ export class BusMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
-      /**
+      
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'Desvio de viaturas no metro da Casa da Música por condicionante de trânsito em vigor. Última atualização: 16:05',
+        'Serviço Especial gratuito Festival Comida Continente: procure a linha 38 no mapa ou "SE1" nas paragens.',
         { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
-      */
+      
       await scheduleService.loadScheduleData();
 
       this.mapManager = new MapManager(this.mapElementId);
