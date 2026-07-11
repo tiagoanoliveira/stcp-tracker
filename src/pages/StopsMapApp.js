@@ -78,7 +78,7 @@ export class StopsMapApp {
       
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'Serviço Especial Festival Comida Continente: procure a linha 38 no mapa ou "SE1" nas paragens.',
+        'Serviço Especial Festival Comida Continente: procure a linha 35 ou 38 no mapa ou SE1/SE2 nas paragens.',
         { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
      
