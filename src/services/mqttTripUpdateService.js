@@ -398,4 +398,37 @@ export const mqttTripUpdateService = {
       topicsSeen: [..._topicsSeen],
     };
   },
+
+  /**
+   * Devolve o atraso em segundos para uma viagem na sua próxima paragem.
+   * Retorna null se não houver dados disponíveis.
+   * @param {string} tripId
+   * @param {string} nextStopId - stopId da próxima paragem (do tópico MQTT)
+   * @returns {number|null}
+   */
+  getDelayForTripAtStop(tripId, nextStopId) {
+    if (!tripId || !nextStopId) return null;
+    const meta = _byTrip.get(tripId);
+    if (!meta) return null;
+    const stu = meta.arrivals.find(a => a.stopId === String(nextStopId));
+    return stu ? stu.delaySeconds : null;
+  },
+
+  /**
+   * Devolve o atraso mínimo/mais próximo para uma viagem
+   * (usa a primeira stop_time_update disponível em sequência).
+   * @param {string} tripId
+   * @returns {number|null}
+   */
+  getDelayForTrip(tripId) {
+    if (!tripId) return null;
+    const meta = _byTrip.get(tripId);
+    if (!meta?.arrivals?.length) return null;
+    // Ordenar por stopSequence e devolver o delay da primeira paragem futura
+    const now = Math.floor(Date.now() / 1000);
+    const future = meta.arrivals
+        .filter(a => a.arrivalTime === 0 || a.arrivalTime > now - 30)
+        .sort((a, b) => a.stopSequence - b.stopSequence);
+    return future.length ? future[0].delaySeconds : null;
+  },
 };

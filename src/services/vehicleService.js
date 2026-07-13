@@ -202,9 +202,6 @@ class VehicleService {
 
       if (!line || direction == null) return null;
 
-      // Speed já em km/h (MQTT e worker enviam valor convertido)
-      const rawSpeed = bus.speed;
-      const speed    = Number.isFinite(rawSpeed) ? Math.round(rawSpeed) : 'N/A';
 
       // Destino: usar o valor do tópico se disponível, senão resolver preguiçosamente
       const destination = (bus.destination != null && bus.destination !== '')
@@ -220,7 +217,7 @@ class VehicleService {
         displayLine: this.getDisplayLine(line),
         latitude:    bus.lat,
         longitude:   bus.lng,
-        speed,
+        nextStop:    bus.nextStop || null,
         busNumber,
         destination,
         direction,
@@ -238,10 +235,6 @@ class VehicleService {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
     if (!line || direction == null) return null;
 
-    // FIWARE: speed.value em m/s → converter para km/h
-    const rawSpeedFiware = bus.speed?.value;
-    const speedFiware    = Number.isFinite(rawSpeedFiware) ? Math.round(rawSpeedFiware * 3.6) : 'N/A';
-
     // Normalizar ID FIWARE: "urn:ngsi-ld:Vehicle:3261" → "3261"
     // Garante que o id coincide com o número do veículo usado pelo MQTT,
     // evitando marcadores duplicados no BusMarkerManager.
@@ -253,9 +246,9 @@ class VehicleService {
       displayLine: this.getDisplayLine(line),
       latitude:    lat,
       longitude:   lon,
-      speed:       speedFiware,
       busNumber:   normalizedId,
       destination: null,
+      nextStop: null,
       direction,
       tripId
     };

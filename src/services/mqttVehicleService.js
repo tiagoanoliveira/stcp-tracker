@@ -316,14 +316,6 @@ function parseTopicMeta(topic) {
     return s && s.trim() !== '' ? decodeURIComponent(s.trim()) : null;
   };
 
-  const speedRaw = seg(TOPIC_IDX.SPEED);
-  let speed = null;
-  if (speedRaw != null && !isNaN(Number(speedRaw))) {
-    const raw = Number(speedRaw);
-    const kmh = raw < 35 ? Math.round(raw * 3.6) : Math.round(raw);
-    speed = Math.min(kmh, 90);
-  }
-
   const bearingRaw = seg(TOPIC_IDX.BEARING);
   const bearing = bearingRaw != null && !isNaN(Number(bearingRaw))
       ? Number(bearingRaw)
@@ -350,8 +342,6 @@ function parseTopicMeta(topic) {
     geohashCoords: seg(TOPIC_IDX.GEOHASH_COORDS),
     bearing,
     extra16: seg(TOPIC_IDX.EXTRA_16),
-    speedRaw,
-    speed,
     routeId2: seg(TOPIC_IDX.ROUTE_ID_2),
     plate: seg(TOPIC_IDX.PLATE),
   };
@@ -397,7 +387,7 @@ function decodeMessage(payload, topic) {
         lat:         pos.latitude,
         lng:         pos.longitude,
         destination: meta.headsign,
-        speed:       meta.speed,
+        nextStop:    meta.nextStop,
         routeId,
         directionId,
         tripId,
@@ -479,6 +469,11 @@ export const mqttVehicleService = {
         if (!decoded) return;
 
         const { raw, meta, feed, entity, vp } = decoded;
+
+        if (meta.feedId === '1') {
+          _stats.skipped++;
+          return;
+        }
 
         if (!raw.routeId) {
           _stats.skipped++;

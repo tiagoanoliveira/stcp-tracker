@@ -22,8 +22,8 @@
 
 import { iconCache }      from '../../ui/design/iconCache.js';
 import { vehicleService } from '../../services/vehicleService.js';
-
-const _ICON_SPEED = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0"/><path d="M16.95 7.05a7 7 0 1 0 0 9.9"/><path d="m12 12 3-4"/></svg>`;
+import { mqttTripUpdateService } from '../../services/mqttTripUpdateService.js';
+import { stopService }           from '../../services/stopService.js';
 
 /**
  * Devolve { bg, text } para o cabeçalho do popup.
@@ -152,10 +152,6 @@ export class BusMarkerManager {
           <span class="bus-popup__destination" style="color:${colors.text};">A carregar…</span>
         </div>
         <div class="bus-popup__body">
-          <div class="bus-popup__row" style="--popup-accent:${colors.bg}">
-            ${_ICON_SPEED}
-            <span>${bus.speed != null ? bus.speed + ' km/h' : 'N/D'}</span>
-          </div>
           <div class="bus-popup__vehicle">Veículo nº ${bus.busNumber ?? '—'}</div>
         </div>
       </div>`;
@@ -165,22 +161,56 @@ export class BusMarkerManager {
     const line        = bus.displayLine ?? bus.line ?? '?';
     const colors      = _lineColors(line);
     const destination = bus.destination || 'Desconhecido';
-    const speed       = bus.speed != null ? bus.speed + ' km/h' : 'N/D';
     const vehicle     = bus.busNumber ?? '—';
-    return `
-      <div>
-        <div class="bus-popup__header" style="background:${colors.bg};">
-          <span class="bus-popup__badge" style="color:${colors.bg};">${line}</span>
-          <span class="bus-popup__destination" style="color:${colors.text};" title="${destination}">${destination}</span>
-        </div>
-        <div class="bus-popup__body">
-          <div class="bus-popup__row" style="--popup-accent:${colors.bg}">
-            ${_ICON_SPEED}
-            <span>${speed}</span>
-          </div>
-          <div class="bus-popup__vehicle">Veículo nº ${vehicle}</div>
-        </div>
+
+    // ─── Próxima paragem ──────────────────────────────────────────────
+    let nextStopHtml = '';
+    if (bus.nextStop) {
+      const stopObj  = stopService.getStopById(bus.nextStop);
+      const stopName = stopObj?.stop_name ?? bus.nextStop; // fallback: código
+      nextStopHtml = `
+      <div class="bus-popup__row">
+        <span class="bus-popup__label">Próxima paragem:</span>
+        <span>${stopName}</span>
       </div>`;
+    }
+
+    // ─── Atraso via TripUpdate MQTT ───────────────────────────────────
+    let delayHtml = '';
+    if (bus.tripId) {
+      const delaySec = bus.nextStop
+          ? mqttTripUpdateService.getDelayForTripAtStop(bus.tripId, bus.nextStop)
+          : mqttTripUpdateService.getDelayForTrip(bus.tripId);
+
+      if (delaySec != null) {
+        const absSec  = Math.abs(delaySec);
+        const mins    = Math.floor(absSec / 60);
+        const secs    = absSec % 60;
+        const label   = delaySec > 30
+            ? `⚠ ${mins > 0 ? mins + 'min ' : ''}${secs}s atrasado`
+            : delaySec < -30
+                ? `✅ ${mins > 0 ? mins + 'min ' : ''}${secs}s adiantado`
+                : '✅ Dentro do horário';
+        const color   = delaySec > 30 ? '#c0392b' : '#27ae60';
+        delayHtml = `
+        <div class="bus-popup__row" style="color:${color};font-weight:600;">
+          ${label}
+        </div>`;
+      }
+    }
+
+    return `
+    <div>
+      <div class="bus-popup__header" style="background:${colors.bg};">
+        <span class="bus-popup__badge" style="color:${colors.bg};">${line}</span>
+        <span class="bus-popup__destination" style="color:${colors.text};" title="${destination}">${destination}</span>
+      </div>
+      <div class="bus-popup__body">
+        ${nextStopHtml}
+        ${delayHtml}
+        <div class="bus-popup__vehicle">Veículo nº ${vehicle}</div>
+      </div>
+    </div>`;
   }
 
   // ─── Utilitários ─────────────────────────────────────────────────────────
