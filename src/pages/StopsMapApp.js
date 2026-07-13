@@ -254,7 +254,7 @@ export class StopsMapApp {
     if (!this.currentStopId) return;
     if (!this.busMarkerManager) return;
 
-    if (this._restrictToAllowedTrips) {
+    if (this._allowedTripIds.size > 0) {
       if (!vehicle.tripId || !this._allowedTripIds.has(vehicle.tripId)) {
         return;
       }
@@ -668,6 +668,7 @@ export class StopsMapApp {
     }
 
     _log(`updateBusMap: a chamar updateBusMarkers com ${busesToShow.length} veículo(s)`);
+    this._restrictToAllowedTrips = true;
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this.currentBusPositions = busPositions;
 
