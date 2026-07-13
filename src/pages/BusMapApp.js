@@ -82,7 +82,7 @@ export class BusMapApp {
       
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'Serviço Especial gratuito Festival Comida Continente: procure a linha 35 ou 38 no mapa ou SE1/SE2 nas paragens.',
+        'Por motivos desconhecidos a linha 200 não está a apresentar dados em tempo real.',
         { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
       
