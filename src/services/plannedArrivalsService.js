@@ -77,7 +77,9 @@ function _normalizeOne(a) {
     headsign:          a.headsign          || a.trip_headsign || '',
     scheduled_arrival: a.scheduled_arrival || a.arrival_time  || null,
     realtime_arrival:  a.realtime_arrival  || null,
-    delay:             a.delay             ?? null,
+    delay: a.delay
+        ?? a.delay_seconds
+        ?? (a.delay_minutes != null ? Number(a.delay_minutes) * 60 : null),
     is_realtime:       Boolean(a.is_realtime),
     directionId:       a.directionId       ?? a.direction_id  ?? null,
     _source:           a._source           || 'unknown',

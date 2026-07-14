@@ -22,9 +22,9 @@
 
 import { iconCache }      from '../../ui/design/iconCache.js';
 import { vehicleService } from '../../services/vehicleService.js';
-import { mqttTripUpdateService } from '../../services/mqttTripUpdateService.js';
 import { stopService }           from '../../services/stopService.js';
 import { normalizeDestinationText } from '../../services/vehicleService.js';
+import { plannedArrivalsService } from '../../services/plannedArrivalsService.js';
 
 /**
  * Devolve { bg, text } para o cabeçalho do popup.
@@ -81,6 +81,14 @@ export class BusMarkerManager {
   // ─── Upsert central ──────────────────────────────────────────────────────
 
   _upsertMarker(bus) {
+    const prev = this._busData[bus.id];
+    // Limpar atraso cacheado se a próxima paragem mudou
+    if (prev && prev.nextStop !== bus.nextStop) {
+      bus._delaySec = undefined; // forçar re-resolução do atraso
+    } else if (prev) {
+      bus._delaySec = prev._delaySec; // preservar atraso existente
+    }
+
     this._busData[bus.id] = bus;
     const icon = iconCache.getBusIcon(bus.line);
 
@@ -89,11 +97,17 @@ export class BusMarkerManager {
       marker.setLatLng([bus.latitude, bus.longitude]);
       marker.setIcon(icon);
       if (bus.destination !== null && bus.destination !== undefined) {
-        marker.setPopupContent(this._createPopupContent(bus));
+        // Se o popup está aberto e nextStop mudou, re-resolver nome e atraso
+        if (prev?.nextStop !== bus.nextStop && marker.isPopupOpen()) {
+          this._resolvePopupHeadsign(bus.id, marker);
+        } else if (!marker.isPopupOpen()) {
+          marker.setPopupContent(this._createPopupContent(bus));
+        } else {
+          marker.setPopupContent(this._createPopupContent(bus));
+        }
       }
       return marker;
     }
-
     return this._createBusMarker(bus);
   }
 
@@ -132,19 +146,26 @@ export class BusMarkerManager {
     const bus = this._busData[busId];
     if (!bus) return;
 
-    // Resolver destino se ainda não está disponível
     if (bus.destination == null) {
       const destination = await vehicleService.resolveHeadsign(bus);
       bus.destination = destination;
       this._busData[busId] = bus;
     }
 
-    // Resolver nome da próxima paragem se ainda não está em cache
     if (bus.nextStop && !stopService.getStopById(bus.nextStop)) {
+      try { await stopService.searchStops(bus.nextStop); } catch {}
+    }
+
+    if (bus.nextStop && bus._delaySec === undefined) {
       try {
-        // Pesquisar a paragem pelo código para popular o cache
-        await stopService.searchStops(bus.nextStop);
-      } catch (e) { /* silencioso — o código será usado como fallback */ }
+        const arrivals = await plannedArrivalsService.getNextArrivals(bus.nextStop);
+        const match = arrivals.find(a =>
+            a.trip_id === bus.tripId ||
+            (a.route_short_name && a.route_short_name === bus.displayLine)
+        );
+        bus._delaySec = match?.delay ?? null;
+        this._busData[busId] = bus;
+      } catch { bus._delaySec = null; }
     }
 
     marker.setPopupContent(this._createPopupContent(bus));
@@ -190,26 +211,18 @@ export class BusMarkerManager {
 
     // ─── Atraso via TripUpdate MQTT ───────────────────────────────────
     let delayHtml = '';
-    if (bus.tripId) {
-      const delaySec = bus.nextStop
-          ? mqttTripUpdateService.getDelayForTripAtStop(bus.tripId, bus.nextStop)
-          : mqttTripUpdateService.getDelayForTrip(bus.tripId);
-
-      if (delaySec != null) {
-        const absSec  = Math.abs(delaySec);
-        const mins    = Math.floor(absSec / 60);
-        const secs    = absSec % 60;
-        const label   = delaySec > 30
-            ? `⚠ ${mins > 0 ? mins + 'min ' : ''}${secs}s atrasado`
-            : delaySec < -30
-                ? `✅ ${mins > 0 ? mins + 'min ' : ''}${secs}s adiantado`
-                : '✅ Dentro do horário';
-        const color   = delaySec > 30 ? '#c0392b' : '#27ae60';
-        delayHtml = `
-        <div class="bus-popup__row" style="color:${color};font-weight:600;">
-          ${label}
-        </div>`;
-      }
+    const delaySec = bus._delaySec ?? null;
+    if (delaySec != null) {
+      const absSec = Math.abs(delaySec);
+      const mins   = Math.floor(absSec / 60);
+      const secs   = absSec % 60;
+      const label  = delaySec > 30
+          ? `${mins > 0 ? mins + 'min. ' : ''}${secs} seg. atrasado`
+          : delaySec < -30
+              ? `${mins > 0 ? mins + ' min. ' : ''}${secs} seg. adiantado`
+              : 'Dentro do horário';
+      const color  = delaySec > 30 ? '#c0392b' : '#27ae60';
+      delayHtml = `<div class="bus-popup__row" style="color:${color};font-weight:600;text-align: center;">${label}</div>`;
     }
 
     return `

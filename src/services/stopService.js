@@ -193,6 +193,25 @@ class StopService {
   }
 }
 
+(async () => {
+  try {
+    const resp = await fetch('./resources/stops.json');
+    if (!resp.ok) return;
+    const stops = await resp.json();
+    for (const s of stops) {
+      if (!stopService.allStopsCache.has(s.stop_code)) {
+        stopService.allStopsCache.set(s.stop_code, {
+          stop_id:   s.stop_code,
+          stop_code: s.stop_code,
+          stop_name: s.stop_name,
+          latitude:  s.stop_lat,
+          longitude: s.stop_lon,
+        });
+      }
+    }
+  } catch { /* silencioso */ }
+})();
+
 export const stopService = new StopService();
 
 // Limpeza automática de cache a cada 10 minutos
