@@ -24,6 +24,7 @@ import { iconCache }      from '../../ui/design/iconCache.js';
 import { vehicleService } from '../../services/vehicleService.js';
 import { mqttTripUpdateService } from '../../services/mqttTripUpdateService.js';
 import { stopService }           from '../../services/stopService.js';
+import { normalizeDestinationText } from '../../services/vehicleService.js';
 
 /**
  * Devolve { bg, text } para o cabeçalho do popup.
@@ -130,13 +131,22 @@ export class BusMarkerManager {
   async _resolvePopupHeadsign(busId, marker) {
     const bus = this._busData[busId];
     if (!bus) return;
-    if (bus.destination !== null && bus.destination !== undefined) {
-      marker.setPopupContent(this._createPopupContent(bus));
-      return;
+
+    // Resolver destino se ainda não está disponível
+    if (bus.destination == null) {
+      const destination = await vehicleService.resolveHeadsign(bus);
+      bus.destination = destination;
+      this._busData[busId] = bus;
     }
-    const destination = await vehicleService.resolveHeadsign(bus);
-    bus.destination = destination;
-    this._busData[busId] = bus;
+
+    // Resolver nome da próxima paragem se ainda não está em cache
+    if (bus.nextStop && !stopService.getStopById(bus.nextStop)) {
+      try {
+        // Pesquisar a paragem pelo código para popular o cache
+        await stopService.searchStops(bus.nextStop);
+      } catch (e) { /* silencioso — o código será usado como fallback */ }
+    }
+
     marker.setPopupContent(this._createPopupContent(bus));
   }
 
@@ -167,11 +177,14 @@ export class BusMarkerManager {
     let nextStopHtml = '';
     if (bus.nextStop) {
       const stopObj  = stopService.getStopById(bus.nextStop);
-      const stopName = stopObj?.stop_name ?? bus.nextStop; // fallback: código
+      const rawName  = stopObj?.stop_name ?? bus.nextStop;
+      const stopName = normalizeDestinationText(rawName) ?? rawName;
       nextStopHtml = `
       <div class="bus-popup__row">
-        <span class="bus-popup__label">Próxima paragem:</span>
-        <span>${stopName}</span>
+        <div class="bus-popup-next-stop">
+          <span class="bus-popup__label">Próxima paragem:</span>
+          <span>${stopName}</span>
+        </div>
       </div>`;
     }
 

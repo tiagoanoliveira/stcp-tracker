@@ -23,8 +23,8 @@ POPUP DO AUTOCARRO — card com cor dinâmica da linha
     margin: 0 !important;
     padding: 0 !important;
     line-height: 1.4 !important;
-    width: fit-content !important;
-    min-width: 130px !important;
+    width: max-content !important;
+    min-width: 120px !important;
 }
 
 .popup-line-stop {
@@ -54,7 +54,7 @@ POPUP DO AUTOCARRO — card com cor dinâmica da linha
 
 /* Destino — até 2 linhas, sem truncagem abrupta */
 .bus-popup__destination {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     line-height: 1.35;
     /* Permitir até 2 linhas; se ultrapassar, elipsis na 2ª linha */
@@ -80,7 +80,7 @@ POPUP DO AUTOCARRO — card com cor dinâmica da linha
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 12px;
+    font-size: 11px;
     color: #333;
 }
 
@@ -91,6 +91,13 @@ POPUP DO AUTOCARRO — card com cor dinâmica da linha
 }
 
 .bus-popup__row span { white-space: nowrap; }
+
+.bus-popup-next-stop {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
 
 /* Número do veículo */
 .bus-popup__vehicle {
