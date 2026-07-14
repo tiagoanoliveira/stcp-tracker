@@ -68,6 +68,7 @@
 
 import { eventBus }       from '../core/eventBus.js';
 import { vehicleService } from './vehicleService.js';
+import { mqttTripUpdateService } from './mqttTripUpdateService.js';
 
 // ─── Constantes ────────────────────────────────────────────────────────────
 const BROKER_URL         = 'wss://mmt.portodigital.pt/websocket/';
@@ -438,7 +439,7 @@ export const mqttVehicleService = {
           if (err) console.error('❌ Erro ao subscrever tópico MQTT:', err);
           else     console.info(`📡 Subscrito: ${TOPIC}`);
         });
-
+        mqttTripUpdateService.attach(client, _protoRoot);
         _startNoDataTimer();
         _startStats();
         _startTtlCheck();
@@ -537,6 +538,7 @@ export const mqttVehicleService = {
   },
 
   stop() {
+    mqttTripUpdateService.detach();
     if (client) { client.end(true); client = null; }
     _isConnected      = false;
     _isStarted        = false;
