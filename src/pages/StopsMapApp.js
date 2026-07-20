@@ -634,7 +634,6 @@ export class StopsMapApp {
           _log(`    → match por matchVehicleToTrip (fuzzy)`);
         }
       }
-
       if (!processedBus) {
         _warn(`    → sem veículo para tripId:${arrTripId} linha:${arrival.route_short_name || arrival.route_id}`);
         notFound++;
@@ -643,6 +642,9 @@ export class StopsMapApp {
 
       matched++;
       _log(`    → veículo encontrado id:${processedBus.id} lat:${processedBus.latitude?.toFixed(5)} lng:${processedBus.longitude?.toFixed(5)}`);
+
+      // Passar o atraso da chegada para o veículo (evita recalcular no popup)
+      processedBus._delaySec = arrival.delay ?? null;
 
       busesToShow.push(processedBus);
       busPositions.push([processedBus.latitude, processedBus.longitude]);

@@ -32,7 +32,7 @@ function formatDelay(delaySeconds) {
   const abs  = Math.abs(delaySeconds);
   const sign = delaySeconds < 0 ? '-' : '+';
   const m    = Math.floor(abs / 60);
-  const s    = abs % 60;
+  const s    = Math.round(abs % 60);
   if (m === 0) return `${sign}${s} seg.`;
   if (s === 0) return `${sign}${String(m).padStart(2, '0')} min.`;
   return `${sign}${String(m).padStart(2, '0')} min. ${String(s).padStart(2, '0')} seg.`;

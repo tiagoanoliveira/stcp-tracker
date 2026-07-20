@@ -24,7 +24,6 @@ import { iconCache }      from '../../ui/design/iconCache.js';
 import { vehicleService } from '../../services/vehicleService.js';
 import { stopService }           from '../../services/stopService.js';
 import { normalizeDestinationText } from '../../services/vehicleService.js';
-import { plannedArrivalsService } from '../../services/plannedArrivalsService.js';
 
 /**
  * Devolve { bg, text } para o cabeçalho do popup.
@@ -154,18 +153,6 @@ export class BusMarkerManager {
 
     if (bus.nextStop && !stopService.getStopById(bus.nextStop)) {
       try { await stopService.searchStops(bus.nextStop); } catch {}
-    }
-
-    if (bus.nextStop && bus._delaySec === undefined) {
-      try {
-        const arrivals = await plannedArrivalsService.getNextArrivals(bus.nextStop);
-        const match = arrivals.find(a =>
-            a.trip_id === bus.tripId ||
-            (a.route_short_name && a.route_short_name === bus.displayLine)
-        );
-        bus._delaySec = match?.delay ?? null;
-        this._busData[busId] = bus;
-      } catch { bus._delaySec = null; }
     }
 
     marker.setPopupContent(this._createPopupContent(bus));
