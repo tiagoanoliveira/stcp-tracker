@@ -330,34 +330,14 @@ export class NextArrivals {
    */
   _matchVehicle(arrival) {
     if (!this.allVehicles?.length) return null;
+    const arrTripId = arrival.trip_id;
+    if (!arrTripId) return null;
 
-    const arrTripId = arrival.trip_id;        // já sem prefixo feed (stripped pelo OTP service)
-    const arrLine   = String(arrival.route_short_name || '');
+    const exact = this.allVehicles.find(v => String(v.tripId || '') === arrTripId);
+    if (exact) return exact;
 
-    // 1. Match por trip_id exacto
-    if (arrTripId) {
-      const exact = this.allVehicles.find(v => {
-        const vTripId = String(v.tripId || '');
-        return vTripId === arrTripId;
-      });
-      if (exact) return exact;
-
-      // 2. Match ignorando o 2º segmento (nr_viagem) usando scheduleService logic
-      const byTrip = this.allVehicles.find(v =>
-        vehicleService.tripIdsMatch(v.tripId, arrTripId)
-      );
-      if (byTrip) return byTrip;
-    }
-
-    // 3. Fallback: apenas por linha (vários veículos podem corresponder — pegar o primeiro)
-    //    Não usar direcção aqui: a direcção dos veículos processados pode estar undefined.
-    if (arrLine) {
-      const byLine = this.allVehicles.filter(v => {
-        const vLine = String(v.displayLine || v.line || '');
-        return vLine === arrLine;
-      });
-      if (byLine.length >= 1) return byLine[0];
-    }
+    const byTrip = this.allVehicles.find(v => vehicleService.tripIdsMatch(v.tripId, arrTripId));
+    if (byTrip) return byTrip;
 
     return null;
   }
@@ -367,7 +347,7 @@ export class NextArrivals {
     const textColor   = arrival.route_text_color || '#FFFFFF';
     const isRealtime  = arrival.is_realtime === true;
     const status      = arrival.status || 'SCHEDULED';
-    const delayS      = arrival.delay_seconds || 0;
+    const delayS      = arrival.delay || 0;
 
     const hasLocation = isRealtime && vehicle &&
       vehicleService.extractVehicleLocation(vehicle) !== null;
