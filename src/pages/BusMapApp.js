@@ -562,9 +562,11 @@ export class BusMapApp {
 
       if (!processedBus) continue;
 
+      processedBus._delaySec = arrival.delay ?? null;
+
       const location = vehicleService.extractVehicleLocation(processedBus);
       if (!location) continue;
-
+      
       if (!busesToShow.find(b => b.id === processedBus.id)) {
         busesToShow.push(processedBus);
         busPositions.push(location);
