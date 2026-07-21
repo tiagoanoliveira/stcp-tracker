@@ -306,7 +306,7 @@ export class NextArrivals {
     this.currentStopId = stopId;
     const titleEl = this.element.querySelector('#arrivals-stop-name');
     const codeEl  = this.element.querySelector('#arrivals-stop-code');
-    if (titleEl && stopName) titleEl.textContent = stopName;
+    if (titleEl && stopName) titleEl.textContent = normalizeDestinationText(stopName);
     if (codeEl  && stopId)  codeEl.textContent  = `Código: ${stopId}`;
     this.showLoading();
     this.element.classList.add('visible');

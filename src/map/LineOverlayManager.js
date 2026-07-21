@@ -11,6 +11,7 @@
  *  onStopClick(cb)  — cb(stop) chamado quando o utilizador clica em
  *                     "Próximos autocarros" no popup de uma paragem
  */
+import {normalizeDestinationText} from "../services/vehicleService";
 
 export class LineOverlayManager {
   constructor(map) {
@@ -115,7 +116,7 @@ export class LineOverlayManager {
   _buildStopPopup(stop, lineColor) {
     return `
       <div class="popup-line-stop" style="font-family:inherit;min-width:150px;padding:2px 0">
-        <strong style="color:${lineColor};font-size:13px">${stop.stop_name}</strong><br>
+        <strong style="color:${lineColor};font-size:13px">${normalizeDestinationText(stop.stop_name)}</strong><br>
         <small style="color:#777">${stop.stop_code || stop.stop_id}</small><br>
         <button class="stop-popup-arrivals-btn" style="
           margin-top:8px;

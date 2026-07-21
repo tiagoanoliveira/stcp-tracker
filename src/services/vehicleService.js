@@ -54,7 +54,7 @@ export function normalizeDestinationText(value) {
   if (!value || typeof value !== 'string') return value;
 
   const trimmed = value.trim();
-  const withoutAsterisk = trimmed.replace(/^\*+\s*/, '').trim();
+  const withoutAsterisk = trimmed.replace(/^\*+\s*/, '').replace(/\s*\*+$/, '').trim();
   if (!withoutAsterisk) return withoutAsterisk;
 
   const lettersOnly = withoutAsterisk.replace(/[^A-Za-zÀ-ÿ]/g, '');
@@ -320,10 +320,6 @@ class VehicleService {
       console.warn(`Erro ao resolver delay para veículo ${vehicle.id}:`, err);
       return null;
     }
-  }
-
-  shouldIncludeBus(bus, filterValue) {
-    return filterValue === '' || (bus.line && bus.line.startsWith(filterValue));
   }
 }
 

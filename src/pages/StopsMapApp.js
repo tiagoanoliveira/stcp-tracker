@@ -46,7 +46,7 @@
 import { geolocationService }    from '../core/geolocationService.js';
 import { apiService }             from '../core/apiService.js';
 import { stopService }            from '../services/stopService.js';
-import { vehicleService }         from '../services/vehicleService.js';
+import {normalizeDestinationText, vehicleService} from '../services/vehicleService.js';
 import { plannedArrivalsService } from '../services/plannedArrivalsService.js';
 import { scheduleService }        from '../services/scheduleService.js';
 import { routeService }           from '../services/routeService.js';
@@ -156,9 +156,6 @@ export class StopsMapApp {
       this.busMapControl = createBusMapControl(this.mapManager.map);
       this.busMapControl.addTo(this.mapManager.map);
 
-      this.linesControl = createLinesControl(this.mapManager.map);
-      this.linesControl.addTo(this.mapManager.map);
-
       this.tutorialControl = createTutorialControl(this.mapManager.map, () => this.tutorialModal?.open());
       this.tutorialControl.addTo(this.mapManager.map);
 
@@ -191,9 +188,7 @@ export class StopsMapApp {
       this.routeFilterBar.onFilterChange((selected, routeObjs) =>
         this._handleGlobalRouteFilterChange(selected, routeObjs)
       );
-      // FIX Bug 2: registar cores da API no iconCache para que o
-      // BusMarkerManager._lineColors() encontre as cores corretas em
-      // qualquer contexto (página inicial E página de paragens).
+
       routeService.fetchRoutesList()
         .then(routes => {
           this.routeFilterBar.setRoutes(routes);
@@ -499,7 +494,7 @@ export class StopsMapApp {
     this.busMarkerManager.clearAllMarkers();
 
     this.currentStopId       = stop.stop_id;
-    this.currentStopName     = stop.stop_name;
+    this.currentStopName = normalizeDestinationText(stop.stop_name)
     this.currentStopPosition = [stop.latitude, stop.longitude];
     this.busMapCentered      = false;
     this.currentBusPositions = [];

@@ -49,22 +49,18 @@ export class BusMapApp {
     this.tutorialControl    = null;
     this.loadingOverlay     = null;
 
-    this._selectedRoutes    = new Set();
     this._routeDirMap       = new Map();
     this._allProcessedBuses = [];
 
     this._arrivalsRefreshInterval = null;
     this._currentStopId           = null;
-    this._currentStopName         = null;
     this._currentStopPosition     = null;
-    this._currentBusPositions     = [];
     this._busMapCentered          = false;
 
     // ID do veículo actualmente seguido (selecionado via clique numa chegada)
     this._trackedVehicleId = null;
 
     // Controlo de fonte de veículos e fallback
-    this._vehiclesSource        = 'mqtt';
     this._primaryEmptySince     = null;
     this._fallbackPromptVisible = false;
   }
@@ -283,6 +279,7 @@ export class BusMapApp {
           }
 
           this.busMarkerManager.updateSingleBusMarker(vehicle);
+          this.busMarkerManager.filterByRoutes(routeFilterState.selectedRoutes, routeFilterState.dirMap);
           this.lastUpdateDisplay.update();
 
           if (this._trackedVehicleId && this._trackedVehicleId === vehicle.id) {
@@ -434,7 +431,6 @@ export class BusMapApp {
 
   async _handleRouteFilterChange(selected, routeObjs) {
     routeFilterState.set(selected, routeObjs);
-    this._selectedRoutes = new Set(selected);
     this._routeDirMap    = new Map(routeObjs.map(r => [String(r.number), r.direction ?? 0]));
 
     if (selected.size === 0) {
@@ -481,8 +477,6 @@ export class BusMapApp {
   async _handleArrivalFilterChange(selectedInPanel) {
     const effectiveFilter = selectedInPanel.size > 0 ? selectedInPanel : routeFilterState.selectedRoutes;
 
-    // Resolver a direcção de CADA linha activa consultando as paragens reais
-    // da linha, em vez de confiar apenas nas chegadas previstas (incompletas).
     const resolvedDirMap = new Map();
     await Promise.all(Array.from(effectiveFilter).map(async routeNum => {
       const routeObj = (this.routeFilterBar?.routes || []).find(r => String(r.number) === String(routeNum));
@@ -492,7 +486,7 @@ export class BusMapApp {
     }));
 
     // Guardar no estado global para que outros consumidores (onVehicleUpdate)
-    // usem sempre a direcção correcta.
+    // usem sempre a direção correta.
     routeFilterState.updateDirections(resolvedDirMap);
 
     this.busMarkerManager.filterByRoutes(effectiveFilter, resolvedDirMap);
@@ -518,10 +512,8 @@ export class BusMapApp {
     this._stopArrivalsRefresh();
 
     this._currentStopId       = stop.stop_id;
-    this._currentStopName     = stop.stop_name;
     this._currentStopPosition = [stop.latitude, stop.longitude];
     this._busMapCentered      = false;
-    this._currentBusPositions = [];
     // Limpar qualquer seguimento de veículo anterior ao mudar de paragem
     this._trackedVehicleId    = null;
 
@@ -675,7 +667,6 @@ export class BusMapApp {
       this._fitToPositions([...busPositions, this._currentStopPosition]);
       this._busMapCentered = true;
     }
-    this._currentBusPositions = busPositions;
   }
 
   _fitToPositions(positions) {
@@ -749,9 +740,7 @@ export class BusMapApp {
   async _handleCloseArrivals() {
     this._stopArrivalsRefresh();
     this._currentStopId       = null;
-    this._currentStopName     = null;
     this._currentStopPosition = null;
-    this._currentBusPositions = [];
     this._busMapCentered      = false;
     this._trackedVehicleId    = null;
 

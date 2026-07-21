@@ -95,7 +95,6 @@ export class BusMarkerManager {
       const marker = this.markers[bus.id];
       marker.setLatLng([bus.latitude, bus.longitude]);
       marker.setIcon(icon);
-      if (!this.map.hasLayer(marker)) marker.addTo(this.map);
 
       if (bus.destination !== null && bus.destination !== undefined) {
         // Se o popup está aberto e nextStop mudou, re-resolver nome e atraso
