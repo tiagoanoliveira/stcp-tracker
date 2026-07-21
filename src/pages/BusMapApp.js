@@ -5,6 +5,7 @@
 import { apiService }             from '../core/apiService.js';
 import { geolocationService }     from '../core/geolocationService.js';
 import { autoRefreshManager }     from '../core/autoRefreshManager.js';
+import { eventBus }               from '../core/eventBus.js';
 import { vehicleService }         from '../services/vehicleService.js';
 import { routeService }           from '../services/routeService.js';
 import { scheduleService }        from '../services/scheduleService.js';
@@ -149,8 +150,31 @@ export class BusMapApp {
         this.startAutoRefresh();
       }
 
-      this.loadingOverlay.remove();
-      this.loadingOverlay = null;
+      if (!mqttVehicleService.hasData()) {
+        this.loadingOverlay.update('A aguardar primeiros dados em tempo real...');
+
+        // Escutar evento de primeiro dado recebido
+        const handleFirstData = () => {
+          if (this.loadingOverlay) {
+            this.loadingOverlay.remove();
+            this.loadingOverlay = null;
+          }
+          eventBus.off('mqtt:dataRestored', handleFirstData);
+        };
+        eventBus.on('mqtt:dataRestored', handleFirstData);
+
+        // Timeout de segurança: remover overlay após 30s mesmo sem dados
+        setTimeout(() => {
+          if (this.loadingOverlay) {
+            this.loadingOverlay.remove();
+            this.loadingOverlay = null;
+          }
+          eventBus.off('mqtt:dataRestored', handleFirstData);
+        }, 30000);
+      } else {
+        this.loadingOverlay.remove();
+        this.loadingOverlay = null;
+      }
 
       await this._handleDeepLink();
 
@@ -222,20 +246,72 @@ export class BusMapApp {
         // 4. Com paragem aberta: só mostrar veículos relevantes para essa paragem
         if (this._currentStopId) {
           const arrivals = this.nextArrivals?.allArrivals || [];
-          const isRelevant = arrivals.some(a =>
-            a.is_realtime && (
-              (a.trip_id && vehicle.tripId && vehicleService.tripIdsMatch(vehicle.tripId, a.trip_id)) ||
-              String(a.route_short_name || '') === String(vehicle.displayLine || vehicle.line || '')
-            )
-          );
+
+          // Obter filtro ativo (painel de chegadas tem prioridade sobre barra global)
+          const panelFilter = this.nextArrivals?.selectedRoutes;
+          const activeFilter = (panelFilter && panelFilter.size > 0)
+              ? panelFilter
+              : routeFilterState.selectedRoutes;
+
+          // Obter mapa de direções do filtro ativo
+          let activeDirMap = new Map();
+          if (panelFilter && panelFilter.size > 0) {
+            // Construir mapa de direções a partir das chegadas filtradas
+            for (const routeNum of panelFilter) {
+              const arrival = arrivals.find(a => String(a.route_short_name) === String(routeNum));
+              if (arrival) {
+                const dir = typeof arrival.directionId === 'number'
+                    ? arrival.directionId
+                    : (typeof arrival.direction_id === 'number' ? arrival.direction_id : 0);
+                activeDirMap.set(routeNum, dir);
+              }
+            }
+          } else if (routeFilterState.hasActive()) {
+            activeDirMap = routeFilterState.dirMap;
+          }
+
+          // Verificar se o veículo é relevante para esta paragem
+          const vehicleLine = String(vehicle.displayLine || vehicle.line || '');
+
+          // 1. Se há filtro ativo, o veículo tem que estar nele
+          if (activeFilter.size > 0 && !activeFilter.has(vehicleLine)) {
+            return;
+          }
+
+          // 2. Verificar se corresponde à direção correta
+          if (activeDirMap.size > 0 && activeDirMap.has(vehicleLine)) {
+            const expectedDir = activeDirMap.get(vehicleLine);
+            if (vehicle.direction !== expectedDir) {
+              return;
+            }
+          }
+
+          // 3. Verificar se corresponde a uma chegada prevista para esta paragem
+          const isRelevant = arrivals.some(a => {
+            // Verificar linha
+            const arrivalLine = String(a.route_short_name || '');
+            if (arrivalLine !== vehicleLine) return false;
+
+            // Verificar direção se disponível
+            if (typeof a.directionId === 'number' && typeof vehicle.direction === 'number') {
+              if (a.directionId !== vehicle.direction) return false;
+            } else if (typeof a.direction_id === 'number' && typeof vehicle.direction === 'number') {
+              if (a.direction_id !== vehicle.direction) return false;
+            }
+
+            // Verificar trip_id se disponível
+            return a.is_realtime && (
+                (a.trip_id && vehicle.tripId && vehicleService.tripIdsMatch(vehicle.tripId, a.trip_id)) ||
+                true // Se chegou aqui, linha e direção coincidem
+            );
+          });
+
           if (!isRelevant) return;
 
           this.busMarkerManager.updateSingleBusMarker(vehicle);
           this.lastUpdateDisplay.update();
 
-          // FIX: se este for o veículo actualmente seguido (selecionado via
-          // clique numa chegada), recentrar o mapa na nova posição.
-          // paddingTopLeft compensa a barra de filtros + campo de pesquisa no topo.
+          // Seguimento de veículo selecionado
           if (this._trackedVehicleId && this._trackedVehicleId === vehicle.id) {
             const location = vehicleService.extractVehicleLocation(vehicle);
             if (location) {
@@ -491,6 +567,21 @@ export class BusMapApp {
       ? stopInfo.value.routes : (stop.routes || []);
     this.nextArrivals.setRoutes(routes);
 
+    // Sincronizar filtros da barra global com a paragem
+    if (routeFilterState.hasActive()) {
+      // Pré-selecionar no painel as linhas que estão no filtro global
+      const relevantRoutes = routes.filter(r =>
+          routeFilterState.selectedRoutes.has(String(r.number))
+      );
+
+      if (relevantRoutes.length > 0) {
+        this.nextArrivals.selectedRoutes = new Set(
+            relevantRoutes.map(r => String(r.number))
+        );
+        this.nextArrivals._renderFilterBar();
+      }
+    }
+
     await this._loadStopArrivals(stop.stop_id, true);
     this._startArrivalsRefresh();
     this._pushStopToURL(stop.stop_id);
@@ -654,7 +745,7 @@ export class BusMapApp {
     });
   }
 
-  _handleCloseArrivals() {
+  async _handleCloseArrivals() {
     this._stopArrivalsRefresh();
     this._currentStopId       = null;
     this._currentStopName     = null;
@@ -662,12 +753,36 @@ export class BusMapApp {
     this._currentBusPositions = [];
     this._busMapCentered      = false;
     this._trackedVehicleId    = null;
-    this.lineOverlayManager.clearAll();
+
+    // Restaurar markers de todos os autocarros
     this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
+
     const activeRoutes = routeFilterState.selectedRoutes;
+
     if (activeRoutes.size > 0) {
+      // Re-aplicar filtros e overlays ativos
       this.busMarkerManager.filterByRoutes(activeRoutes, routeFilterState.dirMap);
+
+      // Restaurar shapes e stops das linhas filtradas
+      const routeObjs = routeFilterState.selectedRouteObjs;
+      const routesToFetch = routeObjs.map(r => ({
+        routeId:    String(r.id || r.number),
+        direction:  r.direction ?? 0,
+        color:      r.color      || '#187EC2',
+        text_color: r.text_color || '#FFFFFF'
+      }));
+
+      try {
+        const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
+        this.lineOverlayManager.setRoutes(overlayData);
+      } catch (err) {
+        console.warn('Erro ao restaurar overlays:', err);
+      }
+    } else {
+      // Sem filtros ativos - limpar overlays
+      this.lineOverlayManager.clearAll();
     }
+
     this._removeStopFromURL();
   }
 

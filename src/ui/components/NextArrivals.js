@@ -173,19 +173,59 @@ export class NextArrivals {
 
   setRoutes(routes = []) {
     this.availableRoutes = routes;
-    this.selectedRoutes  = new Set(
-      routes.map(r => String(r.number)).filter(num => routeFilterState.selectedRoutes.has(num))
+
+    // Sincronizar com filtro global: se houver filtros globais ativos
+    // que correspondem a rotas desta paragem, pré-selecioná-los
+    this.selectedRoutes = new Set(
+        routes
+            .map(r => String(r.number))
+            .filter(num => routeFilterState.selectedRoutes.has(num))
     );
+
     this._renderFilterBar();
     if (this.allArrivals.length > 0) this._renderArrivals();
   }
-
   _toggleRoute(routeNumber) {
-    if (this.selectedRoutes.has(routeNumber)) this.selectedRoutes.delete(routeNumber);
-    else this.selectedRoutes.add(routeNumber);
+    if (this.selectedRoutes.has(routeNumber)) {
+      this.selectedRoutes.delete(routeNumber);
+    } else {
+      this.selectedRoutes.add(routeNumber);
+    }
+
+    // Sincronizar com barra global
+    if (this.selectedRoutes.size > 0) {
+      // Construir objetos de rota com direções para o estado global
+      const routeObjs = Array.from(this.selectedRoutes).map(num => {
+        const route = this.availableRoutes.find(r => String(r.number) === String(num));
+        const arrival = this.allArrivals.find(a => String(a.route_short_name) === String(num));
+
+        let direction = 0;
+        if (typeof arrival?.directionId === 'number') {
+          direction = arrival.directionId;
+        } else if (typeof arrival?.direction_id === 'number') {
+          direction = arrival.direction_id;
+        }
+
+        return {
+          number: num,
+          id: route?.id || num,
+          direction: direction,
+          color: route?.color || '#0072C6',
+          text_color: route?.text_color || '#FFFFFF'
+        };
+      });
+
+      routeFilterState.set(this.selectedRoutes, routeObjs);
+    } else {
+      // Limpar filtro global quando nenhuma linha está selecionada
+      routeFilterState.clear();
+    }
+
     this._renderFilterBar();
     this._renderArrivals();
-    if (this.onFilterChangeCallback) this.onFilterChangeCallback(new Set(this.selectedRoutes));
+    if (this.onFilterChangeCallback) {
+      this.onFilterChangeCallback(new Set(this.selectedRoutes));
+    }
   }
 
   _renderFilterBar() {

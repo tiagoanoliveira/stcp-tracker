@@ -228,7 +228,7 @@ export class BusMarkerManager {
     if (delaySec != null) {
       const absSec = Math.abs(delaySec);
       const mins   = Math.floor(absSec / 60);
-      const secs   = Math.abs(absSec % 60);
+      const secs   = Math.round(absSec % 60);
       const label  = delaySec > 30
           ? `${mins > 0 ? mins + 'min. ' : ''}${secs} seg. atrasado`
           : delaySec < -30
