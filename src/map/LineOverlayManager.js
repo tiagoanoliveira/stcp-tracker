@@ -11,7 +11,7 @@
  *  onStopClick(cb)  — cb(stop) chamado quando o utilizador clica em
  *                     "Próximos autocarros" no popup de uma paragem
  */
-import {normalizeDestinationText} from "../services/vehicleService";
+import {normalizeDestinationText} from "../services/vehicleService.js";
 
 export class LineOverlayManager {
   constructor(map) {
