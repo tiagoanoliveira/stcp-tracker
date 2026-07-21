@@ -145,12 +145,26 @@ export class BusMarkerManager {
     const bus = this._busData[busId];
     if (!bus) return;
 
+    // Resolver destino (já existe)
     if (bus.destination == null) {
       const destination = await vehicleService.resolveHeadsign(bus);
       bus.destination = destination;
       this._busData[busId] = bus;
     }
 
+    // ADICIONAR: Resolver delay se nextStop existe e delay ainda não foi calculado
+    if (bus.nextStop && bus._delaySec === undefined) {
+      try {
+        const delay = await vehicleService.resolveVehicleDelay(bus);
+        bus._delaySec = delay;
+        this._busData[busId] = bus;
+      } catch (err) {
+        console.warn(`Não foi possível obter delay para veículo ${busId}:`, err);
+        bus._delaySec = null; // Marcar como tentado para não repetir
+      }
+    }
+
+    // Resolver nome da paragem (já existe)
     if (bus.nextStop && !stopService.getStopById(bus.nextStop)) {
       try { await stopService.searchStops(bus.nextStop); } catch {}
     }
@@ -181,6 +195,17 @@ export class BusMarkerManager {
     const destination = bus.destination || 'Desconhecido';
     const vehicle     = bus.busNumber ?? '—';
 
+    // ─── Ícones inline ────────────────────
+    const ICON_NEXT_STOP = `<svg class="bus-popup__icon bus-popup__icon--wide" width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="0" y1="2" x2="2" y2="20"></line>
+      <rect x="0" y="2" width="12" height="7" rx="2"></rect>
+    </svg>`;
+
+    const ICON_CLOCK = `<svg class="bus-popup__icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10"></circle>
+      <polyline points="12 6 12 12 16 14"></polyline>
+    </svg>`;
+
     // ─── Próxima paragem ──────────────────────────────────────────────
     let nextStopHtml = '';
     if (bus.nextStop) {
@@ -189,8 +214,9 @@ export class BusMarkerManager {
       const stopName = normalizeDestinationText(rawName) ?? rawName;
       nextStopHtml = `
       <div class="bus-popup__row">
-        <div class="bus-popup-next-stop">
-          <span class="bus-popup__label">Próxima paragem:</span>
+        <div class="bus-popup-next-stop" title="Próxima paragem">
+          ${ICON_NEXT_STOP}
+          <span class="bus-popup__label">Próxima:</span>
           <span>${stopName}</span>
         </div>
       </div>`;
@@ -202,14 +228,19 @@ export class BusMarkerManager {
     if (delaySec != null) {
       const absSec = Math.abs(delaySec);
       const mins   = Math.floor(absSec / 60);
-      const secs   = absSec % 60;
+      const secs   = Math.abs(absSec % 60);
       const label  = delaySec > 30
           ? `${mins > 0 ? mins + 'min. ' : ''}${secs} seg. atrasado`
           : delaySec < -30
               ? `${mins > 0 ? mins + ' min. ' : ''}${secs} seg. adiantado`
               : 'Dentro do horário';
       const color  = delaySec > 30 ? '#c0392b' : '#27ae60';
-      delayHtml = `<div class="bus-popup__row" style="color:${color};font-weight:600;text-align: center;">${label}</div>`;
+      delayHtml = `
+      <div class="bus-popup__row bus-popup__delay" style="color:${color};font-weight:600;">
+        ${ICON_CLOCK}
+        <span>${label}</span>
+      </div>`;
+
     }
 
     return `
