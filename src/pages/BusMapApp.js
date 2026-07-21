@@ -247,71 +247,44 @@ export class BusMapApp {
         if (this._currentStopId) {
           const arrivals = this.nextArrivals?.allArrivals || [];
 
-          // Obter filtro ativo (painel de chegadas tem prioridade sobre barra global)
-          const panelFilter = this.nextArrivals?.selectedRoutes;
-          const activeFilter = (panelFilter && panelFilter.size > 0)
-              ? panelFilter
-              : routeFilterState.selectedRoutes;
+          // routeFilterState é sempre a fonte de verdade (painel e barra global
+          // escrevem sempre nele), incluindo a direcção já corrigida em
+          // _handleArrivalFilterChange().
+          const activeFilter = routeFilterState.selectedRoutes;
+          const activeDirMap = routeFilterState.dirMap;
 
-          // Obter mapa de direções do filtro ativo
-          let activeDirMap = new Map();
-          if (panelFilter && panelFilter.size > 0) {
-            // Construir mapa de direções a partir das chegadas filtradas
-            for (const routeNum of panelFilter) {
-              const arrival = arrivals.find(a => String(a.route_short_name) === String(routeNum));
-              if (arrival) {
-                const dir = typeof arrival.directionId === 'number'
-                    ? arrival.directionId
-                    : (typeof arrival.direction_id === 'number' ? arrival.direction_id : 0);
-                activeDirMap.set(routeNum, dir);
-              }
-            }
-          } else if (routeFilterState.hasActive()) {
-            activeDirMap = routeFilterState.dirMap;
-          }
-
-          // Verificar se o veículo é relevante para esta paragem
           const vehicleLine = String(vehicle.displayLine || vehicle.line || '');
 
-          // 1. Se há filtro ativo, o veículo tem que estar nele
+          // 1. Se há filtro activo, o veículo tem de pertencer a uma das linhas filtradas
           if (activeFilter.size > 0 && !activeFilter.has(vehicleLine)) {
             return;
           }
 
-          // 2. Verificar se corresponde à direção correta
-          if (activeDirMap.size > 0 && activeDirMap.has(vehicleLine)) {
-            const expectedDir = activeDirMap.get(vehicleLine);
-            if (vehicle.direction !== expectedDir) {
-              return;
-            }
+          // 2. Verificar direcção
+          if (activeDirMap.has(vehicleLine) && vehicle.direction !== activeDirMap.get(vehicleLine)) {
+            return;
           }
 
-          // 3. Verificar se corresponde a uma chegada prevista para esta paragem
-          const isRelevant = arrivals.some(a => {
-            // Verificar linha
-            const arrivalLine = String(a.route_short_name || '');
-            if (arrivalLine !== vehicleLine) return false;
-
-            // Verificar direção se disponível
-            if (typeof a.directionId === 'number' && typeof vehicle.direction === 'number') {
-              if (a.directionId !== vehicle.direction) return false;
-            } else if (typeof a.direction_id === 'number' && typeof vehicle.direction === 'number') {
-              if (a.direction_id !== vehicle.direction) return false;
-            }
-
-            // Verificar trip_id se disponível
-            return a.is_realtime && (
-                (a.trip_id && vehicle.tripId && vehicleService.tripIdsMatch(vehicle.tripId, a.trip_id)) ||
-                true // Se chegou aqui, linha e direção coincidem
-            );
-          });
-
-          if (!isRelevant) return;
+          // 3. SEM filtro de linha activo: restringir aos veículos com chegada
+          //    prevista para esta paragem (evita mostrar toda a rede).
+          //    COM filtro activo: mostrar sempre todos os veículos da linha/direcção.
+          if (activeFilter.size === 0) {
+            const isRelevant = arrivals.some(a => {
+              const arrivalLine = String(a.route_short_name || '');
+              if (arrivalLine !== vehicleLine) return false;
+              if (typeof a.directionId === 'number' && typeof vehicle.direction === 'number') {
+                if (a.directionId !== vehicle.direction) return false;
+              } else if (typeof a.direction_id === 'number' && typeof vehicle.direction === 'number') {
+                if (a.direction_id !== vehicle.direction) return false;
+              }
+              return a.is_realtime;
+            });
+            if (!isRelevant) return;
+          }
 
           this.busMarkerManager.updateSingleBusMarker(vehicle);
           this.lastUpdateDisplay.update();
 
-          // Seguimento de veículo selecionado
           if (this._trackedVehicleId && this._trackedVehicleId === vehicle.id) {
             const location = vehicleService.extractVehicleLocation(vehicle);
             if (location) {
@@ -506,36 +479,34 @@ export class BusMapApp {
   }
 
   async _handleArrivalFilterChange(selectedInPanel) {
-    const arrivalDirMap = new Map();
-
-    for (const routeNum of selectedInPanel) {
-      const arrival = this.nextArrivals.allArrivals.find(
-        a => String(a.route_short_name) === String(routeNum)
-      );
-      if (arrival) {
-        let dir = 0;
-        if (typeof arrival.directionId === 'number')   dir = arrival.directionId;
-        else if (typeof arrival.direction_id === 'number') dir = arrival.direction_id;
-        arrivalDirMap.set(routeNum, dir);
-      }
-    }
-
     const effectiveFilter = selectedInPanel.size > 0 ? selectedInPanel : routeFilterState.selectedRoutes;
-    const effectiveDirMap = arrivalDirMap.size > 0    ? arrivalDirMap  : routeFilterState.dirMap;
-    this.busMarkerManager.filterByRoutes(effectiveFilter, effectiveDirMap);
+
+    // Resolver a direcção de CADA linha activa consultando as paragens reais
+    // da linha, em vez de confiar apenas nas chegadas previstas (incompletas).
+    const resolvedDirMap = new Map();
+    await Promise.all(Array.from(effectiveFilter).map(async routeNum => {
+      const routeObj = (this.routeFilterBar?.routes || []).find(r => String(r.number) === String(routeNum));
+      const routeId  = String(routeObj?.id || routeNum);
+      const dir      = await this._resolveDirectionForStop(routeId);
+      resolvedDirMap.set(String(routeNum), dir);
+    }));
+
+    // Guardar no estado global para que outros consumidores (onVehicleUpdate)
+    // usem sempre a direcção correcta.
+    routeFilterState.updateDirections(resolvedDirMap);
+
+    this.busMarkerManager.filterByRoutes(effectiveFilter, resolvedDirMap);
 
     if (selectedInPanel.size > 0) {
-      const routesToFetch = [];
-      for (const routeNum of selectedInPanel) {
-        const dir = arrivalDirMap.get(routeNum) ?? 0;
+      const routesToFetch = Array.from(selectedInPanel).map(routeNum => {
         const routeObj = (this.routeFilterBar?.routes || []).find(r => String(r.number) === String(routeNum));
-        routesToFetch.push({
+        return {
           routeId:    String(routeObj?.id || routeNum),
-          direction:  dir,
+          direction:  resolvedDirMap.get(String(routeNum)) ?? 0,
           color:      routeObj?.color      || '#187EC2',
           text_color: routeObj?.text_color || '#FFFFFF',
-        });
-      }
+        };
+      });
       const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
       this.lineOverlayManager.setRoutes(overlayData);
     } else {
@@ -588,6 +559,23 @@ export class BusMapApp {
   }
 
   /**
+   * Resolve a direcção correta de uma linha para a paragem actualmente aberta,
+   * verificando se essa paragem pertence à lista de paragens da direcção 0.
+   * Mais fiável do que assumir 0 quando não há chegada prevista correspondente.
+   */
+  async _resolveDirectionForStop(routeId) {
+    if (!this._currentStopId) return 0;
+    try {
+      const stopsDir0 = await routeService.fetchRouteStops(routeId, 0);
+      const stopIds0  = (stopsDir0?.stops || []).map(s => String(s.stop_id));
+      return stopIds0.includes(String(this._currentStopId)) ? 0 : 1;
+    } catch (e) {
+      console.warn(`⚠️ Erro ao verificar direção da linha ${routeId} para a paragem ${this._currentStopId}:`, e);
+      return 0;
+    }
+  }
+
+  /**
    * Carrega chegadas para a paragem actual.
    *
    * @param {string}  stopId       - ID da paragem
@@ -631,43 +619,57 @@ export class BusMapApp {
   async _updateArrivalsOnMap(arrivals, vehicles, centerMap = false) {
     const busesToShow  = [];
     const busPositions = [];
+    const shownIds      = new Set();
 
+    const addBus = (bus, delaySec) => {
+      if (!bus || shownIds.has(bus.id)) return;
+      const location = vehicleService.extractVehicleLocation(bus);
+      if (!location) return;
+      if (delaySec !== undefined) bus._delaySec = delaySec;
+      shownIds.add(bus.id);
+      busesToShow.push(bus);
+      busPositions.push(location);
+    };
+
+    // 1. Associar chegadas previstas a veículos (para obter o delay correcto)
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
-
       let processedBus = null;
-
       if (arrival.trip_id && vehicles.length > 0) {
         processedBus = vehicles.find(v =>
-          v.tripId && vehicleService.tripIdsMatch(v.tripId, arrival.trip_id)
+            v.tripId && vehicleService.tripIdsMatch(v.tripId, arrival.trip_id)
         ) || null;
       }
-
       if (!processedBus && vehicles.length > 0) {
         const arrLine  = String(arrival.route_short_name || '');
         const candidates = vehicles.filter(v =>
-          String(v.displayLine || v.line || '') === arrLine
+            String(v.displayLine || v.line || '') === arrLine
         );
         if (candidates.length > 0) processedBus = candidates[0];
       }
+      addBus(processedBus, arrival.delay ?? null);
+    }
 
-      if (!processedBus) continue;
-
-      processedBus._delaySec = arrival.delay ?? null;
-
-      const location = vehicleService.extractVehicleLocation(processedBus);
-      if (!location) continue;
-      
-      if (!busesToShow.find(b => b.id === processedBus.id)) {
-        busesToShow.push(processedBus);
-        busPositions.push(location);
-      }
+    // 2. Com filtro de linha activo: adicionar TODOS os veículos dessa
+    //    linha/direcção, mesmo sem chegada prevista correspondente (autocarros
+    //    ainda longe da paragem, ou fora da janela/limite da OTP).
+    const activeFilter = routeFilterState.selectedRoutes;
+    if (activeFilter.size > 0) {
+      const activeDirMap = routeFilterState.dirMap;
+      vehicles.forEach(v => {
+        const line = String(v.displayLine || v.line || '');
+        if (!activeFilter.has(line)) return;
+        if (activeDirMap.has(line) && v.direction !== activeDirMap.get(line)) return;
+        addBus(v);
+      });
     }
 
     if (busesToShow.length > 0) {
       this.busMarkerManager.updateBusMarkers(busesToShow);
-    } else if (vehicles.length > 0) {
+    } else if (vehicles.length > 0 && activeFilter.size === 0) {
       this.busMarkerManager.updateBusMarkers(vehicles.slice(0, 20));
+    } else {
+      this.busMarkerManager.clearAllMarkers();
     }
 
     if (centerMap && !this._busMapCentered && busPositions.length > 0 && this._currentStopPosition) {

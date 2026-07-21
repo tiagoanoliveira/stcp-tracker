@@ -192,24 +192,29 @@ export class NextArrivals {
       this.selectedRoutes.add(routeNumber);
     }
 
-    // Sincronizar com barra global
     if (this.selectedRoutes.size > 0) {
-      // Construir objetos de rota com direções para o estado global
       const routeObjs = Array.from(this.selectedRoutes).map(num => {
         const route = this.availableRoutes.find(r => String(r.number) === String(num));
         const arrival = this.allArrivals.find(a => String(a.route_short_name) === String(num));
 
-        let direction = 0;
+        let direction;
         if (typeof arrival?.directionId === 'number') {
           direction = arrival.directionId;
         } else if (typeof arrival?.direction_id === 'number') {
           direction = arrival.direction_id;
+        } else if (routeFilterState.dirMap.has(String(num))) {
+          // Sem chegada prevista para esta linha: preservar a direcção já
+          // conhecida (ex: escolhida manualmente na barra global) em vez de
+          // a substituir por 0, que pode estar errado.
+          direction = routeFilterState.dirMap.get(String(num));
+        } else {
+          direction = 0;
         }
 
         return {
           number: num,
           id: route?.id || num,
-          direction: direction,
+          direction,
           color: route?.color || '#0072C6',
           text_color: route?.text_color || '#FFFFFF'
         };
@@ -217,7 +222,6 @@ export class NextArrivals {
 
       routeFilterState.set(this.selectedRoutes, routeObjs);
     } else {
-      // Limpar filtro global quando nenhuma linha está selecionada
       routeFilterState.clear();
     }
 

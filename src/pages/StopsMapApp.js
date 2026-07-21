@@ -254,16 +254,25 @@ export class StopsMapApp {
     if (!this.currentStopId) return;
     if (!this.busMarkerManager) return;
 
-    if (this._allowedTripIds.size > 0) {
+    const activeFilter = routeFilterState.selectedRoutes;
+    const vehicleLine  = String(vehicle.displayLine || vehicle.line || '');
+
+    if (activeFilter.size > 0) {
+      // Com filtro de linha activo: mostrar sempre os veículos dessa linha/direcção
+      if (!activeFilter.has(vehicleLine)) return;
+      const activeDirMap = routeFilterState.dirMap;
+      if (activeDirMap.has(vehicleLine) && vehicle.direction !== activeDirMap.get(vehicleLine)) return;
+    } else if (this._allowedTripIds.size > 0) {
+      // Sem filtro: manter restrição às chegadas previstas para esta paragem
       if (!vehicle.tripId || !this._allowedTripIds.has(vehicle.tripId)) {
         return;
       }
     }
 
     _log(
-      `onVehicleUpdate PERMITIDO id:${vehicle.id} linha:${vehicle.displayLine}`,
-      `tripId:${vehicle.tripId} lat:${vehicle.latitude?.toFixed(5)} lng:${vehicle.longitude?.toFixed(5)}`,
-      `marcadores actuais: ${this.busMarkerManager.getMarkerCount()}`
+        `onVehicleUpdate PERMITIDO id:${vehicle.id} linha:${vehicle.displayLine}`,
+        `tripId:${vehicle.tripId} lat:${vehicle.latitude?.toFixed(5)} lng:${vehicle.longitude?.toFixed(5)}`,
+        `marcadores actuais: ${this.busMarkerManager.getMarkerCount()}`
     );
 
     this.busMarkerManager.updateSingleBusMarker(vehicle);
@@ -694,45 +703,46 @@ export class StopsMapApp {
 
   async handleArrivalFilterChange(selectedRoutes) {
     const effectiveFilter = selectedRoutes.size > 0
-      ? selectedRoutes
-      : routeFilterState.selectedRoutes;
+        ? selectedRoutes
+        : routeFilterState.selectedRoutes;
 
-    const visiblePositions = this.busMarkerManager.filterByRoutes(
-      effectiveFilter, routeFilterState.dirMap
-    );
+    const availableRoutes = this.nextArrivals?.availableRoutes || [];
+    const resolvedDirMap  = new Map();
+
+    if (this.currentStopId && effectiveFilter.size > 0) {
+      await Promise.all(Array.from(effectiveFilter).map(async routeNum => {
+        const r       = availableRoutes.find(rt => String(rt.number) === String(routeNum));
+        const routeId = String(r?.id || routeNum);
+        let direction = 0;
+        try {
+          const stopsDir0 = await routeService.fetchRouteStops(routeId, 0);
+          const stopIds0  = (stopsDir0?.stops || []).map(s => String(s.stop_id));
+          if (!stopIds0.includes(String(this.currentStopId))) direction = 1;
+          _log(`handleArrivalFilterChange linha:${routeId} paragem:${this.currentStopId} dir0 tem ${stopIds0.length} paragens → usar dir:${direction}`);
+        } catch (e) {
+          _warn(`handleArrivalFilterChange: erro ao obter paragens dir0 para linha ${routeId}`, e);
+        }
+        resolvedDirMap.set(String(routeNum), direction);
+      }));
+    }
+
+    // Actualizar o estado global com as direcções correctas.
+    routeFilterState.updateDirections(resolvedDirMap);
+
+    const visiblePositions = this.busMarkerManager.filterByRoutes(effectiveFilter, resolvedDirMap);
 
     if (selectedRoutes.size === 0 && !routeFilterState.hasActive()) {
       this.lineOverlayManager.clearAll();
     } else {
-      const sourceRoutes    = selectedRoutes.size > 0 ? selectedRoutes : routeFilterState.selectedRoutes;
-      const availableRoutes = this.nextArrivals?.availableRoutes || [];
-
-      const routeObjsPromises = availableRoutes
-        .filter(r => sourceRoutes.has(r.number))
-        .map(async r => {
-          const routeId = String(r.id || r.number);
-          let direction = 0;
-
-          if (this.currentStopId) {
-            try {
-              const stopsDir0 = await routeService.fetchRouteStops(routeId, 0);
-              const stopIds0  = (stopsDir0?.stops || []).map(s => String(s.stop_id));
-              if (!stopIds0.includes(String(this.currentStopId))) direction = 1;
-              _log(`handleArrivalFilterChange linha:${routeId} paragem:${this.currentStopId} dir0 tem ${stopIds0.length} paragens → usar dir:${direction}`);
-            } catch (e) {
-              _warn(`handleArrivalFilterChange: erro ao obter paragens dir0 para linha ${routeId}`, e);
-            }
-          }
-
-          return {
-            routeId,
-            direction,
+      const sourceRoutes = selectedRoutes.size > 0 ? selectedRoutes : routeFilterState.selectedRoutes;
+      const routeObjs = availableRoutes
+          .filter(r => sourceRoutes.has(String(r.number)))
+          .map(r => ({
+            routeId:    String(r.id || r.number),
+            direction:  resolvedDirMap.get(String(r.number)) ?? 0,
             color:      r.color      || '#187EC2',
             text_color: r.text_color || '#FFFFFF'
-          };
-        });
-
-      const routeObjs = await Promise.all(routeObjsPromises);
+          }));
 
       if (routeObjs.length > 0) {
         const overlayData = await routeService.fetchMultipleRoutesOverlay(routeObjs);
