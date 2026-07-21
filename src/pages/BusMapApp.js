@@ -277,7 +277,7 @@ export class BusMapApp {
               } else if (typeof a.direction_id === 'number' && typeof vehicle.direction === 'number') {
                 if (a.direction_id !== vehicle.direction) return false;
               }
-              return a.is_realtime;
+              return true;
             });
             if (!isRelevant) return;
           }
@@ -516,7 +516,6 @@ export class BusMapApp {
 
   async _handleStopClick(stop) {
     this._stopArrivalsRefresh();
-    this.busMarkerManager.hideAllMarkers();
 
     this._currentStopId       = stop.stop_id;
     this._currentStopName     = stop.stop_name;
