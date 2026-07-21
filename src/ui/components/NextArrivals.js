@@ -32,7 +32,7 @@ function formatDelay(delaySeconds) {
   const abs  = Math.abs(delaySeconds);
   const sign = delaySeconds < 0 ? '-' : '+';
   const m    = Math.floor(abs / 60);
-  const s    = abs % 60;
+  const s    = Math.round(abs % 60);
   if (m === 0) return `${sign}${s} seg.`;
   if (s === 0) return `${sign}${String(m).padStart(2, '0')} min.`;
   return `${sign}${String(m).padStart(2, '0')} min. ${String(s).padStart(2, '0')} seg.`;
@@ -173,19 +173,59 @@ export class NextArrivals {
 
   setRoutes(routes = []) {
     this.availableRoutes = routes;
-    this.selectedRoutes  = new Set(
-      routes.map(r => String(r.number)).filter(num => routeFilterState.selectedRoutes.has(num))
+
+    // Sincronizar com filtro global: se houver filtros globais ativos
+    // que correspondem a rotas desta paragem, pré-selecioná-los
+    this.selectedRoutes = new Set(
+        routes
+            .map(r => String(r.number))
+            .filter(num => routeFilterState.selectedRoutes.has(num))
     );
+
     this._renderFilterBar();
     if (this.allArrivals.length > 0) this._renderArrivals();
   }
-
   _toggleRoute(routeNumber) {
-    if (this.selectedRoutes.has(routeNumber)) this.selectedRoutes.delete(routeNumber);
-    else this.selectedRoutes.add(routeNumber);
+    if (this.selectedRoutes.has(routeNumber)) {
+      this.selectedRoutes.delete(routeNumber);
+    } else {
+      this.selectedRoutes.add(routeNumber);
+    }
+
+    // Sincronizar com barra global
+    if (this.selectedRoutes.size > 0) {
+      // Construir objetos de rota com direções para o estado global
+      const routeObjs = Array.from(this.selectedRoutes).map(num => {
+        const route = this.availableRoutes.find(r => String(r.number) === String(num));
+        const arrival = this.allArrivals.find(a => String(a.route_short_name) === String(num));
+
+        let direction = 0;
+        if (typeof arrival?.directionId === 'number') {
+          direction = arrival.directionId;
+        } else if (typeof arrival?.direction_id === 'number') {
+          direction = arrival.direction_id;
+        }
+
+        return {
+          number: num,
+          id: route?.id || num,
+          direction: direction,
+          color: route?.color || '#0072C6',
+          text_color: route?.text_color || '#FFFFFF'
+        };
+      });
+
+      routeFilterState.set(this.selectedRoutes, routeObjs);
+    } else {
+      // Limpar filtro global quando nenhuma linha está selecionada
+      routeFilterState.clear();
+    }
+
     this._renderFilterBar();
     this._renderArrivals();
-    if (this.onFilterChangeCallback) this.onFilterChangeCallback(new Set(this.selectedRoutes));
+    if (this.onFilterChangeCallback) {
+      this.onFilterChangeCallback(new Set(this.selectedRoutes));
+    }
   }
 
   _renderFilterBar() {
@@ -330,34 +370,14 @@ export class NextArrivals {
    */
   _matchVehicle(arrival) {
     if (!this.allVehicles?.length) return null;
+    const arrTripId = arrival.trip_id;
+    if (!arrTripId) return null;
 
-    const arrTripId = arrival.trip_id;        // já sem prefixo feed (stripped pelo OTP service)
-    const arrLine   = String(arrival.route_short_name || '');
+    const exact = this.allVehicles.find(v => String(v.tripId || '') === arrTripId);
+    if (exact) return exact;
 
-    // 1. Match por trip_id exacto
-    if (arrTripId) {
-      const exact = this.allVehicles.find(v => {
-        const vTripId = String(v.tripId || '');
-        return vTripId === arrTripId;
-      });
-      if (exact) return exact;
-
-      // 2. Match ignorando o 2º segmento (nr_viagem) usando scheduleService logic
-      const byTrip = this.allVehicles.find(v =>
-        vehicleService.tripIdsMatch(v.tripId, arrTripId)
-      );
-      if (byTrip) return byTrip;
-    }
-
-    // 3. Fallback: apenas por linha (vários veículos podem corresponder — pegar o primeiro)
-    //    Não usar direcção aqui: a direcção dos veículos processados pode estar undefined.
-    if (arrLine) {
-      const byLine = this.allVehicles.filter(v => {
-        const vLine = String(v.displayLine || v.line || '');
-        return vLine === arrLine;
-      });
-      if (byLine.length >= 1) return byLine[0];
-    }
+    const byTrip = this.allVehicles.find(v => vehicleService.tripIdsMatch(v.tripId, arrTripId));
+    if (byTrip) return byTrip;
 
     return null;
   }
@@ -367,7 +387,7 @@ export class NextArrivals {
     const textColor   = arrival.route_text_color || '#FFFFFF';
     const isRealtime  = arrival.is_realtime === true;
     const status      = arrival.status || 'SCHEDULED';
-    const delayS      = arrival.delay_seconds || 0;
+    const delayS      = arrival.delay || 0;
 
     const hasLocation = isRealtime && vehicle &&
       vehicleService.extractVehicleLocation(vehicle) !== null;

@@ -278,6 +278,50 @@ class VehicleService {
     }
   }
 
+  /**
+   * Resolve o delay de um veículo consultando as chegadas da sua próxima paragem.
+   * @param {Object} vehicle - Veículo processado com nextStop e tripId
+   * @returns {Promise<number|null>} Delay em segundos, ou null se não encontrado
+   */
+  async resolveVehicleDelay(vehicle) {
+    if (!vehicle.nextStop) return null;
+
+    // Importar plannedArrivalsService no topo do ficheiro se ainda não estiver
+    const { plannedArrivalsService } = await import('./plannedArrivalsService.js');
+
+    try {
+      // Buscar próximas chegadas para a paragem (com cache de 30s)
+      const arrivals = await plannedArrivalsService.getNextArrivals(
+          vehicle.nextStop,
+          10, // Apenas primeiras 10 chegadas
+          false // Usar cache
+      );
+
+      if (!arrivals || arrivals.length === 0) return null;
+
+      // Tentar match por tripId exacto
+      if (vehicle.tripId) {
+        const exactMatch = arrivals.find(a =>
+            a.trip_id && this.tripIdsMatch(vehicle.tripId, a.trip_id)
+        );
+        if (exactMatch && exactMatch.delay != null) {
+          return exactMatch.delay;
+        }
+      }
+
+      // Fallback: match por linha
+      const lineMatch = arrivals.find(a =>
+          String(a.route_short_name || '') === String(vehicle.displayLine || vehicle.line || '')
+      );
+
+      return (lineMatch && lineMatch.delay != null) ? lineMatch.delay : null;
+
+    } catch (err) {
+      console.warn(`Erro ao resolver delay para veículo ${vehicle.id}:`, err);
+      return null;
+    }
+  }
+
   shouldIncludeBus(bus, filterValue) {
     return filterValue === '' || (bus.line && bus.line.startsWith(filterValue));
   }
