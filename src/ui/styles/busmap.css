@@ -37,7 +37,7 @@ html, body {
   height: 56px;
 }
 .logo-overlay img { height: 32px; width: auto; }
-.logo-overlay .logo-text { font-size: 14px; font-weight: 600; color: #0072c6; }
+.logo-overlay .logo-text { font-size: 14px; font-weight: 600; color: var(--color-primary); }
 
 /* Header pill */
 .header-overlay {
@@ -109,7 +109,7 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.2);
   font-size: 14px; font-weight: 400; color: #333; text-align: center;
 }
-.footer-overlay a { color: #0072c6; text-decoration: none; font-weight: 500; }
+.footer-overlay a { color: var(--color-primary); text-decoration: none; font-weight: 500; }
 .footer-overlay a:hover { text-decoration: underline; }
 
 /* Leaflet controls */
@@ -157,7 +157,7 @@ html, body {
   background-color: rgba(255,255,255,0.95); box-shadow: 0 4px 12px rgba(0,0,0,.15);
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: all 0.2s ease; padding: 0;
-  color: #0072c6;
+  color: var(--color-primary);
 }
 .lines-map-btn:hover { background-color: #fff; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.2); }
 .lines-map-btn svg { display: block; }
@@ -192,10 +192,32 @@ html, body {
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-/* Popups */
-.leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
-.bus-popup { font-family: inherit; padding: 4px 0; }
-.bus-popup strong { color: #0072c6; font-size: 15px; }
+/* ═══════════════════════════════════════════════════════════════════════════
+   MARCADOR DA LOCALIZAÇÃO DO UTILIZADOR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes user-pulse {
+  0%   { transform: scale(1);   opacity: 0.55; }
+  70%  { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+.user-marker-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-marker-icon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 114, 198, 0.35);
+  animation: user-pulse 2.2s ease-out infinite;
+  pointer-events: none;
+}
 
 /* Tablet */
 @media (max-width: 768px) {

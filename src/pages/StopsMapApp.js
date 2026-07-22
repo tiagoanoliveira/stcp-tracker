@@ -1,15 +1,58 @@
 /**
  * StopsMapApp - Aplicação de mapa de paragens
+ *
+ * Integração MQTT:
+ *  - Quando REALTIME_BUSES_ENABLED, o MQTT é iniciado no initialize().
+ *  - onVehicleUpdate recebe veículos JÁ PROCESSADOS (formato { latitude,
+ *    longitude, line, displayLine, direction, tripId, ... }) porque
+ *    mqttVehicleService.start() chama vehicleService.processBusData()
+ *    internamente antes de chamar o callback.
+ *  - Não chamar processBusData() uma segunda vez sobre estes objectos.
+ *
+ * FILTRO DE MARCADORES MQTT (_allowedTripIds):
+ *  - updateBusMap() preenche this._allowedTripIds com os tripIds das
+ *    chegadas em tempo real da paragem activa.
+ *  - _handleMqttVehicleUpdate() só desenha o marcador se o tripId do
+ *    veículo estiver em _allowedTripIds. Isto impede que autocarros de
+ *    outras paragens sejam desenhados conforme os updates MQTT chegam.
+ *  - Quando o painel fecha (handleCloseArrivals), _allowedTripIds é limpo.
+ *
+ * VIEWPORT / RECENTRAMENTO:
+ *  - Ao clicar numa paragem (handleStopClick), o mapa centra-se
+ *    imediatamente na localização da paragem (zoom 16), independentemente
+ *    de já existirem autocarros ou não.
+ *  - Quando os autocarros chegam (updateBusMap com centerMap=true),
+ *    o mapa recentra sobre eles.
+ *  - Ao clicar numa chegada específica no painel, handleArrivalClick()
+ *    centra em zoom 17 com offset de 35% da altura para que o marcador
+ *    fique bem acima do painel.
+ *  - _recenterOnPositions() usa paddingBottomRight com 60% da altura do
+ *    painel + 100px extra para que os marcadores não fiquem tapados.
+ *
+ * BOTÃO DE REFRESH:
+ *  - handleRefreshArrivals() passa forceRefresh=true para que o cache
+ *    seja ignorado e os dados sejam sempre buscados à rede.
+ *  - O intervalo de 5 s também passa forceRefresh=true pelo mesmo motivo.
+ *
+ * DIRECÇÃO DO SHAPE (handleArrivalFilterChange):
+ *  - Para cada linha filtrada, pede as paragens da direcção 0.
+ *  - Se a paragem actual (currentStopId) não estiver nessa lista, usa direcção 1.
+ *
+ * BANNER DE SERVIÇO INDISPONÍVEL:
+ *  - mqtt:noDataTimeout (15 s sem dados) → mostra AnnouncementBanner.
+ *  - mqtt:dataRestored → esconde o banner.
  */
 
 import { geolocationService }    from '../core/geolocationService.js';
 import { apiService }             from '../core/apiService.js';
 import { stopService }            from '../services/stopService.js';
-import { vehicleService }         from '../services/vehicleService.js';
+import {normalizeDestinationText, vehicleService} from '../services/vehicleService.js';
 import { plannedArrivalsService } from '../services/plannedArrivalsService.js';
 import { scheduleService }        from '../services/scheduleService.js';
 import { routeService }           from '../services/routeService.js';
 import { routeFilterState }       from '../services/routeFilterState.js';
+import { mqttVehicleService }     from '../services/mqttVehicleService.js';
+import { eventBus }               from '../core/eventBus.js';
 import { MapManager }             from '../map/MapManager.js';
 import { StopMarkerManager }      from '../map/markers/StopMarkerManager.js';
 import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
@@ -27,6 +70,13 @@ import { favouritesManager }      from '../services/FavouritesManager.js';
 import { iconCache }              from '../ui/design/iconCache.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
+
+// ─── Helpers de debug ──────────────────────────────────────────────────────────
+// Activar com: localStorage.setItem('BUS_DEBUG', '1') e recarregar.
+// Desactivar:  localStorage.removeItem('BUS_DEBUG')
+const _busDebug = () => { try { return localStorage.getItem('BUS_DEBUG') === '1'; } catch { return false; } };
+const _log  = (...a) => { if (_busDebug()) console.log  ('%c[BUS DEBUG]', 'color:#01696f;font-weight:bold', ...a); };
+const _warn = (...a) => { if (_busDebug()) console.warn ('%c[BUS DEBUG]', 'color:#964219;font-weight:bold', ...a); };
 
 export class StopsMapApp {
   constructor(options = {}) {
@@ -63,6 +113,15 @@ export class StopsMapApp {
     this._globalSelectedRoutes    = new Set();
     this._globalSelectedRouteObjs = [];
     this._lineFilterMode          = false;
+
+    this._mqttActive     = false;
+    this._noDataBannerId = 'mqtt-no-data';
+
+    /**
+     * Set de tripIds das chegadas em tempo real da paragem activa.
+     * Preenchido por updateBusMap(); limpo ao fechar o painel.
+     */
+    this._allowedTripIds = new Set();
   }
 
   async initialize() {
@@ -94,9 +153,6 @@ export class StopsMapApp {
       this.busMapControl = createBusMapControl(this.mapManager.map);
       this.busMapControl.addTo(this.mapManager.map);
 
-      this.linesControl = createLinesControl(this.mapManager.map);
-      this.linesControl.addTo(this.mapManager.map);
-
       this.tutorialControl = createTutorialControl(this.mapManager.map, () => this.tutorialModal?.open());
       this.tutorialControl.addTo(this.mapManager.map);
 
@@ -104,7 +160,6 @@ export class StopsMapApp {
       this.busMarkerManager   = new BusMarkerManager(this.mapManager.map);
       this.lineOverlayManager = new LineOverlayManager(this.mapManager.map);
 
-      // Tutorial
       this.tutorialModal = new TutorialModal({ page: 'stopsmap' });
       this.tutorialModal.mount();
 
@@ -112,6 +167,8 @@ export class StopsMapApp {
       this.nextArrivals.create();
       this.nextArrivals.onArrivalClick(data => this.handleArrivalClick(data));
       this.nextArrivals.onClose(() => this.handleCloseArrivals());
+      // IMPORTANTE: devolve a Promise para que o botão aguarde o fim antes
+      // de remover a animação de rotação (classe 'refreshing')
       this.nextArrivals.onRefresh(() => this.handleRefreshArrivals());
       this.nextArrivals.onFilterChange(selected => this.handleArrivalFilterChange(selected));
       this.nextArrivals.onFavouriteClick(stopId => this._toggleFavourite(stopId));
@@ -128,13 +185,21 @@ export class StopsMapApp {
       this.routeFilterBar.onFilterChange((selected, routeObjs) =>
         this._handleGlobalRouteFilterChange(selected, routeObjs)
       );
+
       routeService.fetchRoutesList()
-        .then(routes => this.routeFilterBar.setRoutes(routes))
+        .then(routes => {
+          this.routeFilterBar.setRoutes(routes);
+          iconCache.registerRouteColors(routes);
+        })
         .catch(() => this.routeFilterBar.setLoading(false));
 
       await this.setupGeolocation();
       this.setupEventListeners();
       this.setupMapListeners();
+
+      if (REALTIME_BUSES_ENABLED) {
+        this._startMqtt();
+      }
 
       const deepLinkHandled = await this._handleDeepLink();
       if (!deepLinkHandled) await this.loadNearbyStops();
@@ -142,15 +207,83 @@ export class StopsMapApp {
       this.loadingOverlay.remove();
       this.loadingOverlay = null;
 
-      // Mostrar tutorial na primeira visita
       this.tutorialModal.showIfFirstVisit();
 
     } catch (error) {
-      console.error('\u274C Erro na inicializa\u00e7\u00e3o:', error);
+      console.error('❌ Erro na inicialização:', error);
       if (this.loadingOverlay) this.loadingOverlay.remove();
-      this.showError('Erro ao inicializar aplica\u00e7\u00e3o');
+      this.showError('Erro ao inicializar aplicação');
     }
   }
+
+  // ── MQTT ──────────────────────────────────────────────────────────────────────
+
+  _startMqtt() {
+    eventBus.on('mqtt:noDataTimeout', () => {
+      AnnouncementBanner.show(
+        '⚠️ Os dados de localização em tempo real não estão disponíveis de momento. ' +
+        'Isto é uma falha no serviço externo — o teu dispositivo e rede estão OK.',
+        { type: 'warning', id: this._noDataBannerId, dismissible: true }
+      );
+    });
+
+    eventBus.on('mqtt:dataRestored', () => {
+      AnnouncementBanner.hide(this._noDataBannerId);
+    });
+
+    mqttVehicleService.start({
+      onVehicleUpdate:  (vehicle)   => this._handleMqttVehicleUpdate(vehicle),
+      onVehicleExpired: (vehicleId) => this._handleMqttVehicleExpired(vehicleId),
+      onConnected:      ()          => { this._mqttActive = true; },
+      onDisconnected:   ()          => { this._mqttActive = false; },
+    }).catch(err => {
+      console.error('❌ Falha ao iniciar MQTT:', err);
+      this._mqttActive = false;
+    });
+  }
+
+  _handleMqttVehicleUpdate(vehicle) {
+    if (!this.currentStopId) return;
+    if (!this.busMarkerManager) return;
+
+    const activeFilter = routeFilterState.selectedRoutes;
+    const vehicleLine  = String(vehicle.displayLine || vehicle.line || '');
+
+    if (activeFilter.size > 0) {
+      // Com filtro de linha activo: mostrar sempre os veículos dessa linha/direcção
+      if (!activeFilter.has(vehicleLine)) return;
+      const activeDirMap = routeFilterState.dirMap;
+      if (activeDirMap.has(vehicleLine) && vehicle.direction !== activeDirMap.get(vehicleLine)) return;
+    } else if (this._allowedTripIds.size > 0) {
+      // Sem filtro: manter restrição às chegadas previstas para esta paragem
+      if (!vehicle.tripId || !this._allowedTripIds.has(vehicle.tripId)) {
+        return;
+      }
+    }
+
+    _log(
+        `onVehicleUpdate PERMITIDO id:${vehicle.id} linha:${vehicle.displayLine}`,
+        `tripId:${vehicle.tripId} lat:${vehicle.latitude?.toFixed(5)} lng:${vehicle.longitude?.toFixed(5)}`,
+        `marcadores actuais: ${this.busMarkerManager.getMarkerCount()}`
+    );
+
+    this.busMarkerManager.updateSingleBusMarker(vehicle);
+
+    _log(`→ marcadores após upsert: ${this.busMarkerManager.getMarkerCount()}`);
+  }
+
+  _handleMqttVehicleExpired(vehicleId) {
+    if (!this.busMarkerManager) return;
+    if (this.busMarkerManager.markers[vehicleId]) {
+      _log(`TTL expirado: remover marcador id:${vehicleId}`);
+      this.busMarkerManager.removeBusMarker(vehicleId);
+      this.currentBusPositions = this.busMarkerManager
+        .getAllPositions()
+        .map(ll => [ll.lat, ll.lng]);
+    }
+  }
+
+  // ── Geolocalização ────────────────────────────────────────────────────────────
 
   async setupGeolocation() {
     try {
@@ -158,7 +291,7 @@ export class StopsMapApp {
       this.mapManager.updateUserMarker(position);
       this.mapManager.centerOn(position, 15);
     } catch (error) {
-      console.warn('\u26A0\uFE0F N\u00e3o foi poss\u00edvel obter localiza\u00e7\u00e3o:', error.message);
+      console.warn('⚠️ Não foi possível obter localização:', error.message);
       this.mapManager.centerOn([41.1579, -8.6291], 13);
     }
   }
@@ -218,7 +351,7 @@ export class StopsMapApp {
       if (stops.length === 0) { this.stopMarkerManager.clearAllMarkers(); return; }
       this.stopMarkerManager.updateStopMarkers(stops, false, stop => this.handleStopClick(stop));
     } catch (error) {
-      console.error('\u274C Erro ao carregar paragens:', error);
+      console.error('❌ Erro ao carregar paragens:', error);
     } finally {
       this.isLoadingStops = false;
     }
@@ -226,12 +359,11 @@ export class StopsMapApp {
 
   async _handleDeepLink() {
     const params  = new URLSearchParams(window.location.search);
-    const stopId  = params.get('stop');   // may be stop_code from line-detail.html
+    const stopId  = params.get('stop');
     const lineNum = params.get('line');
     const dir     = parseInt(params.get('dir') ?? '0', 10);
     if (!stopId && !lineNum) return false;
 
-    // Apply line filter first (so the overlay is drawn before the stop opens)
     if (lineNum && this.routeFilterBar) {
       await this._waitForRoutes();
       const route = (this.routeFilterBar.routes || []).find(r => String(r.number) === String(lineNum));
@@ -245,30 +377,19 @@ export class StopsMapApp {
 
     if (stopId) {
       try {
-        // fetchStopInfo accepts both stop_id and stop_code
         const stopInfo = await apiService.fetchStopInfo(stopId);
         const stop = {
-          // Prefer the canonical stop_id returned by the API; fall back to
-          // the URL value so marker lookup still works if the API is down.
           stop_id:   stopInfo?.stop_id   || stopId,
           stop_name: stopInfo?.stop_name || `Paragem ${stopId}`,
           latitude:  stopInfo?.latitude  || 41.1579,
           longitude: stopInfo?.longitude || -8.6291,
           routes:    stopInfo?.routes    || []
         };
-
-        // Centre the map BEFORE rendering markers so the stop is visible
         this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
-
-        // If we are NOT in line-filter mode, load nearby stop markers so the
-        // stop marker for this stop exists in the manager before we highlight it.
-        if (!this._lineFilterMode) {
-          await this.loadNearbyStops();
-        }
-
+        if (!this._lineFilterMode) await this.loadNearbyStops();
         await this.handleStopClick(stop);
       } catch (e) {
-        console.warn('Deep-link: paragem n\u00e3o encontrada', stopId, e);
+        console.warn('Deep-link: paragem não encontrada', stopId, e);
       }
     }
     return true;
@@ -294,7 +415,6 @@ export class StopsMapApp {
       this.lineOverlayManager.clearAll();
       this.stopMarkerManager.clearAllMarkers();
       this._setGlobalFilterBarDisabled(false);
-
       if (this.nextArrivals?.isVisible) {
         this.nextArrivals._renderArrivals();
         this.busMarkerManager.filterByRoutes(new Set());
@@ -371,10 +491,13 @@ export class StopsMapApp {
     this.busMarkerManager.clearAllMarkers();
 
     this.currentStopId       = stop.stop_id;
-    this.currentStopName     = stop.stop_name;
+    this.currentStopName = normalizeDestinationText(stop.stop_name)
     this.currentStopPosition = [stop.latitude, stop.longitude];
     this.busMapCentered      = false;
     this.currentBusPositions = [];
+
+    this._allowedTripIds.clear();
+    this._restrictToAllowedTrips = false;
 
     clearTimeout(this.loadStopsDebounce);
     this.loadStopsDebounce = null;
@@ -386,15 +509,21 @@ export class StopsMapApp {
     if (!this._lineFilterMode) {
       this.stopMarkerManager.showOnlyMarker(stop.stop_id);
     }
-    // Highlight the selected stop marker (orange icon)
     this.stopMarkerManager.setSelectedStop(stop.stop_id);
+
+    this.suppressMapChangeUntil = Date.now() + 2000;
+    this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
+
+    // Limpar cache da paragem para garantir fetch fresco na primeira abertura
+    plannedArrivalsService.clearCache(stop.stop_id);
 
     const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
     const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes
       ? stopInfo.value.routes : (stop.routes || []);
     this.nextArrivals.setRoutes(routes);
 
-    await this.loadStopArrivals(stop.stop_id, true);
+    // Primeiro load: forceRefresh=true para garantir dados frescos
+    await this.loadStopArrivals(stop.stop_id, true, true);
     this.startAutoRefresh();
     this._pushStopToURL(stop.stop_id);
   }
@@ -405,25 +534,50 @@ export class StopsMapApp {
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
   }
 
-  async loadStopArrivals(stopId, centerMap = false) {
+  /**
+   * Carrega chegadas para a paragem activa.
+   *
+   * @param {string}  stopId       - ID da paragem
+   * @param {boolean} centerMap    - recentrar o mapa nos autocarros (só 1.º load)
+   * @param {boolean} forceRefresh - ignorar cache e forçar fetch à rede
+   */
+  async loadStopArrivals(stopId, centerMap = false, forceRefresh = false) {
     try {
-      const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60);
-      if (arrivals.length === 0) {
+      // forceRefresh=true: botão de refresh e intervalo de 5 s
+      const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60, forceRefresh);
+
+      if (!arrivals || arrivals.length === 0) {
         this.nextArrivals.setArrivals([], []);
         this.busMarkerManager.clearAllMarkers();
         this.nextArrivals.updateLastUpdate();
+        this._allowedTripIds.clear();
+        this._restrictToAllowedTrips = false;
         return;
       }
-      const vehicles = REALTIME_BUSES_ENABLED ? await apiService.fetchBusData() : [];
+
+      let vehicles = [];
+      if (REALTIME_BUSES_ENABLED) {
+        if (this._mqttActive && mqttVehicleService.hasData()) {
+          vehicles = mqttVehicleService.getAllVehicles();
+          _log(`loadStopArrivals: usando MQTT — ${vehicles.length} veículos em memória`);
+        } else {
+          _log('loadStopArrivals: MQTT sem dados ainda — fallback HTTP');
+          const raw = await apiService.fetchBusData();
+          vehicles = vehicleService.processBusDataBatch(raw);
+          _log(`loadStopArrivals: HTTP devolveu ${vehicles.length} veículos processados`);
+        }
+      }
+
       this.nextArrivals.setArrivals(arrivals, vehicles);
       this.nextArrivals.updateLastUpdate();
+
       if (REALTIME_BUSES_ENABLED) {
         await this.updateBusMap(arrivals, vehicles, centerMap);
       }
     } catch (error) {
-      console.error('\u274C Erro ao carregar chegadas:', error);
+      console.error('❌ Erro ao carregar chegadas:', error);
       this.nextArrivals.hideLoading();
-      this.showError('Erro ao carregar informa\u00e7\u00f5es da paragem');
+      this.showError('Erro ao carregar informações da paragem');
     }
   }
 
@@ -431,25 +585,93 @@ export class StopsMapApp {
     if (!arrivals || arrivals.length === 0) {
       this.busMarkerManager.clearAllMarkers();
       this.currentBusPositions = [];
+      this._allowedTripIds.clear();
       return;
     }
+
+    _log(`updateBusMap: ${arrivals.length} chegadas, ${vehicles.length} veículos disponíveis`);
+
     const busesToShow  = [];
     const busPositions = [];
+
+    const vehiclesByTripId = new Map();
+    for (const v of vehicles) {
+      if (v.tripId) vehiclesByTripId.set(v.tripId, v);
+    }
+
+    const realtimeTripIds = arrivals
+      .filter(a => a.is_realtime && a.trip_id)
+      .map(a => a.trip_id);
+    const mqttDirect = REALTIME_BUSES_ENABLED
+      ? mqttVehicleService.getVehiclesByTripIds(realtimeTripIds)
+      : [];
+    const mqttByTripId = new Map(mqttDirect.map(v => [v.tripId, v]));
+
+    _log(`updateBusMap: ${realtimeTripIds.length} chegadas RT, ${mqttDirect.length} veículos MQTT por tripId`);
+
+    let matched = 0, notFound = 0;
+    const newAllowedTripIds = new Set();
+
     for (const arrival of arrivals) {
       if (!arrival.is_realtime) continue;
-      const vehicle = vehicleService.matchVehicleToTrip(vehicles, arrival.trip_id);
-      if (!vehicle) continue;
-      const processedBus = vehicleService.processBusData(vehicle);
-      if (!processedBus) continue;
+
+      const arrTripId = arrival.trip_id;
+      _log(`  chegada linha:${arrival.route_short_name || arrival.route_id} tripId:${arrTripId} is_realtime:true`);
+
+      if (arrTripId) newAllowedTripIds.add(arrTripId);
+
+      let processedBus = arrTripId ? mqttByTripId.get(arrTripId) : null;
+
+      if (!processedBus && arrTripId) {
+        processedBus = vehiclesByTripId.get(arrTripId);
+        if (processedBus) _log(`    → match por tripId exacto`);
+      }
+
+      if (!processedBus) {
+        const matched3 = vehicleService.matchVehicleToTrip(vehicles, arrTripId);
+        if (matched3) {
+          processedBus = matched3;
+          if (matched3.tripId) newAllowedTripIds.add(matched3.tripId);
+          _log(`    → match por matchVehicleToTrip (fuzzy)`);
+        }
+      }
+      if (!processedBus) {
+        _warn(`    → sem veículo para tripId:${arrTripId} linha:${arrival.route_short_name || arrival.route_id}`);
+        notFound++;
+        continue;
+      }
+
+      matched++;
+      _log(`    → veículo encontrado id:${processedBus.id} lat:${processedBus.latitude?.toFixed(5)} lng:${processedBus.longitude?.toFixed(5)}`);
+
+      // Passar o atraso da chegada para o veículo (evita recalcular no popup)
+      processedBus._delaySec = arrival.delay ?? null;
+
       busesToShow.push(processedBus);
       busPositions.push([processedBus.latitude, processedBus.longitude]);
+
       const routeNum = String(
         arrival.route_short_name || arrival.route_number ||
         arrival.route_id || processedBus.displayLine || processedBus.line || ''
       );
       this.busMarkerManager.setRouteForMarker(processedBus.id, routeNum);
     }
-    if (busesToShow.length === 0) { this.busMarkerManager.clearAllMarkers(); this.currentBusPositions = []; return; }
+
+    _log(`updateBusMap: ${matched} matched, ${notFound} sem veículo`);
+
+    this._allowedTripIds = newAllowedTripIds;
+    _log(`updateBusMap: _allowedTripIds actualizado com ${newAllowedTripIds.size} tripId(s):`, [...newAllowedTripIds]);
+
+    if (busesToShow.length === 0) {
+      _warn('updateBusMap: nenhum veículo para mostrar — marcadores limpos');
+      this.busMarkerManager.clearAllMarkers();
+      this.currentBusPositions = [];
+      this._restrictToAllowedTrips = true;
+      return;
+    }
+
+    _log(`updateBusMap: a chamar updateBusMarkers com ${busesToShow.length} veículo(s)`);
+    this._restrictToAllowedTrips = true;
     this.busMarkerManager.updateBusMarkers(busesToShow);
     this.currentBusPositions = busPositions;
 
@@ -466,26 +688,54 @@ export class StopsMapApp {
     if (centerMap && !this.busMapCentered) {
       this.busMapCentered = true;
       const positionsForCenter = visiblePositions.length > 0 ? visiblePositions : busPositions;
+      _log(`updateBusMap: recentrar mapa em ${positionsForCenter.length} posição(ões)`);
       setTimeout(() => this._recenterOnPositions(positionsForCenter), 150);
     }
   }
 
   async handleArrivalFilterChange(selectedRoutes) {
     const effectiveFilter = selectedRoutes.size > 0
-      ? selectedRoutes
-      : routeFilterState.selectedRoutes;
+        ? selectedRoutes
+        : routeFilterState.selectedRoutes;
 
-    const visiblePositions = this.busMarkerManager.filterByRoutes(
-      effectiveFilter, routeFilterState.dirMap
-    );
+    const availableRoutes = this.nextArrivals?.availableRoutes || [];
+    const resolvedDirMap  = new Map();
+
+    if (this.currentStopId && effectiveFilter.size > 0) {
+      await Promise.all(Array.from(effectiveFilter).map(async routeNum => {
+        const r       = availableRoutes.find(rt => String(rt.number) === String(routeNum));
+        const routeId = String(r?.id || routeNum);
+        let direction = 0;
+        try {
+          const stopsDir0 = await routeService.fetchRouteStops(routeId, 0);
+          const stopIds0  = (stopsDir0?.stops || []).map(s => String(s.stop_id));
+          if (!stopIds0.includes(String(this.currentStopId))) direction = 1;
+          _log(`handleArrivalFilterChange linha:${routeId} paragem:${this.currentStopId} dir0 tem ${stopIds0.length} paragens → usar dir:${direction}`);
+        } catch (e) {
+          _warn(`handleArrivalFilterChange: erro ao obter paragens dir0 para linha ${routeId}`, e);
+        }
+        resolvedDirMap.set(String(routeNum), direction);
+      }));
+    }
+
+    // Actualizar o estado global com as direcções correctas.
+    routeFilterState.updateDirections(resolvedDirMap);
+
+    const visiblePositions = this.busMarkerManager.filterByRoutes(effectiveFilter, resolvedDirMap);
 
     if (selectedRoutes.size === 0 && !routeFilterState.hasActive()) {
       this.lineOverlayManager.clearAll();
     } else {
       const sourceRoutes = selectedRoutes.size > 0 ? selectedRoutes : routeFilterState.selectedRoutes;
-      const routeObjs = (this.nextArrivals?.availableRoutes || [])
-        .filter(r => sourceRoutes.has(r.number))
-        .map(r => ({ routeId: String(r.id || r.number), direction: 0, color: r.color || '#187EC2', text_color: r.text_color || '#FFFFFF' }));
+      const routeObjs = availableRoutes
+          .filter(r => sourceRoutes.has(String(r.number)))
+          .map(r => ({
+            routeId:    String(r.id || r.number),
+            direction:  resolvedDirMap.get(String(r.number)) ?? 0,
+            color:      r.color      || '#187EC2',
+            text_color: r.text_color || '#FFFFFF'
+          }));
+
       if (routeObjs.length > 0) {
         const overlayData = await routeService.fetchMultipleRoutesOverlay(routeObjs);
         this.lineOverlayManager.setRoutes(overlayData);
@@ -497,32 +747,61 @@ export class StopsMapApp {
 
   recenterOnBuses() { this._recenterOnPositions(this.currentBusPositions); }
 
+  /**
+   * Recentra o mapa sobre um conjunto de posições, deixando o marcador
+   * visível acima do painel inferior.
+   *
+   * Bug 1 FIX: quando há apenas 1 posição, o offset anterior era +panelH
+   * (60% da altura), deslocando o centro para baixo e empurrando o marcador
+   * para cima do viewport. Corrigido para +panelH/2, que posiciona o ponto
+   * no centro da área visível acima do painel.
+   */
   _recenterOnPositions(positions) {
     if (!this.mapManager || positions.length === 0) return;
-    const panelHeight = this.mapManager.map.getSize().y * 0.5;
-    if (positions.length === 1) { this.mapManager.centerOnWithOffset(positions[0], 16, Math.round(panelHeight * 0.5)); return; }
-    this.mapManager.fitBounds(positions, { paddingTopLeft: [60, 60], paddingBottomRight: [60, panelHeight + 60], maxZoom: 16, minZoom: 13 });
+    const mapH   = this.mapManager.map.getSize().y;
+    const panelH = Math.round(mapH * 0.6);
+
+    if (positions.length === 1) {
+      // Offset positivo = desloca o ponto de referência para baixo no ecrã,
+      // o que faz o marcador aparecer mais acima (centrado na zona visível).
+      // Usar metade da altura do painel para ficar centrado na área livre.
+      this.mapManager.centerOnWithOffset(positions[0], 17, Math.round(panelH / 2));
+      return;
+    }
+
+    this.mapManager.fitBounds(positions, {
+      paddingTopLeft:     [80, 30],
+      paddingBottomRight: [30, panelH + 10],
+      maxZoom: 18,
+      minZoom: 14,
+    });
   }
 
-  /**
-   * Clique num autocarro nas próximas chegadas — foca no mapa.
-   * `location` vem de vehicleService.extractVehicleLocation → { lat, lon }
-   */
   handleArrivalClick(data) {
     const { vehicleId, location } = data;
     if (!location || !this.mapManager) return;
-    // extractVehicleLocation returns { lat, lon } — NOT { latitude, longitude }
     const lat = location.lat ?? location.latitude;
     const lon = location.lon ?? location.longitude;
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-    const offsetY = Math.round(this.mapManager.map.getSize().y * 0.25);
-    this.mapManager.centerOnWithOffset([lat, lon], 17, offsetY);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      _warn(`handleArrivalClick: coordenadas inválidas para vehicleId:${vehicleId}`, location);
+      return;
+    }
+    _log(`handleArrivalClick: centrar em [${lat.toFixed(5)}, ${lon.toFixed(5)}] zoom 17 vehicleId:${vehicleId}`);
+    const offsetY = Math.round(this.mapManager.map.getSize().y * 0.20);
+    this.mapManager.centerOnWithOffset([lat, lon], 18, offsetY);
     const marker = this.busMarkerManager.markers[vehicleId];
     if (marker) marker.openPopup();
   }
 
+  /**
+   * Chamado pelo botão de refresh no painel.
+   * Passa forceRefresh=true para ignorar o cache e buscar dados frescos.
+   * Devolve a Promise para que o listener do botão aguarde o fim antes
+   * de remover a animação de rotação.
+   */
   handleRefreshArrivals() {
-    if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false);
+    if (!this.currentStopId) return Promise.resolve();
+    return this.loadStopArrivals(this.currentStopId, false, true);
   }
 
   handleCloseArrivals() {
@@ -531,13 +810,15 @@ export class StopsMapApp {
     this.lineOverlayManager.clearAll();
     this.busMapCentered      = false;
     this.currentBusPositions = [];
+    this._allowedTripIds.clear();
+    this._restrictToAllowedTrips = false;
+
     const wasSearchActive = this.isSearchActive;
     const returnPosition  = this.currentStopPosition;
     this.currentStopId       = null;
     this.currentStopName     = null;
     this.currentStopPosition = null;
     this._setGlobalFilterBarDisabled(false);
-    // Clear stop highlight
     this.stopMarkerManager.setSelectedStop(null);
 
     const params = new URLSearchParams(window.location.search);
@@ -572,10 +853,14 @@ export class StopsMapApp {
     if (added) { this.favouritesPanel.open(); setTimeout(() => this.favouritesPanel.close(), 1800); }
   }
 
+  /**
+   * Inicia o intervalo de refresh automático a cada 5 s.
+   * Passa forceRefresh=true para garantir que o cache é ignorado.
+   */
   startAutoRefresh() {
     this.stopAutoRefresh();
     this.refreshInterval = setInterval(() => {
-      if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false);
+      if (this.currentStopId) this.loadStopArrivals(this.currentStopId, false, true);
     }, 5000);
   }
 
@@ -584,7 +869,7 @@ export class StopsMapApp {
   }
 
   showError(message) {
-    console.error('\u274C', message);
+    console.error('❌', message);
     const el = document.getElementById('error-message');
     if (el) { el.textContent = message; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 5000); }
   }
@@ -600,7 +885,11 @@ export class StopsMapApp {
     if (this.favouritesPanel)    this.favouritesPanel.destroy();
     if (this.tutorialModal)      this.tutorialModal.destroy();
     if (this.mapManager)         this.mapManager.cleanup();
+    if (REALTIME_BUSES_ENABLED)  mqttVehicleService.stop();
+    eventBus.off('mqtt:noDataTimeout');
+    eventBus.off('mqtt:dataRestored');
     routeFilterState.clear();
+    this._allowedTripIds.clear();
   }
 }
 

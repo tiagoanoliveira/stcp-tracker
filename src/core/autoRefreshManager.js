@@ -1,9 +1,16 @@
 /**
  * Auto Refresh Manager - Centraliza a lógica de atualização automática
- * Reutilizável em qualquer componente que necessite de polling
+ *
+ * Suporta dois modos:
+ *   - Polling (start/forceRefresh/stop): comportamento original via setTimeout.
+ *   - MQTT    (startMqtt):              sem polling — o mapa é atualizado por eventos
+ *     emitidos pelo MqttVehicleService. O manager mantém o registo do refresh
+ *     activo mas não agenda nenhum setTimeout.
  */
 
-import { eventBus } from './eventBus.js';
+import { eventBus }           from './eventBus.js';
+import { mqttVehicleService } from '../services/mqttVehicleService.js';
+import { apiService }         from './apiService.js';
 
 class AutoRefreshManager {
   constructor() {
@@ -11,25 +18,20 @@ class AutoRefreshManager {
   }
 
   /**
-   * Iniciar refresh automático
-   * @param {string} id - ID único para este refresh
+   * Iniciar refresh automático (modo polling).
+   * @param {string}   id       - ID único para este refresh
    * @param {function} callback - Função a executar a cada intervalo
-   * @param {number} interval - Intervalo em ms (padrão: 5000)
+   * @param {number}   interval - Intervalo em ms (padrão: 5000)
    */
   start(id, callback, interval = 5000) {
-    if (this.refreshes[id]) {
-      return;
-    }
-
+    if (this.refreshes[id]) return;
 
     let isRefreshing = false;
 
     const scheduleNext = async () => {
       const startTime = Date.now();
       try {
-        if (isRefreshing) {
-          return;
-        }
+        if (isRefreshing) return;
         isRefreshing = true;
         await callback();
         const duration = Date.now() - startTime;
@@ -46,20 +48,84 @@ class AutoRefreshManager {
     };
 
     this.refreshes[id] = {
+      mode:         'polling',
       callback,
       interval,
       isRefreshing: () => isRefreshing,
-      timeout: setTimeout(scheduleNext, interval)
+      timeout:      setTimeout(scheduleNext, interval),
     };
   }
 
   /**
-   * Forçar refresh imediatamente
+   * Inicia o refresh no modo MQTT (event-driven).
+   *
+   * Em vez de polling, subscreve ao MqttVehicleService e chama
+   * onVehicleUpdate por cada mensagem recebida.
+   *
+   * O bootstrap inicial (snapshot FIWARE) é feito uma única vez aqui.
+   *
+   * @param {string}   id              - ID único para este refresh
+   * @param {function} onVehicleUpdate - callback(vehicle) chamado por cada update MQTT
+   * @param {function} onSnapshot      - callback(vehicles[]) para o snapshot inicial
+   */
+  async startMqtt(id, { onVehicleUpdate, onSnapshot } = {}) {
+    if (this.refreshes[id]) {
+      console.warn(`⚠ Refresh '${id}' já existe`);
+      return;
+    }
+
+    this.refreshes[id] = {
+      mode:         'mqtt',
+      isRefreshing: () => false,
+      timeout:      null,
+    };
+
+    // Bootstrap: snapshot inicial antes do MQTT ligar
+    try {
+      const snapshot = await apiService.fetchBusData();
+      if (snapshot.length > 0) {
+        onSnapshot?.(snapshot);
+        eventBus.emit(`refresh:complete:${id}`, { duration: 0, source: 'bootstrap' });
+      }
+    } catch (err) {
+      console.error('❌ Snapshot inicial falhou:', err);
+    }
+
+    // Inicia MQTT
+    try {
+      await mqttVehicleService.start({
+        onVehicleUpdate: (vehicle) => {
+          onVehicleUpdate?.(vehicle);
+          eventBus.emit(`refresh:complete:${id}`, { duration: 0, source: 'mqtt' });
+        },
+        onConnected:    () => console.info('🟢 MQTT activo — atualizações em tempo real'),
+        onDisconnected: () => console.warn('🔴 MQTT desligado — aguardar reconexão…'),
+      });
+    } catch (err) {
+      console.error('❌ MQTT falhou ao iniciar. A recair em polling…', err);
+      // Fallback para polling se o MQTT não estiver disponível
+      this.stop(id);
+      const pollCallback = async () => {
+        const vehicles = await apiService.fetchBusData();
+        onSnapshot?.(vehicles);
+      };
+      this.start(id, pollCallback, 15000);
+    }
+  }
+
+  /**
+   * Forçar refresh imediatamente (só faz sentido no modo polling).
+   * No modo MQTT, os dados já chegam em tempo real — emite um aviso.
    * @param {string} id - ID do refresh
    */
   async forceRefresh(id) {
     if (!this.refreshes[id]) {
       console.warn(`⚠ Refresh '${id}' não encontrado`);
+      return;
+    }
+
+    if (this.refreshes[id].mode === 'mqtt') {
+      console.info(`ℹ️  Refresh '${id}' em modo MQTT — dados já chegam em tempo real`);
       return;
     }
 
@@ -75,29 +141,30 @@ class AutoRefreshManager {
   }
 
   /**
-   * Parar refresh automático
+   * Parar refresh automático.
    * @param {string} id - ID do refresh
    */
   stop(id) {
-    if (!this.refreshes[id]) {
-      return;
+    if (!this.refreshes[id]) return;
+
+    if (this.refreshes[id].mode === 'mqtt') {
+      mqttVehicleService.stop();
+    } else {
+      clearTimeout(this.refreshes[id].timeout);
     }
 
-    clearTimeout(this.refreshes[id].timeout);
     delete this.refreshes[id];
     eventBus.emit(`refresh:stopped:${id}`);
   }
 
-  /**
-   * Parar todos os refreshes
-   */
+  /** Parar todos os refreshes */
   stopAll() {
     Object.keys(this.refreshes).forEach(id => this.stop(id));
   }
 
   /**
-   * Alterar intervalo de um refresh
-   * @param {string} id - ID do refresh
+   * Alterar intervalo de um refresh (só relevante no modo polling).
+   * @param {string} id       - ID do refresh
    * @param {number} interval - Novo intervalo em ms
    */
   setInterval(id, interval) {
@@ -105,20 +172,27 @@ class AutoRefreshManager {
       console.warn(`⚠ Refresh '${id}' não encontrado`);
       return;
     }
-
+    if (this.refreshes[id].mode === 'mqtt') {
+      console.info(`ℹ️  setInterval ignorado — refresh '${id}' está em modo MQTT`);
+      return;
+    }
     this.refreshes[id].interval = interval;
   }
 
   /**
-   * Obter informações sobre um refresh
+   * Obter informações sobre um refresh.
    * @param {string} id - ID do refresh
    */
   getStatus(id) {
-    return this.refreshes[id] ? {
-      isActive: true,
-      isRefreshing: this.refreshes[id].isRefreshing(),
-      interval: this.refreshes[id].interval
-    } : null;
+    if (!this.refreshes[id]) return null;
+    const r = this.refreshes[id];
+    return {
+      isActive:     true,
+      mode:         r.mode,
+      isRefreshing: r.isRefreshing(),
+      interval:     r.interval ?? null,
+      mqttConnected: r.mode === 'mqtt' ? mqttVehicleService.isConnected() : null,
+    };
   }
 }
 

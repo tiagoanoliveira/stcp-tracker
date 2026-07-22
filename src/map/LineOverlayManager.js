@@ -11,6 +11,7 @@
  *  onStopClick(cb)  — cb(stop) chamado quando o utilizador clica em
  *                     "Próximos autocarros" no popup de uma paragem
  */
+import {normalizeDestinationText} from "../services/vehicleService.js";
 
 export class LineOverlayManager {
   constructor(map) {
@@ -114,28 +115,25 @@ export class LineOverlayManager {
 
   _buildStopPopup(stop, lineColor) {
     return `
-      <div style="font-family:inherit;min-width:140px;padding:2px 0">
-        <strong style="color:${lineColor};font-size:13px">${stop.stop_name}</strong><br>
+      <div class="popup-line-stop" style="font-family:inherit;min-width:150px;padding:2px 0">
+        <strong style="color:${lineColor};font-size:13px">${normalizeDestinationText(stop.stop_name)}</strong><br>
         <small style="color:#777">${stop.stop_code || stop.stop_id}</small><br>
         <button class="stop-popup-arrivals-btn" style="
           margin-top:8px;
           width:100%;
-          padding:6px 10px;
+          padding:6px;
           background:${lineColor};
           color:#fff;
           border:none;
-          border-radius:20px;
+          border-radius:12px;
           font-size:12px;
           font-weight:600;
           cursor:pointer;
           display:flex;
           align-items:center;
           justify-content:center;
-          gap:6px;
+          gap:4px;
         ">
-          <svg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5'>
-            <circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/>
-          </svg>
           Próximos autocarros
         </button>
       </div>`;

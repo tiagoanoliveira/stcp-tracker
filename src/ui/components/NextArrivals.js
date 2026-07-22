@@ -4,49 +4,88 @@
  * Os chips de linhas diurnas/nocturnas são ocultados fora do seu horário:
  *   - Linhas diurnas (sem sufixo 'M'): ocultadas entre 01:30 e 05:30
  *   - Linhas nocturnas (sufixo 'M', ex: 3M, 200M): visíveis entre 00:30 e 06:30
- *   Nota: linhas como MB1 começam com M mas não são nocturnas.
+ *     Nota: linhas como MB1 começam com M mas não são nocturnas.
  */
 
-import { vehicleService }    from '../../services/vehicleService.js';
+import { vehicleService, normalizeDestinationText } from '../../services/vehicleService.js';
 import { LoadingSpinner }    from './LoadingSpinner.js';
 import { routeFilterState }  from '../../services/routeFilterState.js';
 
-// ---------------------------------------------------------------------------
-// Helpers de visibilidade temporal (espelham a lógica do RouteFilterBar)
-// ---------------------------------------------------------------------------
-
-/** Devolve true se a linha é nocturna (número TERMINA em 'M', case-insensitive).
- *  Ex: "3M" → true, "200M" → true, "MB1" → false
- */
-function isNightLine(number) {
-  return /M$/i.test(String(number));
-}
+function isNightLine(number) { return /M$/i.test(String(number)); }
 
 function getLineVisibility(date) {
   const total = date.getHours() * 60 + date.getMinutes();
-  const dayHidden    = total >= 90  && total < 330; // 01:30 – 05:30
-  const nightVisible = total >= 30  && total < 390; // 00:30 – 06:30
-  return { showDay: !dayHidden, showNight: nightVisible };
+  return { showDay: !(total >= 90 && total < 330), showNight: (total >= 30 && total < 390) };
 }
 
-// ---------------------------------------------------------------------------
+// ─── Helpers de delay ────────────────────────────────────────────────────────
+
+/**
+ * Formata um delay em segundos como string compacta:
+ *   - Só segundos se minutos = 0:   "+34 seg."
+ *   - Só minutos  se segundos = 0:  "+04 min."
+ *   - Ambos caso contrário:         "+04 min. 34 seg."
+ * @param {number} delaySeconds
+ * @returns {string}
+ */
+function formatDelay(delaySeconds) {
+  const abs  = Math.abs(delaySeconds);
+  const sign = delaySeconds < 0 ? '-' : '+';
+  const m    = Math.floor(abs / 60);
+  const s    = Math.round(abs % 60);
+  if (m === 0) return `${sign}${s} seg.`;
+  if (s === 0) return `${sign}${String(m).padStart(2, '0')} min.`;
+  return `${sign}${String(m).padStart(2, '0')} min. ${String(s).padStart(2, '0')} seg.`;
+}
+
+/**
+ * Devolve a classe CSS de cor para o delay.
+ *   verde   : ON_TIME ou EARLY
+ *   amarelo : DELAYED 1–300 s
+ *   vermelho: DELAYED > 300 s
+ * @param {string} status
+ * @param {number} delaySeconds
+ * @returns {string}
+ */
+function delayColorClass(status, delaySeconds) {
+  if (status === 'ON_TIME' || status === 'EARLY') return 'delay-green';
+  if (status === 'DELAYED') {
+    return delaySeconds <= 300 ? 'delay-yellow' : 'delay-red';
+  }
+  return '';
+}
+
+/**
+ * Texto legível para o estado da chegada.
+ */
+function statusLabel(status) {
+  return {
+    ON_TIME:   'No horário previsto',
+    EARLY:     'Adiantado',
+    DELAYED:   'Atrasado',
+    SCHEDULED: 'Planeado',
+    ARRIVING:  'A chegar',
+  }[status] || status;
+}
+
+// ─── Componente ──────────────────────────────────────────────────────────────
 
 export class NextArrivals {
   constructor() {
     this.element = null;
     this.isVisible = false;
-    this.onArrivalClickCallback = null;
-    this.onCloseCallback = null;
-    this.onRefreshCallback = null;
-    this.onFilterChangeCallback = null;
-    this.currentStopId = null;
-    this.loadingSpinner = null;
-
+    this.onArrivalClickCallback  = null;
+    this.onCloseCallback         = null;
+    this.onRefreshCallback       = null;
+    this.onFilterChangeCallback  = null;
+    this.onFavouriteClickCallback = null;
+    this.onIsFavouriteCallback   = null;
+    this.currentStopId   = null;
+    this.loadingSpinner  = null;
     this.availableRoutes = [];
-    this.selectedRoutes = new Set();
-    this.allArrivals = [];
-    this.allVehicles = [];
-
+    this.selectedRoutes  = new Set();
+    this.allArrivals     = [];
+    this.allVehicles     = [];
     this._timeCheckInterval = null;
   }
 
@@ -105,57 +144,87 @@ export class NextArrivals {
     this.element = sheet;
 
     sheet.querySelector('.next-arrivals-close').addEventListener('click', () => this.hide());
-    sheet.querySelector('#arrivals-refresh-btn').addEventListener('click', () => {
+
+    // Refresh: aguarda a Promise do callback antes de remover o estado de loading
+    sheet.querySelector('#arrivals-refresh-btn').addEventListener('click', async () => {
       const btn = sheet.querySelector('#arrivals-refresh-btn');
-      if (this.onRefreshCallback) {
-        btn.classList.add('refreshing');
-        this.showLoading('A atualizar...');
-        this.onRefreshCallback();
-        setTimeout(() => btn.classList.remove('refreshing'), 1000);
+      if (!this.onRefreshCallback) return;
+      btn.disabled = true;
+      btn.classList.add('refreshing');
+      this.showLoading('A atualizar...');
+      try {
+        await Promise.resolve(this.onRefreshCallback());
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('refreshing');
       }
     });
 
-    // Botão de favorito — ligação ao FavouritesManager via callback
     sheet.querySelector('#arrivals-favourite-btn').addEventListener('click', () => {
       if (this.onFavouriteClickCallback) this.onFavouriteClickCallback(this.currentStopId);
     });
 
-    // Verificar visibilidade a cada minuto
     this._timeCheckInterval = setInterval(() => this._applyChipTimeVisibility(), 60_000);
 
     return sheet;
   }
 
-  // ---------------------------------------------------------------------------
-  // Filtros
-  // ---------------------------------------------------------------------------
+  // ─── Filtros ────────────────────────────────────────────────────────────────
 
-  /**
-   * Define as linhas disponíveis nos chips do painel.
-   * Pré-selecciona qualquer linha que já esteja activa no filtro global,
-   * para que abrir uma paragem não limpe o filtro que o utilizador definiu.
-   */
   setRoutes(routes = []) {
     this.availableRoutes = routes;
 
-    // Pré-seleccionar linhas que coincidam com o filtro global activo
+    // Sincronizar com filtro global: se houver filtros globais ativos
+    // que correspondem a rotas desta paragem, pré-selecioná-los
     this.selectedRoutes = new Set(
-      routes
-        .map(r => String(r.number))
-        .filter(num => routeFilterState.selectedRoutes.has(num))
+        routes
+            .map(r => String(r.number))
+            .filter(num => routeFilterState.selectedRoutes.has(num))
     );
 
     this._renderFilterBar();
-    // Re-renderizar chegadas com o filtro já aplicado
     if (this.allArrivals.length > 0) this._renderArrivals();
   }
-
   _toggleRoute(routeNumber) {
     if (this.selectedRoutes.has(routeNumber)) {
       this.selectedRoutes.delete(routeNumber);
     } else {
       this.selectedRoutes.add(routeNumber);
     }
+
+    if (this.selectedRoutes.size > 0) {
+      const routeObjs = Array.from(this.selectedRoutes).map(num => {
+        const route = this.availableRoutes.find(r => String(r.number) === String(num));
+        const arrival = this.allArrivals.find(a => String(a.route_short_name) === String(num));
+
+        let direction;
+        if (typeof arrival?.directionId === 'number') {
+          direction = arrival.directionId;
+        } else if (typeof arrival?.direction_id === 'number') {
+          direction = arrival.direction_id;
+        } else if (routeFilterState.dirMap.has(String(num))) {
+          // Sem chegada prevista para esta linha: preservar a direcção já
+          // conhecida (ex: escolhida manualmente na barra global) em vez de
+          // a substituir por 0, que pode estar errado.
+          direction = routeFilterState.dirMap.get(String(num));
+        } else {
+          direction = 0;
+        }
+
+        return {
+          number: num,
+          id: route?.id || num,
+          direction,
+          color: route?.color || '#0072C6',
+          text_color: route?.text_color || '#FFFFFF'
+        };
+      });
+
+      routeFilterState.set(this.selectedRoutes, routeObjs);
+    } else {
+      routeFilterState.clear();
+    }
+
     this._renderFilterBar();
     this._renderArrivals();
     if (this.onFilterChangeCallback) {
@@ -165,97 +234,62 @@ export class NextArrivals {
 
   _renderFilterBar() {
     if (!this.element) return;
-    const bar = this.element.querySelector('#arrivals-filter-bar');
-    const chipsContainer = this.element.querySelector('#arrivals-filter-chips');
-    if (!bar || !chipsContainer) return;
-
+    const bar   = this.element.querySelector('#arrivals-filter-bar');
+    const chips = this.element.querySelector('#arrivals-filter-chips');
+    if (!bar || !chips) return;
     if (this.availableRoutes.length === 0) { bar.style.display = 'none'; return; }
-
     bar.style.display = 'flex';
-    chipsContainer.innerHTML = '';
-
+    chips.innerHTML   = '';
     this.availableRoutes.forEach(route => {
       const isActive = this.selectedRoutes.has(route.number);
       const chip = document.createElement('button');
-      chip.className = `filter-chip${isActive ? ' active' : ''}`;
-      chip.dataset.line = String(route.number);
+      chip.className  = `filter-chip${isActive ? ' active' : ''}`;
+      chip.dataset.line      = String(route.number);
       chip.dataset.nightLine = isNightLine(route.number) ? 'true' : 'false';
-      chip.style.backgroundColor = route.color || '#0072C6';
-      chip.style.color = route.text_color || '#FFFFFF';
-      chip.title = route.name || route.number;
+      chip.style.backgroundColor = route.color      || '#0072C6';
+      chip.style.color           = route.text_color || '#FFFFFF';
+      chip.title       = route.name || route.number;
       chip.textContent = route.number;
       chip.addEventListener('click', () => this._toggleRoute(route.number));
-      chipsContainer.appendChild(chip);
+      chips.appendChild(chip);
     });
-
     this._applyChipTimeVisibility();
   }
 
-  /**
-   * Oculta/mostra chips conforme o horário actual.
-   * Linhas diurnas ocultadas 01:30–05:30; nocturnas visíveis 00:30–06:30.
-   */
   _applyChipTimeVisibility() {
-    const chipsContainer = this.element?.querySelector('#arrivals-filter-chips');
-    if (!chipsContainer) return;
-
+    const chips = this.element?.querySelector('#arrivals-filter-chips');
+    if (!chips) return;
     const { showDay, showNight } = getLineVisibility(new Date());
-
-    chipsContainer.querySelectorAll('.filter-chip').forEach(chip => {
+    chips.querySelectorAll('.filter-chip').forEach(chip => {
       const night = chip.dataset.nightLine === 'true';
       chip.style.display = (night ? showNight : showDay) ? '' : 'none';
     });
-
-    // Se uma linha seleccionada ficou oculta, des-seleccioná-la silenciosamente
     let changed = false;
     for (const num of this.selectedRoutes) {
-      const night = isNightLine(num);
-      const show  = night ? showNight : showDay;
-      if (!show) { this.selectedRoutes.delete(num); changed = true; }
+      if (!(isNightLine(num) ? showNight : showDay)) { this.selectedRoutes.delete(num); changed = true; }
     }
-    if (changed) {
-      this._renderFilterBar();
-      this._renderArrivals();
-      if (this.onFilterChangeCallback) this.onFilterChangeCallback(new Set(this.selectedRoutes));
-    }
+    if (changed) { this._renderFilterBar(); this._renderArrivals(); if (this.onFilterChangeCallback) this.onFilterChangeCallback(new Set(this.selectedRoutes)); }
   }
 
-  /**
-   * Devolve chegadas filtradas pela intersecção de:
-   *   1. filtro interno do painel (selectedRoutes)
-   *   2. filtro global (routeFilterState) — apenas se o painel não tiver
-   *      nenhum chip seleccionado mas o filtro global estiver activo.
-   *
-   * Regra: o chip do painel tem prioridade; se nenhum chip estiver activo
-   * mas o filtro global tiver linhas seleccionadas, usa o filtro global.
-   */
   _getFilteredArrivals() {
     const panelActive  = this.selectedRoutes.size > 0;
     const globalActive = routeFilterState.hasActive();
-
     if (!panelActive && !globalActive) return this.allArrivals;
-
     const activeFilter = panelActive ? this.selectedRoutes : routeFilterState.selectedRoutes;
-
-    return this.allArrivals.filter(arrival => {
-      const num = String(arrival.route_short_name || arrival.route_number || arrival.route_id || '');
+    return this.allArrivals.filter(a => {
+      const num = String(a.route_short_name || a.route_number || a.route_id || '');
       return activeFilter.has(num);
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Loading
-  // ---------------------------------------------------------------------------
+  // ─── Loading ────────────────────────────────────────────────────────────────
 
   showLoading(message = 'O que gostarias de ver aqui em breve? Submete as tuas sugestões <a href="https://tiagoanoliveira.pt/support/a260e7bee11b401b9fd09290e8a8d6d9">aqui</a> ou no link do rodapé.') {
     if (!this.element) return;
     const listContainer = this.element.querySelector('#arrivals-list-panel');
     listContainer.classList.add('panel-loading');
-    if (!this.loadingSpinner) {
-      this.loadingSpinner = new LoadingSpinner({ size: 'medium', message });
-    } else {
-      this.loadingSpinner.setMessage(message);
-    }
+    if (!this.loadingSpinner) this.loadingSpinner = new LoadingSpinner({ size: 'medium', message });
+    else this.loadingSpinner.setMessage(message);
     this.loadingSpinner.show(listContainer);
   }
 
@@ -265,16 +299,14 @@ export class NextArrivals {
     if (this.loadingSpinner) this.loadingSpinner.remove();
   }
 
-  // ---------------------------------------------------------------------------
-  // Mostrar / Esconder painel
-  // ---------------------------------------------------------------------------
+  // ─── Mostrar / Esconder ──────────────────────────────────────────────────────
 
   show(stopName, stopId = null) {
     if (!this.element) this.create();
     this.currentStopId = stopId;
     const titleEl = this.element.querySelector('#arrivals-stop-name');
     const codeEl  = this.element.querySelector('#arrivals-stop-code');
-    if (titleEl && stopName) titleEl.textContent = stopName;
+    if (titleEl && stopName) titleEl.textContent = normalizeDestinationText(stopName);
     if (codeEl  && stopId)  codeEl.textContent  = `Código: ${stopId}`;
     this.showLoading();
     this.element.classList.add('visible');
@@ -285,21 +317,19 @@ export class NextArrivals {
   hide() {
     if (this.element) {
       this.element.classList.remove('visible');
-      this.isVisible = false;
-      this.currentStopId = null;
-      this.hideLoading();
+      this.isVisible       = false;
+      this.currentStopId   = null;
       this.availableRoutes = [];
-      this.selectedRoutes = new Set();
-      this.allArrivals = [];
-      this.allVehicles = [];
+      this.selectedRoutes  = new Set();
+      this.allArrivals     = [];
+      this.allVehicles     = [];
+      this.hideLoading();
       this._renderFilterBar();
       if (this.onCloseCallback) this.onCloseCallback();
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Chegadas
-  // ---------------------------------------------------------------------------
+  // ─── Chegadas ────────────────────────────────────────────────────────────────
 
   setArrivals(arrivals, vehicles) {
     if (!this.element) return;
@@ -312,7 +342,7 @@ export class NextArrivals {
   _renderArrivals() {
     if (!this.element) return;
     const listContainer = this.element.querySelector('#arrivals-list-panel');
-    const filtered = this._getFilteredArrivals();
+    const filtered      = this._getFilteredArrivals();
 
     if (!filtered || filtered.length === 0) {
       listContainer.innerHTML = this.allArrivals.length === 0
@@ -323,87 +353,142 @@ export class NextArrivals {
 
     listContainer.innerHTML = '';
     filtered.forEach(arrival => {
+      // Match: tentar tripId exacto → sem prefixo feed → por linha+direcção
       const vehicle = arrival.is_realtime
-        ? vehicleService.matchVehicleToTrip(this.allVehicles, arrival.trip_id)
+        ? this._matchVehicle(arrival)
         : null;
-      listContainer.appendChild(this.createArrivalElement(arrival, vehicle));
+      listContainer.appendChild(this._createArrivalElement(arrival, vehicle));
     });
   }
 
-  createArrivalElement(arrival, vehicle) {
-    const statusClass = arrival.status === 'ON_TIME' ? 'status-ontime' :
-      (arrival.status === 'SCHEDULED' ? 'status-scheduled' : 'status-delayed');
-    const busColor  = arrival.route_color      || '#0072C6';
-    const textColor = arrival.route_text_color || '#FFFFFF';
+  /**
+   * Tenta associar uma chegada OTP a um veículo MQTT.
+   *
+   * Estratégia (por ordem de precisão):
+   *   1. trip_id exacto
+   *   2. trip_id sem prefixo feed ("2:LINE_..." → "LINE_...")
+   *   3. Match por linha (fallback quando os trip_ids divergem)
+   *
+   * Os veículos em allVehicles já estão no formato processado
+   * (têm .tripId directamente) e têm .latitude/.longitude.
+   */
+  _matchVehicle(arrival) {
+    if (!this.allVehicles?.length) return null;
+    const arrTripId = arrival.trip_id;
+    if (!arrTripId) return null;
+
+    const exact = this.allVehicles.find(v => String(v.tripId || '') === arrTripId);
+    if (exact) return exact;
+
+    const byTrip = this.allVehicles.find(v => vehicleService.tripIdsMatch(v.tripId, arrTripId));
+    if (byTrip) return byTrip;
+
+    return null;
+  }
+
+  _createArrivalElement(arrival, vehicle) {
+    const busColor    = arrival.route_color      || '#0072C6';
+    const textColor   = arrival.route_text_color || '#FFFFFF';
     const isRealtime  = arrival.is_realtime === true;
+    const status      = arrival.status || 'SCHEDULED';
+    const delayS      = arrival.delay || 0;
+
     const hasLocation = isRealtime && vehicle &&
       vehicleService.extractVehicleLocation(vehicle) !== null;
     const locationIcon = hasLocation ? this.getActiveLocationIcon() : this.getInactiveLocationIcon();
 
+    // ── Status line — label SEMPRE a preto, só o delay como badge colorido ───
+    let statusHtml = '';
+    if (!isRealtime) {
+      statusHtml = '<span class="delay-label">Planeado - localização desconhecida</span>';
+    } else if (status === 'ON_TIME') {
+      statusHtml = '<span class="delay-label">No horário previsto</span>';
+    } else if (status === 'EARLY') {
+      const colorCls = 'delay-green';
+      const diff     = formatDelay(delayS);
+      statusHtml = `<span class="delay-label">Adiantado <span class="delay-badge ${colorCls}">${diff}</span></span>`;
+    } else if (status === 'DELAYED') {
+      const colorCls = delayColorClass(status, delayS);
+      const diff     = formatDelay(delayS);
+      statusHtml = `<span class="delay-label">Atrasado <span class="delay-badge ${colorCls}">${diff}</span></span>`;
+    } else {
+      statusHtml = `<span class="delay-label">${statusLabel(status)}</span>`;
+    }
+
+    // ── Tempo de chegada — verde=realtime, preto=planeado ─────────────────────
+    const timeColorCls = isRealtime ? 'arrival-time-realtime' : '';
+    const timeHtml     = `<div class="arrival-time ${timeColorCls}">${this._formatArrivalTime(arrival)}</div>`;
+
+    // ── Elemento ─────────────────────────────────────────────────────────────
     const div = document.createElement('div');
     div.className = 'arrival-item';
 
     if (hasLocation) {
       const location = vehicleService.extractVehicleLocation(vehicle);
-      div.style.cursor = 'pointer';
+      div.classList.add('arrival-item--clickable');
       div.setAttribute('data-vehicle-id', vehicle.id);
       div.addEventListener('click', () => {
-        if (this.onArrivalClickCallback) {
-          this.onArrivalClickCallback({ vehicleId: vehicle.id, location, arrival });
-        }
+        if (this.onArrivalClickCallback) this.onArrivalClickCallback({ vehicleId: vehicle.id, location, arrival });
       });
     }
-
-    let statusText = '';
-    if (!isRealtime) {
-      statusText = 'Planeado - localização desconhecida';
-    } else {
-      statusText = this.getStatusText(arrival.status);
-      if (arrival.delay_minutes > 1)
-        statusText += ` <span class="status-badge ${statusClass}">+${Math.round(arrival.delay_minutes)} min</span>`;
-    }
-
-    const timeClass = isRealtime ? 'arrival-time-realtime' : 'arrival-time-scheduled';
+    const normalizedDestination = normalizeDestinationText(arrival.trip_headsign);
 
     div.innerHTML = `
-      <div class="arrival-line" style="background-color: ${busColor}; color: ${textColor};">
+      <div class="arrival-line" style="background-color:${busColor};color:${textColor};">
         ${arrival.route_short_name}
       </div>
       <div class="arrival-info">
-        <div class="arrival-destination">${arrival.trip_headsign}</div>
-        <div class="arrival-status">${statusText}</div>
+        <div class="arrival-destination">${normalizedDestination}</div>
+        <div class="arrival-status">${statusHtml}</div>
       </div>
       <div class="arrival-time-container">
         <div class="arrival-location-icon">${locationIcon}</div>
-        <div class="arrival-time ${timeClass}">${this.formatArrivalTime(arrival.arrival_minutes)}</div>
+        ${timeHtml}
       </div>
     `;
     return div;
   }
 
-  // ---------------------------------------------------------------------------
-  // Botão de favorito
-  // ---------------------------------------------------------------------------
+  /**
+   * Formata o tempo de chegada de forma precisa:
+   *   < 60 s       → "A chegar"
+   *   60 s – 59 m  → "N min"
+   *   ≥ 60 m       → "Xh YY"
+   */
+  _formatArrivalTime(arrival) {
+    const seconds = arrival.arrival_seconds;
+    const minutes = arrival.arrival_minutes;
+    // Preferir seconds se disponível (mais preciso)
+    if (Number.isFinite(seconds)) {
+      if (seconds < 60) return 'A chegar';
+      const m = Math.floor(seconds / 60);
+      if (m < 60) return `${m} min`;
+      const h = Math.floor(m / 60);
+      return `${h}h${String(m % 60).padStart(2, '0')}`;
+    }
+    // Fallback para minutos
+    if (minutes === undefined || minutes === null) return 'N/A';
+    if (minutes < 1) return 'A chegar';
+    if (minutes < 60) return `${Math.round(minutes)} min`;
+    const h = Math.floor(minutes / 60);
+    return `${h}h${String(Math.round(minutes % 60)).padStart(2, '0')}`;
+  }
+
+  // ─── Favoritos ───────────────────────────────────────────────────────────────
 
   _updateFavouriteBtn() {
     const btn = this.element?.querySelector('#arrivals-favourite-btn');
     if (!btn || !this.currentStopId) return;
-    const isFav = this.onIsFavouriteCallback
-      ? this.onIsFavouriteCallback(this.currentStopId)
-      : false;
+    const isFav = this.onIsFavouriteCallback ? this.onIsFavouriteCallback(this.currentStopId) : false;
     btn.classList.toggle('is-favourite', isFav);
     btn.title = isFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
-    // Preencher/esvaziar a estrela via atributo fill do SVG polygon
     const poly = btn.querySelector('polygon');
     if (poly) poly.setAttribute('fill', isFav ? 'currentColor' : 'none');
   }
 
-  /** Chamado pelo app quando o estado de favorito muda externamente */
   refreshFavouriteBtn() { this._updateFavouriteBtn(); }
 
-  // ---------------------------------------------------------------------------
-  // Ícones + helpers
-  // ---------------------------------------------------------------------------
+  // ─── Ícones ──────────────────────────────────────────────────────────────────
 
   getActiveLocationIcon() {
     return `
@@ -437,18 +522,7 @@ export class NextArrivals {
       </svg>`;
   }
 
-  getStatusText(status) {
-    return { ON_TIME: 'No horário', DELAYED: 'Atrasado', EARLY: 'Adiantado', SCHEDULED: 'Programado', ARRIVING: 'A chegar' }[status] || status;
-  }
-
-  formatArrivalTime(minutes) {
-    if (minutes === undefined || minutes === null) return 'N/A';
-    if (minutes < 1) return 'A chegar';
-    if (minutes === 1) return '1 min';
-    if (minutes < 60) return `${Math.round(minutes)} min`;
-    const h = Math.floor(minutes / 60);
-    return `${h}h${Math.round(minutes % 60).toString().padStart(2, '0')}`;
-  }
+  // ─── Callbacks ───────────────────────────────────────────────────────────────
 
   updateLastUpdate(timestamp) {
     if (!this.element) return;
@@ -459,16 +533,16 @@ export class NextArrivals {
     }
   }
 
-  onArrivalClick(callback)  { this.onArrivalClickCallback  = callback; }
-  onClose(callback)         { this.onCloseCallback         = callback; }
-  onRefresh(callback)       { this.onRefreshCallback       = callback; }
-  onFilterChange(callback)  { this.onFilterChangeCallback  = callback; }
-  onFavouriteClick(callback){ this.onFavouriteClickCallback = callback; }
-  onIsFavourite(callback)   { this.onIsFavouriteCallback   = callback; }
+  onArrivalClick(callback)   { this.onArrivalClickCallback   = callback; }
+  onClose(callback)          { this.onCloseCallback          = callback; }
+  onRefresh(callback)        { this.onRefreshCallback        = callback; }
+  onFilterChange(callback)   { this.onFilterChangeCallback   = callback; }
+  onFavouriteClick(callback) { this.onFavouriteClickCallback = callback; }
+  onIsFavourite(callback)    { this.onIsFavouriteCallback    = callback; }
 
   destroy() {
     if (this._timeCheckInterval) clearInterval(this._timeCheckInterval);
-    if (this.element) { this.element.remove(); this.element = null; }
-    if (this.loadingSpinner) { this.loadingSpinner.remove(); this.loadingSpinner = null; }
+    if (this.element)       { this.element.remove();       this.element      = null; }
+    if (this.loadingSpinner){ this.loadingSpinner.remove(); this.loadingSpinner = null; }
   }
 }

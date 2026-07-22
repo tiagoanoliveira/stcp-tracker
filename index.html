@@ -59,6 +59,7 @@
   <meta name="theme-color" content="#0072c6">
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="./src/ui/styles/base.css">
   <link rel="stylesheet" href="./src/ui/styles/busmap.css">
   <link rel="stylesheet" href="./src/ui/styles/loading.css">
   <link rel="stylesheet" href="./src/ui/styles/routeFilterBar.css">
@@ -67,8 +68,8 @@
   <link rel="stylesheet" href="./src/ui/styles/favourites.css">
   <link rel="stylesheet" href="./src/ui/styles/tutorial.css">
   <link rel="stylesheet" href="./src/ui/styles/announcement.css">
-  <link rel="stylesheet" href="./src/ui/styles/fallback-modal.css">
-  
+  <link rel="stylesheet" href="./src/ui/styles/map-popup.css">
+
   <link rel="shortcut icon" href="./resources/favicon.svg">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYVRR1K1R2"></script>
   <script>
@@ -107,6 +108,12 @@
   <div id="error-message" class="error-overlay"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="module" src="./src/pages/BusMapApp.js"></script>
+
+  <!-- Entry-point: importa a classe e inicializa a aplicação -->
+  <script type="module">
+    import { BusMapApp } from './src/pages/BusMapApp.js';
+    const app = new BusMapApp({ mapElementId: 'map', refreshInterval: 5000 });
+    app.initialize();
+  </script>
 </body>
 </html>

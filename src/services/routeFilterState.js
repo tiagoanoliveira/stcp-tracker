@@ -55,6 +55,21 @@ class RouteFilterState {
       return this.selectedRoutes.has(num);
     });
   }
+
+  /**
+   * Actualiza apenas as direcções das linhas já activas (sem alterar quais
+   * linhas estão seleccionadas). Necessário porque a direcção correcta só
+   * pode, nalguns casos, ser determinada de forma assíncrona (verificação
+   * contra as paragens reais da linha).
+   * @param {Map<string, number>} dirMap
+   */
+  updateDirections(dirMap) {
+    this.dirMap = new Map(dirMap);
+    this.selectedRouteObjs = this.selectedRouteObjs.map(r => ({
+      ...r,
+      direction: dirMap.has(String(r.number)) ? dirMap.get(String(r.number)) : r.direction
+    }));
+  }
 }
 
 export const routeFilterState = new RouteFilterState();

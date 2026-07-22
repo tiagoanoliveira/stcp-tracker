@@ -2,7 +2,9 @@
  * Vehicle Service - Lógica centralizada de processamento de dados de autocarros
  *
  * LAZY HEADSIGN: processBusData / processBusDataBatch não resolvem o destino.
- * Esse campo fica null até ao primeiro clique no marker.
+ * Esse campo fica null até ao primeiro clique no marker — A MENOS QUE o caller
+ * (ex: mqttVehicleService) já tenha extraído o destino do tópico MQTT e o passe
+ * no campo `bus.destination`. Nesse caso o valor é preservado sem resolver nada.
  *
  * TRIP MATCHING: O trip_id tem o formato:
  *   {linha}_{dir}_{seq}|{nr_viagem}|{dia}|{turno}|{servico}
@@ -12,6 +14,14 @@
  * LINE ALIASES: Algumas linhas são reportadas pela API com um ID numérico
  * diferente do nome real da linha. O mapa LINE_ID_ALIASES faz essa tradução.
  * Exemplo: a linha ZC é transmitida como '107' na localização em tempo real.
+ *
+ * ID NORMALISATION (FIWARE):
+ *   O FIWARE usa o formato "urn:ngsi-ld:Vehicle:{number}" como id de entidade.
+ *   O MQTT usa apenas o número do veículo (ex: "3261").
+ *   Para garantir deduplicação correcta no BusMarkerManager, o branch FIWARE
+ *   de processBusData extrai o número final do URN:
+ *     "urn:ngsi-ld:Vehicle:3261" → "3261"
+ *   Se o id não seguir esse padrão, é usado tal qual.
  */
 
 import { scheduleService } from './scheduleService.js';
@@ -23,6 +33,46 @@ import { scheduleService } from './scheduleService.js';
 const LINE_ID_ALIASES = {
   '107': 'ZC',
 };
+
+/**
+ * Normaliza um id de entidade FIWARE para o número puro do veículo.
+ * "urn:ngsi-ld:Vehicle:3261" → "3261"
+ * "3261"                     → "3261"  (passthrough)
+ * @param {string} rawId
+ * @returns {string}
+ */
+function _normalizeFiwareId(rawId) {
+  if (!rawId) return rawId;
+  // Extrair último segmento de URN separado por ':'
+  const parts = String(rawId).split(':');
+  return parts[parts.length - 1] || String(rawId);
+}
+
+export const KEEP_LOWERCASE_DEST_WORDS = new Set(['de', 'da', 'do']);
+
+export function normalizeDestinationText(value) {
+  if (!value || typeof value !== 'string') return value;
+
+  const trimmed = value.trim();
+  const withoutAsterisk = trimmed.replace(/^\*+\s*/, '').replace(/\s*\*+$/, '').trim();
+  if (!withoutAsterisk) return withoutAsterisk;
+
+  const lettersOnly = withoutAsterisk.replace(/[^A-Za-zÀ-ÿ]/g, '');
+  const isAllCaps = lettersOnly.length > 0 && lettersOnly === lettersOnly.toUpperCase();
+  const startedWithAsterisk = trimmed.startsWith('*');
+
+  if (!isAllCaps && !startedWithAsterisk) return withoutAsterisk;
+
+  return withoutAsterisk
+      .toLowerCase()
+      .split(/\s+/)
+      .map(word => {
+        if (!word) return word;
+        if (KEEP_LOWERCASE_DEST_WORDS.has(word)) return word;
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      })
+      .join(' ');
+}
 
 class VehicleService {
   extractAnnotation(bus, prefix) {
@@ -128,13 +178,23 @@ class VehicleService {
    * Normaliza um veículo de qualquer origem para o formato interno usado no mapa.
    *
    * Suporta:
+   *  - Formato MQTT (mqttVehicleService): { id, routeId, directionId, lat, lng,
+   *      speed, tripId, destination, busNumber }
+   *    → speed já em km/h, destination já resolvido do tópico.
    *  - Formato normalizado do worker (/vehicles): { id, routeId, directionId, lat, lng, speed, tripId }
    *  - Formato FIWARE bruto: annotations + location.value.coordinates
    *
-   * VELOCIDADE: arredondada às unidades (Math.round) para apresentação ao utilizador.
+   * VELOCIDADE: para o formato MQTT e worker, o campo speed chega já em km/h
+   * (arredondado). Para FIWARE bruto, speed.value está em m/s e é convertido.
+   *
+   * DESTINO: se bus.destination já tiver valor (string não-nula e não-vazia),
+   * é preservado directamente — não é chamado resolveHeadsign.
+   *
+   * ID (FIWARE): o URN é normalizado para o número puro do veículo via
+   * _normalizeFiwareId, garantindo deduplicação com marcadores MQTT.
    */
   processBusData(bus) {
-    // Formato normalizado do worker (/vehicles)
+    // Formato normalizado do worker (/vehicles) ou MQTT
     if (Number.isFinite(bus.lat) && Number.isFinite(bus.lng)) {
       const line      = this.extractLineNumber(bus);
       const direction = this.extractDirection(bus);
@@ -142,8 +202,14 @@ class VehicleService {
 
       if (!line || direction == null) return null;
 
-      const rawSpeed = bus.speed;
-      const speed    = Number.isFinite(rawSpeed) ? Math.round(rawSpeed) : 'N/A';
+
+      // Destino: usar o valor do tópico se disponível, senão resolver preguiçosamente
+      const destination = (bus.destination != null && bus.destination !== '')
+          ? normalizeDestinationText(bus.destination)
+          : null;
+
+      // busNumber: do tópico MQTT se disponível, senão do campo id
+      const busNumber = bus.busNumber || bus.id || 'N/A';
 
       return {
         id:          String(bus.id),
@@ -151,9 +217,9 @@ class VehicleService {
         displayLine: this.getDisplayLine(line),
         latitude:    bus.lat,
         longitude:   bus.lng,
-        speed,
-        busNumber:   bus.id ?? 'N/A',
-        destination: null,
+        nextStop:    bus.nextStop || null,
+        busNumber,
+        destination,
         direction,
         tripId
       };
@@ -169,18 +235,20 @@ class VehicleService {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
     if (!line || direction == null) return null;
 
-    const rawSpeedFiware = bus.speed?.value;
-    const speedFiware    = Number.isFinite(rawSpeedFiware) ? Math.round(rawSpeedFiware) : 'N/A';
+    // Normalizar ID FIWARE: "urn:ngsi-ld:Vehicle:3261" → "3261"
+    // Garante que o id coincide com o número do veículo usado pelo MQTT,
+    // evitando marcadores duplicados no BusMarkerManager.
+    const normalizedId = _normalizeFiwareId(bus.id);
 
     return {
-      id:          bus.id,
+      id:          normalizedId,
       line,
       displayLine: this.getDisplayLine(line),
       latitude:    lat,
       longitude:   lon,
-      speed:       speedFiware,
-      busNumber:   bus.fleetVehicleId?.value ?? 'N/A',
+      busNumber:   normalizedId,
       destination: null,
+      nextStop: null,
       direction,
       tripId
     };
@@ -193,21 +261,65 @@ class VehicleService {
 
   /**
    * Resolve o headsign ao clicar no marker.
+   * Só é chamado se bus.destination for null (ou seja, não veio do tópico MQTT).
    * O serviceId é obtido do cache (aquecido em loadScheduleData)
    * e passado directamente a getHeadsignForTrip.
    */
   async resolveHeadsign(bus) {
+    // Se o destino já foi resolvido (ex: via tópico MQTT), devolver directamente
+    if (bus.destination) return normalizeDestinationText(bus.destination);
     if (!bus.tripId || !bus.line || bus.direction == null) return 'Destino desconhecido';
     try {
       const serviceId = await scheduleService.getServiceIdAtual();
-      return await scheduleService.getHeadsignForTrip(bus.tripId, bus.line, bus.direction, serviceId);
+      const headsign = await scheduleService.getHeadsignForTrip(bus.tripId, bus.line, bus.direction, serviceId);
+      return normalizeDestinationText(headsign);
     } catch {
       return 'Destino desconhecido';
     }
   }
 
-  shouldIncludeBus(bus, filterValue) {
-    return filterValue === '' || (bus.line && bus.line.startsWith(filterValue));
+  /**
+   * Resolve o delay de um veículo consultando as chegadas da sua próxima paragem.
+   * @param {Object} vehicle - Veículo processado com nextStop e tripId
+   * @returns {Promise<number|null>} Delay em segundos, ou null se não encontrado
+   */
+  async resolveVehicleDelay(vehicle) {
+    if (!vehicle.nextStop) return null;
+
+    // Importar plannedArrivalsService no topo do ficheiro se ainda não estiver
+    const { plannedArrivalsService } = await import('./plannedArrivalsService.js');
+
+    try {
+      // Buscar próximas chegadas para a paragem (com cache de 30s)
+      const arrivals = await plannedArrivalsService.getNextArrivals(
+          vehicle.nextStop,
+          10, // Apenas primeiras 10 chegadas
+          false // Usar cache
+      );
+
+      if (!arrivals || arrivals.length === 0) return null;
+
+      // Tentar match por tripId exacto
+      if (vehicle.tripId) {
+        const exactMatch = arrivals.find(a =>
+            a.trip_id && this.tripIdsMatch(vehicle.tripId, a.trip_id)
+        );
+        if (exactMatch && exactMatch.delay != null) {
+          return exactMatch.delay;
+        }
+      }
+
+      // Fallback: match por linha
+      const lineMatch = arrivals.find(a =>
+          String(a.route_short_name || '') === String(vehicle.displayLine || vehicle.line || '')
+      );
+
+      return (lineMatch && lineMatch.delay != null) ? lineMatch.delay : null;
+
+    } catch (err) {
+      console.warn(`Erro ao resolver delay para veículo ${vehicle.id}:`, err);
+      return null;
+    }
   }
 }
 

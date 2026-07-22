@@ -1,6 +1,7 @@
 /**
  * StopMarkerManager - Gestão especializada de marcadores de paragens
  */
+import { normalizeDestinationText } from '../../services/vehicleService.js';
 
 export class StopMarkerManager {
   constructor(map) {
@@ -31,7 +32,7 @@ export class StopMarkerManager {
 
     const marker = L.marker([stop.latitude, stop.longitude], {
       icon,
-      title: stop.stop_name
+      title: normalizeDestinationText(stop.stop_name)
     }).addTo(this.map);
 
     marker.bindPopup(popupContent);
@@ -96,13 +97,13 @@ export class StopMarkerManager {
    */
   createPopupContent(stop, showDistance) {
     let content = `<div class="stop-popup">
-      <strong>${stop.stop_name}</strong><br>
-      C\u00f3digo: ${stop.stop_id}`;
+      <strong>${normalizeDestinationText(stop.stop_name)}</strong>
+      Código: ${stop.stop_id}`;
     if (showDistance && stop.distance !== undefined) {
-      content += `<br>Dist\u00e2ncia: ${Math.round(stop.distance)}m`;
+      content += `<br>Distância: ${Math.round(stop.distance)}m`;
     }
     if (!this.clickCallback) {
-      content += `<br><a href="stop.html?id=${stop.stop_id}" style="color:#0072C6;font-weight:bold;">Ver hor\u00e1rios \u2192</a>`;
+      content += `<br><a href="stop.html?id=${stop.stop_id}" style="color:#0072C6;font-weight:bold;">Ver horários \u2192</a>`;
     }
     content += `</div>`;
     return content;

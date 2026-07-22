@@ -1,0 +1,115 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+POPUP DO AUTOCARRO — card com cor dinâmica da linha
+═══════════════════════════════════════════════════════════════════════════ */
+/* Wrapper Leaflet: sem padding, cantos arredondados, largura compacta */
+.leaflet-popup-content-wrapper {
+    border-radius: 14px !important;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.18) !important;
+    padding: 0 !important;
+    overflow: hidden;
+    border: none !important;
+    min-width: 120px;
+    max-width: 200px !important;
+    width: auto !important;
+}
+
+/* Seta do popup: branca */
+.leaflet-popup-tip-container .leaflet-popup-tip {
+    background: #fff !important;
+    box-shadow: none !important;
+}
+
+.leaflet-popup-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.4 !important;
+    width: max-content !important;
+    min-width: 120px !important;
+}
+
+.popup-line-stop {
+    padding: 6px !important;
+}
+
+.bus-popup__header {
+    padding: 7px 10px 7px;
+    display: flex;
+    align-items: flex-start;   /* badge alinhado ao topo mesmo com 2 linhas */
+    gap: 7px;
+}
+
+/* Badge da linha — quadrado pequeno, cor de fundo branca, cor do texto = cor da linha */
+.bus-popup__badge {
+    background: rgba(255,255,255,0.95);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    padding: 3px 6px;
+    border-radius: 5px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* Destino — até 2 linhas, sem truncagem abrupta */
+.bus-popup__destination {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    /* Permitir até 2 linhas; se ultrapassar, elipsis na 2ª linha */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    /* cor injectada via style= inline */
+}
+
+/* Corpo do popup */
+.bus-popup__body {
+    background: #fff;
+    padding: 7px 10px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Linha de detalhe (ícone + texto) */
+.bus-popup__row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: #333;
+}
+
+.bus-popup__row svg {
+    flex-shrink: 0;
+    color: var(--popup-accent, var(--color-primary));
+    opacity: 0.85;
+}
+
+.bus-popup__row span { white-space: nowrap; }
+
+.bus-popup-next-stop {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Número do veículo */
+.bus-popup__vehicle {
+    font-size: 10.5px;
+    color: #bbb;
+    text-align: right;
+    margin-top: 1px;
+    letter-spacing: 0.03em;
+}
+
+/* Popup */
+.stop-popup { font-family: inherit; padding: 4px 0; }
+.stop-popup strong { color: var(--color-primary); font-size: 15px; }
+.stop-popup a { color: var(--color-primary); text-decoration: none; font-weight: 500; }
+.stop-popup a:hover { text-decoration: underline; }

@@ -61,12 +61,6 @@ a.logo-overlay:hover { opacity: 0.85; }
 .search-clear-btn:hover { background: rgba(0,0,0,0.22); color: #111; }
 .search-clear-btn svg { width: 12px; height: 12px; pointer-events: none; }
 
-/* Popup */
-.stop-popup { font-family: inherit; padding: 4px 0; }
-.stop-popup strong { color: #0072c6; font-size: 15px; }
-.stop-popup a { color: #0072c6; text-decoration: none; font-weight: 500; }
-.stop-popup a:hover { text-decoration: underline; }
-
 /* Tablet */
 @media (max-width: 768px) {
   .search-overlay { top: 12px; min-width: 300px; max-width: 500px; padding: 4px 8px; }

@@ -1,5 +1,5 @@
 /**
- * Stop Detail CSS - Estilos do painel de pr\u00f3ximas chegadas
+ * Stop Detail CSS - Estilos do painel de próximas chegadas (NextArrivals)
  */
 
 /* ========================================
@@ -72,6 +72,37 @@
   line-height: 1;
 }
 
+/* ── Acções do header (favorito + fechar) ── */
+.next-arrivals-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.next-arrivals-favourite {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background-color: #f5f7fa;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.next-arrivals-favourite:hover {
+  background-color: #fff3cd;
+  color: #f59e0b;
+}
+
+.next-arrivals-favourite.is-favourite {
+  color: #f59e0b;
+  background-color: #fff3cd;
+}
+
 .next-arrivals-close {
   width: 36px;
   height: 36px;
@@ -88,12 +119,12 @@
 
 .next-arrivals-close:hover {
   background-color: #e8ecf0;
-  color: #0072c6;
+  color: var(--color-primary);
   transform: rotate(90deg);
 }
 
 /* ========================================
-   ⭐ Barra de filtros por linha
+   Barra de filtros por linha
    ======================================== */
 
 .arrivals-filter-bar {
@@ -146,7 +177,7 @@
 }
 
 /* ========================================
-   Conte\u00fado + lista de chegadas
+   Conteúdo + lista de chegadas
    ======================================== */
 
 .next-arrivals-content {
@@ -172,7 +203,7 @@
 }
 
 .no-arrivals a {
-  color: #0072c6;
+  color: var(--color-primary);
   text-decoration: none;
   font-weight: 500;
 }
@@ -190,7 +221,12 @@
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.arrival-item:hover {
+/* Cursor pointer só nos items clicáveis (com localização) */
+.arrival-item--clickable {
+  cursor: pointer;
+}
+
+.arrival-item--clickable:hover {
   background-color: rgba(255, 255, 255, 1);
   transform: translateX(4px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -200,7 +236,8 @@
   padding: 8px 12px;
   border-radius: 8px;
   font-weight: 700;
-  min-width: 56px;
+  min-width: 40px;
+  max-width: 50px;
   text-align: center;
   margin-right: 16px;
   font-size: 16px;
@@ -230,16 +267,6 @@
   gap: 8px;
 }
 
-.status-badge {
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.status-ontime { background-color: #d4edda; color: #155724; }
-.status-delayed { background-color: #f8d7da; color: #721c24; }
-
 .arrival-time-container {
   display: flex;
   align-items: center;
@@ -250,8 +277,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
 }
 
@@ -261,10 +288,44 @@
   min-width: 70px;
   text-align: right;
   flex-shrink: 0;
+  color: #1a1a1a;
 }
 
 .arrival-time-realtime  { color: #22C55E; }
-.arrival-time-scheduled { color: #3B82F6; }
+
+/* ========================================
+   Delay — label e badge
+   ======================================== */
+
+.delay-green  { color: #22C55E; }
+.delay-yellow { color: #F59E0B; }
+.delay-red    { color: #EF4444; }
+
+.delay-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #424242;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Badge colorido para o valor do delay (+04 min.) */
+.delay-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.delay-badge.delay-green  { background-color: rgba(34, 197, 94, 0.12);  color: #16a34a; }
+.delay-badge.delay-yellow { background-color: rgba(245, 158, 11, 0.12); color: #b45309; }
+.delay-badge.delay-red    { background-color: rgba(239, 68, 68, 0.12);  color: #dc2626; }
 
 /* ========================================
    Footer
@@ -294,7 +355,7 @@
   height: 36px;
   border: none;
   border-radius: 50%;
-  background-color: #0072c6;
+  background-color: var(--color-primary);
   color: #fff;
   cursor: pointer;
   display: flex;
@@ -304,7 +365,7 @@
   flex-shrink: 0;
 }
 
-.next-arrivals-refresh:hover { background-color: #005a9e; transform: scale(1.05); }
+.next-arrivals-refresh:hover  { background-color: var(--color-primary-dark); transform: scale(1.05); }
 .next-arrivals-refresh:active { transform: scale(0.95); }
 .next-arrivals-refresh.refreshing { animation: spin 1s linear; }
 
@@ -314,7 +375,7 @@
 }
 
 /* Scrollbar */
-.next-arrivals-content::-webkit-scrollbar { width: 8px; }
+.next-arrivals-content::-webkit-scrollbar       { width: 8px; }
 .next-arrivals-content::-webkit-scrollbar-track { background: rgba(0,0,0,.05); border-radius: 4px; }
 .next-arrivals-content::-webkit-scrollbar-thumb { background: rgba(0,114,198,.3); border-radius: 4px; }
 .next-arrivals-content::-webkit-scrollbar-thumb:hover { background: rgba(0,114,198,.5); }
@@ -324,41 +385,43 @@
    ======================================== */
 
 @media (max-width: 768px) {
-  .next-arrivals-header { padding: 12px 16px; }
-  .next-arrivals-icon { width: 28px; height: 28px; }
+  .next-arrivals-header      { padding: 12px 16px; }
+  .next-arrivals-icon        { width: 28px; height: 28px; }
   .next-arrivals-title-text h2 { font-size: 16px; }
-  .arrivals-stop-code { font-size: 11px; }
-  .arrival-item { padding: 10px 12px; }
-  .arrival-line { min-width: 48px; padding: 6px 10px; font-size: 14px; margin-right: 12px; }
-  .arrival-destination { font-size: 14px; }
-  .arrival-time { font-size: 16px; min-width: 60px; }
-  .next-arrivals-footer { padding: 10px 16px; }
-  .next-arrivals-refresh { width: 32px; height: 32px; }
+  .arrivals-stop-code        { font-size: 11px; }
+  .arrival-item              { padding: 10px 12px; }
+  .arrival-line              { padding: 6px 10px; font-size: 14px; margin-right: 12px; }
+  .arrival-destination       { font-size: 14px; }
+  .arrival-time              { font-size: 16px; min-width: 60px; }
+  .next-arrivals-footer      { padding: 10px 16px; }
+  .next-arrivals-refresh     { width: 32px; height: 32px; }
   .next-arrivals-refresh svg { width: 16px; height: 16px; }
-  .arrivals-filter-bar { padding: 6px 16px; }
-  .filter-chip { font-size: 11px; padding: 3px 10px; }
+  .arrivals-filter-bar       { padding: 6px 16px; }
+  .filter-chip               { font-size: 11px; padding: 3px 10px; }
 }
 
 @media (max-width: 480px) {
-  .next-arrivals { max-height: 45dvh; }
-  .next-arrivals-header { padding: 6px 12px; }
-  .next-arrivals-title { gap: 8px; }
-  .next-arrivals-icon { width: 30px; height: 30px; }
+  .next-arrivals             { max-height: 45dvh; }
+  .next-arrivals-header      { padding: 6px 12px; }
+  .next-arrivals-title       { gap: 8px; }
+  .next-arrivals-icon        { width: 30px; height: 30px; }
   .next-arrivals-title-text h2 { font-size: 15px; }
-  .arrivals-stop-code { font-size: 10px; }
-  .next-arrivals-close { width: 32px; height: 32px; }
-  .next-arrivals-close svg { width: 20px; height: 20px; }
-  .next-arrivals-content { padding: 0 8px; }
-  .arrival-item { padding: 8px 10px; }
-  .arrival-line { min-width: 44px; padding: 4px 8px; font-size: 13px; margin-right: 10px; }
-  .arrival-destination { font-size: 13px; }
-  .arrival-status { font-size: 12px; }
-  .arrival-location-icon { width: 30px; height: 30px; }
-  .arrival-time { font-size: 15px; min-width: 55px; }
-  .next-arrivals-footer { padding: 6px 12px; }
-  .next-arrivals-footer p { font-size: 12px; }
-  .next-arrivals-refresh { width: 30px; height: 30px; }
+  .arrivals-stop-code        { font-size: 10px; }
+  .next-arrivals-close       { width: 32px; height: 32px; }
+  .next-arrivals-close svg   { width: 20px; height: 20px; }
+  .delay-label               { font-weight: 400; gap: 0.2rem }
+  .next-arrivals-content     { padding: 0 4px; }
+  .arrival-item              { padding: 6px; }
+  .arrival-line              { min-width: 35px; padding: 4px 8px; font-size: 13px; margin-right: 10px; }
+  .arrival-destination       { font-size: 13px; }
+  .arrival-status            { font-size: 12px; }
+  .arrival-location-icon     { width: 30px; height: 30px; }
+  .arrival-time              { font-size: 15px; min-width: 55px; }
+  .next-arrivals-footer      { padding: 6px 12px; }
+  .next-arrivals-footer p    { font-size: 12px; }
+  .next-arrivals-refresh     { width: 30px; height: 30px; }
   .next-arrivals-refresh svg { width: 14px; height: 14px; }
-  .arrivals-filter-bar { padding: 6px 12px; }
-  .filter-chip { font-size: 11px; padding: 3px 8px; }
+  .arrivals-filter-bar       { padding: 6px 12px; }
+  .arrivals-list-panel       { gap: 2px; }
+  .filter-chip               { font-size: 11px; padding: 3px 8px; }
 }

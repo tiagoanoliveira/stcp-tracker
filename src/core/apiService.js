@@ -1,21 +1,29 @@
 /**
  * Core API Service - Centraliza todas as chamadas API
+ *
+ * FONTES DE VEÍCULOS:
+ *   'mqtt'     - Porto Digital MQTT/WebSocket (event-driven, sem polling) — ÚNICA fonte activa
+ *
+ * A WebSocket liga sempre antes do site acabar de carregar, por isso não é necessário bootstrap via REST.
+ * Se o MQTT demorar, o mqttVehicleService emite 'mqtt:noDataTimeout' e o
+ * UI mostra um banner de aviso.
  */
+
+import { mqttVehicleService } from '../services/mqttVehicleService.js';
 
 class ApiService {
   constructor() {
-    this.fiwareUrl = 'https://broker.fiware.urbanplatform.portodigital.pt/v2/entities?q=vehicleType==bus&limit=1000';
     this.proxyUrl  = 'https://stcp-worker.tiagoanoliveira.pt';
     this.retries   = 3;
     this.delayMs   = 500;
     this.timeoutMs = 10000;
 
-    // Fonte de veículos: 'primary' (stcp.live) ou 'fallback' (FIWARE via worker)
-    this.vehiclesSource = 'primary';
+    // Fonte de veículos: apenas 'mqtt' em produção
+    this.vehiclesSource = 'mqtt';
   }
 
   setVehiclesSource(source) {
-    if (source === 'primary' || source === 'fallback') {
+    if (['primary', 'fallback', 'mqtt'].includes(source)) {
       this.vehiclesSource = source;
     }
   }
@@ -41,35 +49,35 @@ class ApiService {
   }
 
   /**
-   * Veículos em tempo real (stcp.live como primário, FIWARE como fallback),
-   * sempre via Cloudflare Worker.
-   *
-   * Resposta esperada do worker:
-   *   { success: true, source: 'stcp-fast'|'fiware', vehicles: [...] }
+   * Veículos em tempo real — exclusivamente via MQTT.
+   * Devolve o snapshot em memória actualizado pelo mqttVehicleService.
+   * Enquanto o MQTT ainda não tiver dados, devolve [] e o UI aguarda
+   * pelo evento 'mqtt:vehicleUpdate' para renderizar.
    */
   async fetchBusData() {
+    const source = this.getVehiclesSource();
+
+    if (source === 'mqtt') {
+      // Devolve snapshot em memória — pode ser [] nos primeiros segundos.
+      // O mqttVehicleService emite 'mqtt:noDataTimeout' se passarem 15s sem dados.
+      return mqttVehicleService.getAllVehicles();
+    }
+
+    // Modo polling (mantido apenas para debug manual)
     try {
-      const source = this.getVehiclesSource();
-      const path   = source === 'fallback' ? '/vehicles/fiware' : '/vehicles';
-      const data   = await this.fetchWithRetry(
+      const path = source === 'fallback' ? '/vehicles/fiware' : '/vehicles';
+      const data = await this.fetchWithRetry(
         `${this.proxyUrl}${path}`,
         {},
         this.retries,
         this.delayMs,
         8000
       );
-
       const vehicles = Array.isArray(data)
         ? data
         : Array.isArray(data?.vehicles)
           ? data.vehicles
           : [];
-
-      if (!Array.isArray(vehicles)) {
-        console.error('❌ Dados inválidos recebidos do worker de veículos');
-        return [];
-      }
-
       return vehicles;
     } catch (error) {
       console.error('❌ Erro ao obter dados dos autocarros:', error);
@@ -77,11 +85,13 @@ class ApiService {
     }
   }
 
+  // ─── Paragens e rotas ──────────────────────────────────────────────────────
+
   async fetchStopRealtime(stopId) {
     try {
       return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/realtime`);
     } catch (error) {
-      console.error(`❌ Erro ao obter dados da paragem ${stopId}:`, error);
+      console.warn(`⚠️ fetchStopRealtime(${stopId}) falhou — usando apenas MQTT TripUpdate`, error);
       return null;
     }
   }
@@ -105,14 +115,6 @@ class ApiService {
     }
   }
 
-  /**
-   * Obtém os serviços ativos para uma paragem numa data específica.
-   * Passa pelo proxy Cloudflare Worker para evitar erros de CORS.
-   * Rota do proxy: GET /{stopId}/services?date={date}
-   * @param {string} stopId - Código da paragem (ex: "PLNT2")
-   * @param {string} date - Data no formato YYYY-MM-DD (ex: "2026-04-02")
-   * @returns {Promise<Object>} Objeto com active_service_id e lista de serviços
-   */
   async fetchStopServices(stopId, date) {
     try {
       return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/services?date=${date}`);
@@ -122,10 +124,6 @@ class ApiService {
     }
   }
 
-  /**
-   * Info completa de uma paragem (nome, coordenadas, linhas com cores)
-   * Usa o endpoint GET /{stopId}/info do worker.
-   */
   async fetchStopInfo(stopId) {
     try {
       return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/info`);

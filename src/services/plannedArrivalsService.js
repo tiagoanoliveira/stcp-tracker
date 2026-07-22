@@ -1,183 +1,316 @@
 /**
- * Planned Arrivals Service - Combina chegadas em tempo real com horários programados
- * Suporta paragens STCP normais E paragens de rotas custom (ex: MB1).
- * Usa: apiService, scheduleService, customRouteScheduleService
+ * Planned Arrivals Service — Chegadas planeadas e em tempo real para uma paragem
+ *
+ * Estratégia:
+ *
+ *   OTP Porto Digital (GraphQL) e API Realtime STCP são chamados SEMPRE em
+ *   paralelo. O resultado é cruzado para obter o máximo de tempos reais:
+ *
+ *     - Se apenas o OTP responde         → usar dados OTP.
+ *     - Se apenas a realtime responde    → usar dados realtime.
+ *     - Se ambos respondem               → merge por route_short_name ±5 min:
+ *         · Estrutura base vem do OTP (trip_id, headsign, etc.).
+ *         · delay e realtime_arrival substituídos pelos da API.
+ *     - Chegadas RT sem match OTP        → só adicionadas se a linha NÃO tiver
+ *         NENHUMA chegada OTP (veículos que o OTP genuinamente não conhece).
+ *         Chegadas RT de linhas que o OTP já tem → descartadas para evitar
+ *         duplicados que aparecem como "planeados" no fundo da lista.
+ *
+ *   A API realtime tem timeout de 3 s; se demorar mais, usa-se apenas OTP.
+ *
+ * Cache:
+ *   TTL de 4 s — ligeiramente inferior ao intervalo de refresh (5 s).
+ *   forceRefresh=true ignora o cache completamente (botão + intervalo de 5 s).
+ *
+ * Debug:
+ *   Activar: localStorage.setItem('ARRIVALS_DEBUG', '1') + recarregar
+ *   Desactivar: localStorage.removeItem('ARRIVALS_DEBUG')
  */
 
-import { apiService }                  from '../core/apiService.js';
-import { scheduleService }             from './scheduleService.js';
-import { customRouteScheduleService }  from './customRouteScheduleService.js';
+import { otpService }  from './otpService.js';
+import { stopService } from './stopService.js';
+import { apiService }  from '../core/apiService.js';
+
+const _cache              = new Map();
+const CACHE_TTL           = 4_000;  // ms
+const REALTIME_TIMEOUT_MS = 3_000;  // ms
+// Janela de match entre chegadas OTP e RT (em ms). Alargada de 2 min para
+// 5 min para cobrir casos onde o atraso causa desvio superior a 2 min.
+const MATCH_WINDOW_MS     = 5 * 60_000;
+
+// ── Debug ────────────────────────────────────────────────────────────────────
+const _dbg  = () => { try { return localStorage.getItem('ARRIVALS_DEBUG') === '1'; } catch { return false; } };
+const _log  = (...a) => { if (_dbg()) console.log ('%c[ARRIVALS]', 'color:#006494;font-weight:bold', ...a); };
+const _warn = (...a) => { if (_dbg()) console.warn('%c[ARRIVALS]', 'color:#964219;font-weight:bold', ...a); };
+// Sempre visível (erros e avisos críticos)
+const _info = (...a) => console.info('%c[ARRIVALS]', 'color:#437a22;font-weight:bold', ...a);
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+async function _resolveStopCode(stopId) {
+  const cached = stopService.getStopById(stopId);
+  if (cached?.stop_code) return cached.stop_code;
+  try {
+    const info = await apiService.fetchStopInfo(stopId);
+    if (info?.stop_code) return info.stop_code;
+  } catch { /* silencioso */ }
+  return stopId;
+}
+
+function _withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
+/**
+ * Normaliza uma chegada para campos canónicos.
+ */
+function _normalizeOne(a) {
+  return {
+    ...a,
+    route_short_name:  a.route_short_name  || a.route_number || '',
+    trip_id:           a.trip_id           || null,
+    headsign:          a.headsign          || a.trip_headsign || '',
+    scheduled_arrival: a.scheduled_arrival || a.arrival_time  || null,
+    realtime_arrival:  a.realtime_arrival  || null,
+    delay: a.delay
+        ?? a.delay_seconds
+        ?? (a.delay_minutes != null ? Number(a.delay_minutes) * 60 : null),
+    is_realtime:       Boolean(a.is_realtime),
+    directionId:       a.directionId       ?? a.direction_id  ?? null,
+    _source:           a._source           || 'unknown',
+  };
+}
+
+function _normalize(arrivals) {
+  if (!Array.isArray(arrivals)) return [];
+  return arrivals.map(_normalizeOne);
+}
+
+function _extractRealtimeArrivals(response) {
+  if (!response) return [];
+  if (Array.isArray(response))          return response;
+  if (Array.isArray(response.arrivals)) return response.arrivals;
+  return [];
+}
+
+function _toEpoch(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number')             return value;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
+
+/**
+ * Merge de chegadas OTP com chegadas da API realtime.
+ *
+ * Passos:
+ *  1. Para cada chegada OTP tenta match com uma chegada RT da mesma linha
+ *     dentro da janela MATCH_WINDOW_MS (5 min).
+ *     Se encontrado → substitui delay/realtime_arrival/is_realtime pela RT.
+ *  2. Chegadas RT sem match OTP → só adicionadas se a linha NÃO tiver
+ *     NENHUMA chegada OTP. Isto evita duplicados quando o OTP já conhece
+ *     a linha mas a timestamp RT difere ligeiramente (apareciam como
+ *     entradas «planeadas» no fundo da lista).
+ *  3. Resultado ordenado por tempo de chegada.
+ */
+function _merge(otpArr, realtimeArr) {
+  if (!otpArr.length && !realtimeArr.length) return [];
+  if (!otpArr.length)      return realtimeArr;
+  if (!realtimeArr.length) return otpArr;
+
+  // Indexar RT por linha
+  const rtByLine = new Map();
+  for (const a of realtimeArr) {
+    const key = String(a.route_short_name || '');
+    if (!rtByLine.has(key)) rtByLine.set(key, []);
+    rtByLine.get(key).push(a);
+  }
+
+  // Linhas que o OTP já conhece
+  const otpLines = new Set(otpArr.map(a => String(a.route_short_name || '')));
+
+  const usedRtKeys = new Set();
+
+  // 1. Enriquecer chegadas OTP com dados RT
+  const merged = otpArr.map(otp => {
+    const lineKey   = String(otp.route_short_name || '');
+    const rtOptions = rtByLine.get(lineKey) || [];
+    const otpEpoch  = _toEpoch(otp.realtime_arrival || otp.scheduled_arrival);
+
+    // Tentar match temporal (±MATCH_WINDOW_MS)
+    let matchIdx = rtOptions.findIndex((rt, i) => {
+      if (usedRtKeys.has(lineKey + ':' + i)) return false;
+      const rtEpoch = _toEpoch(rt.realtime_arrival || rt.scheduled_arrival);
+      return otpEpoch !== null && rtEpoch !== null &&
+             Math.abs(otpEpoch - rtEpoch) <= MATCH_WINDOW_MS;
+    });
+
+    // Fallback: match apenas por linha (sem restrição temporal) para o
+    // primeiro item RT ainda não utilizado — previne que chegadas com
+    // timestamps muito diferentes deixem de ser mergeadas.
+    if (matchIdx === -1) {
+      matchIdx = rtOptions.findIndex((_, i) => !usedRtKeys.has(lineKey + ':' + i));
+      if (matchIdx !== -1) {
+        _log(`  merge FALLBACK-LINE linha:${lineKey} (sem match temporal)`);
+      }
+    }
+
+    if (matchIdx !== -1) {
+      const rt = rtOptions[matchIdx];
+      usedRtKeys.add(lineKey + ':' + matchIdx);
+      _log(`  merge MATCH linha:${lineKey} OTP→RT delay:${rt.delay} is_realtime:${rt.is_realtime}`);
+      return {
+        ...otp,
+        delay:            rt.delay            ?? otp.delay,
+        realtime_arrival: rt.realtime_arrival  || otp.realtime_arrival,
+        is_realtime:      rt.is_realtime       || otp.is_realtime,
+        _source:          'otp+rt',
+      };
+    }
+
+    return { ...otp, _source: otp._source || 'otp' };
+  });
+
+  // 2. Chegadas RT sem match → só adicionar se a linha não existir no OTP
+  let rtOnlyCount = 0;
+  for (const [lineKey, rtOptions] of rtByLine.entries()) {
+    // Se o OTP já tem pelo menos uma chegada desta linha, ignorar as RT
+    // que não fizeram match — são simplesmente chegadas que o OTP
+    // também conhece mas com timestamp ligeiramente diferente.
+    if (otpLines.has(lineKey)) {
+      const skipped = rtOptions.filter((_, i) => !usedRtKeys.has(lineKey + ':' + i)).length;
+      if (skipped > 0) {
+        _log(`  merge SKIP ${skipped}x rt-only linha:${lineKey} (OTP já tem esta linha)`);
+      }
+      continue;
+    }
+
+    rtOptions.forEach((rt, i) => {
+      if (!usedRtKeys.has(lineKey + ':' + i)) {
+        _log(`  merge RT-ONLY linha:${lineKey} is_realtime:${rt.is_realtime} delay:${rt.delay}`);
+        merged.push({ ...rt, _source: 'rt-only' });
+        rtOnlyCount++;
+      }
+    });
+  }
+
+  if (rtOnlyCount > 0) {
+    _info(`merge: ${rtOnlyCount} chegada(s) RT de linha(s) desconhecidas pelo OTP adicionada(s)`);
+  }
+
+  // 3. Ordenar por tempo de chegada
+  merged.sort((a, b) => {
+    const tA = _toEpoch(a.realtime_arrival || a.scheduled_arrival);
+    const tB = _toEpoch(b.realtime_arrival || b.scheduled_arrival);
+    if (tA === null && tB === null) return 0;
+    if (tA === null) return 1;
+    if (tB === null) return -1;
+    return tA - tB;
+  });
+
+  return merged;
+}
+
+// ── Serviço ──────────────────────────────────────────────────────────────────
 
 class PlannedArrivalsService {
-  constructor() {
-    this.routesCache    = new Map(); // stopId -> { data, timestamp }
-    this.schedulesCache = new Map(); // `${stopId}_${routeId}_${serviceId}` -> { data, timestamp }
-    this.cacheTTL = 30 * 60 * 1000; // 30 minutos
-  }
 
-  /**
-   * Obtém próximas chegadas combinando tempo real + programadas.
-   * Para paragens custom, usa exclusivamente os dados locais.
-   * @param {string} stopId
-   * @param {number} maxMinutes
-   * @returns {Promise<Array>}
-   */
-  async getNextArrivals(stopId, maxMinutes = 60) {
-    try {
-      // Paragem de rota custom → sem chamada de rede, dados locais gerados
-      if (customRouteScheduleService.handlesStop(stopId)) {
-        return customRouteScheduleService.getNextArrivals(stopId, maxMinutes);
+  async getNextArrivals(stopId, maxMinutes = 60, forceRefresh = false) {
+    const cacheKey = `${stopId}:${maxMinutes}`;
+
+    if (!forceRefresh) {
+      const cached = _cache.get(cacheKey);
+      if (cached && (Date.now() - cached.ts) < CACHE_TTL) {
+        _log(`cache HIT stopId:${stopId} idade:${Date.now() - cached.ts}ms`);
+        return cached.data;
       }
-
-      // Paragem STCP normal (caminho existente)
-      const realtimeData     = await apiService.fetchStopRealtime(stopId);
-      const realtimeArrivals = realtimeData?.arrivals || [];
-
-      const routes = await this.getStopRoutes(stopId);
-      if (routes.length === 0) return this.formatArrivals(realtimeArrivals, true);
-
-      const currentServiceId = await scheduleService.getServiceIdAtual(stopId);
-
-      const scheduledArrivals = [];
-      for (const route of routes) {
-        const scheduleData = await this.getStopSchedule(stopId, route.route_id, currentServiceId);
-        if (scheduleData?.schedule) {
-          scheduledArrivals.push(...this.extractUpcomingTrips(scheduleData.schedule, maxMinutes, route));
-        }
-      }
-
-      return this.combineArrivals(
-        this.formatArrivals(realtimeArrivals, true),
-        this.formatArrivals(scheduledArrivals, false)
-      );
-    } catch (error) {
-      console.error(`❌ Erro ao obter chegadas para ${stopId}:`, error);
-      return [];
-    }
-  }
-
-  async getStopRoutes(stopId) {
-    // Paragem custom: retorna rotas locais sem cache de rede
-    if (customRouteScheduleService.handlesStop(stopId)) {
-      return customRouteScheduleService.getStopRoutes(stopId).display_routes || [];
+    } else {
+      _log(`forceRefresh=true — ignorar cache para stopId:${stopId}`);
     }
 
-    const cached = this.routesCache.get(stopId);
-    const now    = Date.now();
-    if (cached && (now - cached.timestamp) < this.cacheTTL) return cached.data;
-    const result = await apiService.fetchStopRoutes(stopId);
-    const routes = result?.display_routes || [];
-    this.routesCache.set(stopId, { data: routes, timestamp: now });
-    return routes;
-  }
+    const stopCode = await _resolveStopCode(stopId);
+    _log(`getNextArrivals stopId:${stopId} stopCode:${stopCode} maxMinutes:${maxMinutes}`);
 
-  async getStopSchedule(stopId, routeId, serviceId) {
-    const cacheKey = `${stopId}_${routeId}_${serviceId}`;
-    const cached   = this.schedulesCache.get(cacheKey);
-    const now      = Date.now();
-    if (cached && (now - cached.timestamp) < this.cacheTTL) return cached.data;
-    const data = await apiService.fetchStopSchedule(stopId, routeId, serviceId);
-    if (data) this.schedulesCache.set(cacheKey, { data, timestamp: now });
-    return data;
-  }
+    const t0 = performance.now();
+    const [otpResult, rtResult] = await Promise.allSettled([
+      otpService.getArrivalsForStop(stopCode, maxMinutes),
+      _withTimeout(apiService.fetchStopRealtime(stopId), REALTIME_TIMEOUT_MS),
+    ]);
+    const elapsed = Math.round(performance.now() - t0);
 
-  /**
-   * Extrai próximas viagens do schedule.
-   * Suporta horários após 24h (a STCP usa 24, 25, 26 para após meia-noite).
-   */
-  extractUpcomingTrips(schedule, maxMinutes, route) {
-    const now                = new Date();
-    const currentTotalMins   = now.getHours() * 60 + now.getMinutes();
-    const maxTotalMins       = currentTotalMins + maxMinutes;
-    const upcomingTrips      = [];
+    // ── OTP ──
+    const otpArrivals = otpResult.status === 'fulfilled'
+      ? _normalize((otpResult.value || []).map(a => ({ ...a, _source: 'otp' })))
+      : [];
 
-    const endHour            = Math.min(23, Math.floor(maxTotalMins / 60));
-    const checkAfterMidnight = maxTotalMins >= 1440;
-    const afterMidnightEnd   = checkAfterMidnight ? Math.floor((maxTotalMins - 1440) / 60) + 24 : 0;
-
-    for (let h = now.getHours(); h <= endHour; h++) {
-      this._processHourTrips(schedule, h, currentTotalMins, maxTotalMins, route, upcomingTrips);
-    }
-    if (checkAfterMidnight) {
-      for (let h = 24; h <= afterMidnightEnd; h++) {
-        this._processHourTrips(schedule, h, currentTotalMins, maxTotalMins, route, upcomingTrips);
+    if (otpResult.status === 'rejected') {
+      console.warn('[ARRIVALS] OTP falhou:', otpResult.reason?.message);
+    } else {
+      _log(`OTP: ${otpArrivals.length} chegadas (${elapsed}ms)`);
+      if (_dbg()) {
+        otpArrivals.forEach(a =>
+          _log(`  OTP linha:${a.route_short_name} trip:${a.trip_id} rt:${a.is_realtime} delay:${a.delay}`)
+        );
       }
     }
-    return upcomingTrips;
-  }
 
-  _processHourTrips(schedule, hour, currentTotalMins, maxTotalMins, route, out) {
-    const trips = schedule[hour.toString()];
-    if (!trips?.length) return;
+    // ── API Realtime ──
+    const rtArrivals = rtResult.status === 'fulfilled'
+      ? _normalize(_extractRealtimeArrivals(rtResult.value).map(a => ({ ...a, _source: 'rt' })))
+      : [];
 
-    for (const trip of trips) {
-      const tripTotalMins = hour * 60 + parseInt(trip.minute);
-      let adjTrip    = tripTotalMins;
-      let adjCurrent = currentTotalMins;
-
-      if (hour >= 24 && currentTotalMins >= 23 * 60) {
-        // entre 23h-24h, horários 24h+ são futuro próximo
-      } else if (hour >= 24) {
-        adjCurrent = 1440 + currentTotalMins;
+    if (rtResult.status === 'rejected') {
+      const msg = rtResult.reason?.message || '';
+      if (msg.includes('timeout')) {
+        console.warn(`[ARRIVALS] API realtime timeout (>${REALTIME_TIMEOUT_MS}ms) — usar apenas OTP`);
+      } else {
+        console.warn('[ARRIVALS] API realtime falhou:', msg);
       }
-
-      if (adjTrip >= adjCurrent && adjTrip < maxTotalMins) {
-        const displayHour = hour >= 24 ? hour - 24 : hour;
-        out.push({
-          route_short_name:  route.route_short_name,
-          route_color:       route.route_color,
-          route_text_color:  route.route_text_color,
-          trip_headsign:     trip.headsign,
-          arrival_minutes:   adjTrip - adjCurrent,
-          arrival_time:      `${String(displayHour).padStart(2, '0')}:${trip.minute.padStart(2, '0')}`,
-          trip_id:           trip.trip_id || null,
-          status:            'SCHEDULED'
-        });
+    } else {
+      _log(`API Realtime: ${rtArrivals.length} chegadas (${elapsed}ms)`);
+      if (_dbg()) {
+        rtArrivals.forEach(a =>
+          _log(`  RT  linha:${a.route_short_name} trip:${a.trip_id} rt:${a.is_realtime} delay:${a.delay}`)
+        );
       }
     }
-  }
 
-  formatArrivals(arrivals, isRealtime) {
-    return arrivals.map(arr => ({
-      route_short_name: arr.route_short_name,
-      route_color:      arr.route_color      || '#0072C6',
-      route_text_color: arr.route_text_color || '#FFFFFF',
-      trip_headsign:    arr.trip_headsign,
-      arrival_minutes:  arr.arrival_minutes,
-      arrival_time:     arr.arrival_time,
-      trip_id:          arr.trip_id,
-      status:           arr.status           || 'SCHEDULED',
-      delay_minutes:    arr.delay_minutes    || 0,
-      is_realtime:      isRealtime
-    }));
-  }
-
-  /**
-   * Combina chegadas tempo real + programadas, removendo duplicados.
-   * Duplicado: mesma linha + mesmo destino + tempo próximo (±5 min, ajustado ao atraso).
-   */
-  combineArrivals(realtimeArrivals, scheduledArrivals) {
-    const combined = [...realtimeArrivals];
-    for (const scheduled of scheduledArrivals) {
-      const isDuplicate = realtimeArrivals.some(rt => {
-        const sameRoute    = rt.route_short_name === scheduled.route_short_name;
-        const sameHeadsign = this._normalizeHeadsign(rt.trip_headsign) ===
-                             this._normalizeHeadsign(scheduled.trip_headsign);
-        const timeDiff     = Math.abs((rt.arrival_minutes - rt.delay_minutes) - scheduled.arrival_minutes);
-        return sameRoute && sameHeadsign && timeDiff <= 5;
-      });
-      if (!isDuplicate) combined.push(scheduled);
+    // ── Merge ──
+    _log(`merge: OTP=${otpArrivals.length} RT=${rtArrivals.length}`);
+    const result = _merge(otpArrivals, rtArrivals);
+    _log(`merge resultado: ${result.length} chegadas`);
+    if (_dbg()) {
+      const bySource = result.reduce((acc, a) => { acc[a._source] = (acc[a._source] || 0) + 1; return acc; }, {});
+      _log('  por fonte:', bySource);
     }
-    return combined.sort((a, b) => a.arrival_minutes - b.arrival_minutes);
+
+    if (result.length > 0) {
+      _cache.set(cacheKey, { data: result, ts: Date.now() });
+    } else if (!forceRefresh) {
+      const stale = _cache.get(cacheKey);
+      if (stale) {
+        _warn(`resultado vazio — devolver cache stale (${Date.now() - stale.ts}ms antigo)`);
+        return stale.data;
+      }
+    }
+
+    return result;
   }
 
-  _normalizeHeadsign(h) {
-    return h ? h.trim().toUpperCase().replace(/\s+/g, ' ') : '';
-  }
-
-  clearCache() {
-    this.routesCache.clear();
-    this.schedulesCache.clear();
+  clearCache(stopId) {
+    if (stopId) {
+      for (const key of _cache.keys()) {
+        if (key.startsWith(stopId + ':')) _cache.delete(key);
+      }
+    } else {
+      _cache.clear();
+    }
+    otpService.clearCache?.();
   }
 }
 
