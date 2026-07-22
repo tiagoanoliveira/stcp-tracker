@@ -134,16 +134,13 @@ export class StopsMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
-
-      console.info(
-        '%c[BUS DEBUG] Para activar logs de autocarros: localStorage.setItem(\'BUS_DEBUG\', \'1\') e recarrega a página',
-        'color:#01696f;font-style:italic'
+      
+      // Aviso temporário — STCP
+      AnnouncementBanner.show(
+        'Por motivos desconhecidos a linha 200 não está a apresentar dados em tempo real - verifique o horário planeado nas próximas chegadas.',
+        { type: 'warning', id: 'stcp-warning', dismissible: false }
       );
-      console.info(
-        '%c[ARRIVALS DEBUG] Para activar logs de chegadas: localStorage.setItem(\'ARRIVALS_DEBUG\', \'1\') e recarrega a página',
-        'color:#006494;font-style:italic'
-      );
-
+     
       await scheduleService.loadScheduleData();
 
       this.mapManager = new MapManager(this.mapElementId);
