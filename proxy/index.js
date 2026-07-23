@@ -15,6 +15,8 @@ const FIWARE_VEHICLES_URL =
 
 const STCP_FAST_VEHICLES_URL = 'https://stcp.live/api/vehicles';
 
+const UNIR_VEHICLES_URL = 'https://unir.live/api/vehicles';
+
 // ---------------------------------------------------------------------------
 // Lista completa de linhas STCP com cores oficiais.
 // Mantida aqui porque a STCP não expõe endpoint de listagem fiável.
@@ -156,6 +158,30 @@ function normalizeStcpLiveVehicle(v) {
   };
 }
 
+function normalizeUnirVehicle(v) {
+  if (!Number.isFinite(v.lat) || !Number.isFinite(v.lng)) return null;
+
+  // routeId format: "5011:0" → extract line number before ':'
+  const routeParts = String(v.routeId ?? '').split(':');
+  const lineNumber = routeParts[0] || '';
+  const directionId = routeParts[1] != null ? Number(routeParts[1]) : 0;
+
+  if (!lineNumber) return null;
+
+  return {
+    id:          String(v.id),
+    routeId:     lineNumber,
+    directionId: directionId,
+    lat:         v.lat,
+    lng:         v.lng,
+    speed:       Number.isFinite(v.speed) ? v.speed : 0,
+    bearing:     null,
+    timestamp:   Number.isFinite(v.timestamp) ? v.timestamp : Math.floor(Date.now() / 1000),
+    tripId:      v.tripId ?? null,
+    source:      'unir',
+  };
+}
+
 function extractAnnotationFromFiware(bus, prefix) {
   const arr = bus.annotations?.value;
   if (!Array.isArray(arr)) return null;
@@ -281,6 +307,40 @@ async function handleFiwareVehicles() {
     );
   }
 }
+async function handleUnirVehicles() {
+  try {
+    const resp = await fetch(UNIR_VEHICLES_URL, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; STCP-Tracker/4.5)',
+      },
+    });
+
+    if (!resp.ok) {
+      return errorResponse(
+          `Erro ao obter veículos da UNIR (status ${resp.status})`,
+          resp.status
+      );
+    }
+
+    const raw = await resp.json();
+    const vehicles = Array.isArray(raw)
+        ? raw.map(normalizeUnirVehicle).filter(Boolean)
+        : [];
+
+    return jsonResponse(
+        { success: true, source: 'unir', vehicles },
+        'vehicles_unir',
+        'public, max-age=3'
+    );
+  } catch (error) {
+    return errorResponse(
+        `Erro ao obter veículos da UNIR: ${error.message}`,
+        502
+    );
+  }
+}
 
 async function handleRequest(request) {
   const url = new URL(request.url);
@@ -296,7 +356,7 @@ async function handleRequest(request) {
           location_endpoints: ['nearby'],
           route_endpoints:    ['schedule', 'shape', 'stops', 'list'],
           search_endpoints:   ['search'],
-          vehicles_endpoints: ['vehicles', 'vehicles/fiware']
+          vehicles_endpoints: ['vehicles', 'vehicles/fiware', 'vehicles/unir'],
         },
         usage: {
           realtime:       'GET /{STOP_ID}/realtime',
@@ -310,7 +370,8 @@ async function handleRequest(request) {
           route_stops:    'GET /route/{ROUTE_ID}/stops?direction_id={DIR}',
           routes_list:    'GET /routes/list',
           search:         'GET /search?q={QUERY}&limit={LIMIT}',
-          vehicles:       'GET /vehicles (preciso) ou /vehicles/fiware (alternativo)'
+          vehicles:       'GET /vehicles (preciso) ou /vehicles/fiware (alternativo)',
+          vehicles_unir:  'GET /vehicles/unir'
         }
       }, null, 2),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -330,6 +391,7 @@ async function handleRequest(request) {
     if (firstSegment === 'vehicles') {
       const mode = pathParts[1] || 'primary';
       if (mode === 'fiware') return await handleFiwareVehicles();
+      if (mode === 'unir')   return await handleUnirVehicles();
       return await handleStcpLiveVehicles();
     }
 

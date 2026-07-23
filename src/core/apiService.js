@@ -85,6 +85,23 @@ class ApiService {
     }
   }
 
+  async fetchUnirVehicles() {
+    try {
+      const data = await this.fetchWithRetry(
+          `${this.proxyUrl}/vehicles/unir`,
+          {},
+          this.retries,
+          this.delayMs,
+          3000
+      );
+      const vehicles = Array.isArray(data?.vehicles) ? data.vehicles : [];
+      return vehicles;
+    } catch (error) {
+      console.warn('⚠️ Erro ao obter veículos UNIR:', error);
+      return [];
+    }
+  }
+
   // ─── Paragens e rotas ──────────────────────────────────────────────────────
 
   async fetchStopRealtime(stopId) {

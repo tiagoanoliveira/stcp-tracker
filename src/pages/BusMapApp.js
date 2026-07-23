@@ -59,6 +59,8 @@ export class BusMapApp {
 
     // ID do veículo actualmente seguido (selecionado via clique numa chegada)
     this._trackedVehicleId = null;
+    this._unirVehicles        = [];
+    this._unirRefreshInterval = null;
 
     // Controlo de fonte de veículos e fallback
     this._primaryEmptySince     = null;
@@ -150,6 +152,7 @@ export class BusMapApp {
         this.loadingOverlay.update('Agora tens uma app mais rápida com localizações mais precisas. Esperemos que gostes!');
         await this.fetchAndUpdateBuses();
         this.startAutoRefresh();
+        this.startUnirRefresh();
       }
 
       if (!mqttVehicleService.hasData()) {
@@ -310,6 +313,35 @@ export class BusMapApp {
         this.lastUpdateDisplay.update();
       },
     });
+  }
+
+  startUnirRefresh() {
+    const doFetch = async () => {
+      try {
+        const raw = await apiService.fetchUnirVehicles();
+        const processed = vehicleService.processBusDataBatch(raw);
+        this._unirVehicles = processed;
+
+        // Só actualizar marcadores se não houver paragem seleccionada
+        // (quando há paragem, o _loadStopArrivals trata do mapa)
+        if (!this._currentStopId) {
+          processed.forEach(bus => {
+            this.busMarkerManager.setRouteForMarker(
+                bus.id,
+                bus.displayLine || bus.line || '',
+                bus.direction
+            );
+            this.busMarkerManager.updateSingleBusMarker(bus);
+          });
+          this.lastUpdateDisplay.update();
+        }
+      } catch (err) {
+        console.warn('[UNIR] Erro ao obter veículos:', err);
+      }
+    };
+
+    doFetch(); // fetch imediato
+    this._unirRefreshInterval = setInterval(doFetch, this.refreshInterval);
   }
 
   async _tryCenterOnStopBuses() {

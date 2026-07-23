@@ -1,7 +1,7 @@
 // iconCache.js - cache centralizado de ícones de autocarros, paragens e utilizador
 
 import { createBusIcon }                from '../../../resources/busDesign/busIcon.js';
-import { BUS_COLORS, CUSTOM_LINE_TEXTS } from '../../../resources/busDesign/busColors.js';
+import { BUS_COLORS, CUSTOM_LINE_TEXTS, getUnirLineColor } from '../../../resources/busDesign/busColors.js';
 
 class IconCache {
   constructor() {
@@ -52,10 +52,22 @@ class IconCache {
 
   // ── Ícones ──────────────────────────────────────────────────────────────────
 
-  getBusIcon(line) {
-    if (this.cache.bus[line]) return this.cache.bus[line];
-    this.cache.bus[line] = createBusIcon(line, BUS_COLORS, CUSTOM_LINE_TEXTS);
-    return this.cache.bus[line];
+  getBusIcon(line, source = 'stcp') {
+    const cacheKey = `${source}:${line}`;
+    if (this.cache.bus[cacheKey]) return this.cache.bus[cacheKey];
+
+    let colorsForIcon = BUS_COLORS;
+
+    if (source === 'unir') {
+      const unirColor = getUnirLineColor(line);
+      if (unirColor) {
+        // Injetar a cor UNIR como entrada temporária compatível com createBusIcon
+        colorsForIcon = { ...BUS_COLORS, [line]: unirColor };
+      }
+    }
+
+    this.cache.bus[cacheKey] = createBusIcon(line, colorsForIcon, CUSTOM_LINE_TEXTS);
+    return this.cache.bus[cacheKey];
   }
 
   getStopIcon() {

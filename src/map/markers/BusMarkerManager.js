@@ -89,7 +89,7 @@ export class BusMarkerManager {
     }
 
     this._busData[bus.id] = bus;
-    const icon = iconCache.getBusIcon(bus.line);
+    const icon = iconCache.getBusIcon(bus.line, bus.source || 'stcp');
 
     if (this.markers[bus.id]) {
       const marker = this.markers[bus.id];
@@ -131,7 +131,7 @@ export class BusMarkerManager {
   // ─── Criação de marcador ─────────────────────────────────────────────────
 
   _createBusMarker(bus) {
-    const icon         = iconCache.getBusIcon(bus.line);
+    const icon = iconCache.getBusIcon(bus.line, bus.source || 'stcp');
     const popupContent = (bus.destination !== null && bus.destination !== undefined)
       ? this._createPopupContent(bus)
       : this._createLoadingPopup(bus);

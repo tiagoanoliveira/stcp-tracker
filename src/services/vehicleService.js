@@ -25,6 +25,7 @@
  */
 
 import { scheduleService } from './scheduleService.js';
+import { getUnirLineColor } from '../../resources/busDesign/busColors.js';
 
 /**
  * Mapeamento de IDs de linha da API FIWARE para nomes/números reais de linha.
@@ -208,6 +209,11 @@ class VehicleService {
           ? normalizeDestinationText(bus.destination)
           : null;
 
+      // ── UNIR: displayLine = número tal qual (sem alias), cor via getUnirLineColor
+      const displayLine = bus.source === 'unir'
+          ? String(line)
+          : this.getDisplayLine(line);
+
       // busNumber: do tópico MQTT se disponível, senão do campo id
       const busNumber = bus.busNumber || bus.id || 'N/A';
 
@@ -221,7 +227,8 @@ class VehicleService {
         busNumber,
         destination,
         direction,
-        tripId
+        tripId,
+        source:      bus.source || 'stcp',
       };
     }
 
@@ -268,6 +275,15 @@ class VehicleService {
   async resolveHeadsign(bus) {
     // Se o destino já foi resolvido (ex: via tópico MQTT), devolver directamente
     if (bus.destination) return normalizeDestinationText(bus.destination);
+
+    // UNIR: resolver via GTFS local trips.txt
+    if (bus.source === 'unir' && bus.tripId) {
+      try {
+        const destination = await this.resolveUnirHeadsign(bus.tripId);
+        if (destination) return normalizeDestinationText(destination);
+      } catch {}
+    }
+
     if (!bus.tripId || !bus.line || bus.direction == null) return 'Destino desconhecido';
     try {
       const serviceId = await scheduleService.getServiceIdAtual();
@@ -275,6 +291,28 @@ class VehicleService {
       return normalizeDestinationText(headsign);
     } catch {
       return 'Destino desconhecido';
+    }
+  }
+
+  async resolveUnirHeadsign(tripId) {
+    // trips.txt está em resources/unir-gtfs/trips.txt
+    // Formato: ln:5011:0,ut1:A-U,A-U:5011:0:1:1442,"Matosinhos (Mercado)",5011,0,...
+    // Campo 3 (index 3) é o headsign, entre aspas
+    try {
+      const response = await fetch('./resources/unir-gtfs/trips.txt');
+      if (!response.ok) return null;
+      const text = await response.text();
+      const lines = text.split('\n');
+      for (const line of lines) {
+        if (line.includes(tripId)) {
+          // Extrair headsign — campo entre primeiras aspas
+          const match = line.match(/"([^"]+)"/);
+          if (match) return match[1];
+        }
+      }
+      return null;
+    } catch {
+      return null;
     }
   }
 

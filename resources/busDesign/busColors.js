@@ -31,3 +31,31 @@ export const BUS_ICON_COLORS = {
 export const CUSTOM_LINE_TEXTS = {
   '107': 'ZC'
 };
+
+/**
+ * Devolve { busColor, textColor } para uma linha UNIR de 4 dígitos.
+ * Regras:
+ *  1XXX / 2XXX → #de5b35
+ *  3XXX        → #9eb0db
+ *  5XXX / 60XX-65XX → #06d6a0
+ *  66XX-69XX / 7XXX / 8XXX → #fbb03a
+ *  9XXX        → #a4bf62
+ */
+export function getUnirLineColor(lineStr) {
+  const n = parseInt(lineStr, 10);
+  if (isNaN(n)) return null;
+
+  if (n >= 1000 && n <= 2999) return { busColor: '#de5b35', textColor: '#fff' };
+  if (n >= 3000 && n <= 3999) return { busColor: '#9eb0db', textColor: '#000' };
+  if (
+      (n >= 5000 && n <= 5999) ||
+      (n >= 6000 && n <= 6599)
+  ) return { busColor: '#06d6a0', textColor: '#000' };
+  if (
+      (n >= 6600 && n <= 6999) ||
+      (n >= 7000 && n <= 8999)
+  ) return { busColor: '#fbb03a', textColor: '#000' };
+  if (n >= 9000 && n <= 9999) return { busColor: '#a4bf62', textColor: '#000' };
+
+  return null;
+}
