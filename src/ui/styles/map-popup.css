@@ -63,6 +63,7 @@ POPUP DO AUTOCARRO — card com cor dinâmica da linha
     -webkit-box-orient: vertical;
     overflow: hidden;
     word-break: break-word;
+    max-width: 140px;
     /* cor injectada via style= inline */
 }
 

@@ -11,7 +11,7 @@
  */
 
 const IMG = (src, alt = '') =>
-  `<img src="./resources/${src}" alt="${alt}" class="tut-icon-img">`;
+  `<img src="./resources/icons/${src}" alt="${alt}" class="tut-icon-img">`;
 
 const STEPS = {
   busmap: [

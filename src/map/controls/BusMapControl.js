@@ -15,7 +15,7 @@ export function createBusMapControl(map, busMapUrl = 'index') {
       button.type = 'button';
       button.title = 'Ver mapa de autocarros';
       button.innerHTML = `
-        <img src="./resources/busmap.png" alt="Ver localização dos autocarros" />
+        <img src="./resources/icons/busmap.png" alt="Ver localização dos autocarros" />
       `;
 
       // Prevenir propagação de eventos do mapa

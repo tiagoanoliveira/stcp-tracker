@@ -98,7 +98,7 @@ export class NextArrivals {
     sheet.innerHTML = `
       <div class="next-arrivals-header">
         <div class="next-arrivals-title">
-          <img src="./resources/paragem.png" alt="Paragem" class="next-arrivals-icon">
+          <img src="./resources/icons/paragem.png" alt="Paragem" class="next-arrivals-icon">
           <div class="next-arrivals-title-text">
             <h2 id="arrivals-stop-name">Paragem</h2>
             <p id="arrivals-stop-code" class="arrivals-stop-code"></p>

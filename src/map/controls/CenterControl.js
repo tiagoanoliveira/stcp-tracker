@@ -26,7 +26,7 @@ export function createCenterControl(map, getUserPosition, onFreshPosition) {
       const button = L.DomUtil.create('button', '', container);
       button.type  = 'button';
       button.title = 'Centrar no utilizador';
-      button.innerHTML = '<img src="./resources/gps.png" alt="GPS" />';
+      button.innerHTML = '<img src="./resources/icons/gps.png" alt="GPS" />';
 
       L.DomEvent.disableClickPropagation(button);
       L.DomEvent.on(button, 'click', function(e) {

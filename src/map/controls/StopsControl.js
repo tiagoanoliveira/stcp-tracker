@@ -15,7 +15,7 @@ export function createStopsControl(map, stopsMapUrl = 'stopsmap') {
       button.type = 'button';
       button.title = 'Ver mapa de paragens';
       button.innerHTML = `
-        <img src="./resources/paragem.png" alt="Ver paragens" />
+        <img src="./resources/icons/paragem.png" alt="Ver paragens" />
       `;
 
       // Prevenir propagação de eventos do mapa
