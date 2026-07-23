@@ -220,7 +220,7 @@ class VehicleService {
       return {
         id:          String(bus.id),
         line,
-        displayLine: this.getDisplayLine(line),
+        displayLine: displayLine,
         latitude:    bus.lat,
         longitude:   bus.lng,
         nextStop:    bus.nextStop || null,

@@ -11,7 +11,7 @@
  *   de se criar um duplicado.
  *
  * COR DO POPUP:
- *   _lineColors() consulta iconCache.getRouteColor() que verifica em cascata:
+ *   lineColors() consulta iconCache.getRouteColor() que verifica em cascata:
  *     1. Cores registadas via iconCache.registerRouteColors() (vindas da API)
  *     2. BUS_COLORS hardcoded (busColors.js)
  *     3. Fallback azul STCP #0072c6
@@ -24,15 +24,20 @@ import { iconCache }      from '../../ui/design/iconCache.js';
 import { vehicleService } from '../../services/vehicleService.js';
 import { stopService }           from '../../services/stopService.js';
 import { normalizeDestinationText } from '../../services/vehicleService.js';
+import { getUnirLineColor } from '../../../resources/busDesign/busColors.js';
 
 /**
  * Devolve { bg, text } para o cabeçalho do popup.
  * Lê as cores registadas pela API; fallback para azul STCP.
  */
-function _lineColors(line) {
+function lineColors(line, source) {
   const colors = iconCache.getRouteColor(String(line ?? '').trim());
   if (colors?.busColor) {
     return { bg: colors.busColor, text: colors.textColor || '#fff' };
+  }
+  if (source === 'unir') {
+    const unirColor = getUnirLineColor(String(line ?? ''));
+    if (unirColor) return { bg: unirColor.busColor, text: unirColor.textColor || '#fff' };
   }
   return { bg: '#0072c6', text: '#fff' };
 }
@@ -177,7 +182,7 @@ export class BusMarkerManager {
 
   _createLoadingPopup(bus) {
     const line   = bus.displayLine ?? bus.line ?? '?';
-    const colors = _lineColors(line);
+    const colors = lineColors(line, bus.source);
     return `
       <div>
         <div class="bus-popup__header" style="background:${colors.bg};">
@@ -192,7 +197,7 @@ export class BusMarkerManager {
 
   _createPopupContent(bus) {
     const line        = bus.displayLine ?? bus.line ?? '?';
-    const colors      = _lineColors(line);
+    const colors      = lineColors(line, bus.source);
     const destination = bus.destination || 'Desconhecido';
     const vehicle     = bus.busNumber ?? '—';
 
