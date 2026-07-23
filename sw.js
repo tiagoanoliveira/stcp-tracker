@@ -3,7 +3,7 @@
  * Cache estratégico para funcionamento offline
  */
 
-const CACHE_NAME = 'stcp-live-v3.9.1';
+const CACHE_NAME = 'stcp-live-v3.9.2';
 
 // Ficheiros essenciais para cachear
 const urlsToCache = [
@@ -13,7 +13,8 @@ const urlsToCache = [
   '/stopsmap.html',
   
   // Recursos estáticos
-  '/resources/favicon.svg',
+  '/resources/icons/favicon.svg',
+  '/resources/icons/icon_192px.png',
   '/resources/header.js',
   '/manifest.json',
   
@@ -42,7 +43,7 @@ const urlsToCache = [
   
   // Styles
   '/src/ui/styles/base.css',
-  '/src/ui/styles/busMap.css',
+  '/src/ui/styles/busmap.css',
   '/src/ui/styles/stopDetail.css'
 ];
 
@@ -98,8 +99,7 @@ self.addEventListener('fetch', event => {
   }
 
   // Não cachear chamadas à API (sempre buscar dados frescos)
-  if (url.hostname === 'broker.fiware.urbanplatform.portodigital.pt' || 
-      url.pathname.includes('/api/') ||
+  if (url.pathname.includes('/api/') ||
       url.pathname.includes('gtfs.portodigital.pt')) {
     event.respondWith(
       fetch(request)
