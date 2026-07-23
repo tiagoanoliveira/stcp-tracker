@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="As tuas paragens favoritas STCP">
+    <meta name="theme-color" content="#0072c6">
+    <title>Favoritos – STCP Live</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="shortcut icon" href="./resources/icons/favicon.svg">
+    <link rel="stylesheet" href="./src/ui/styles/lines.css">
+    <link rel="stylesheet" href="./src/ui/styles/favourites.css">
+    <link rel="stylesheet" href="./src/ui/styles/bottom-nav.css">
+</head>
+<body>
+<div class="app">
+    <header class="header">
+        <a href="/" class="header-logo" title="Voltar ao mapa">
+            <img src="/resources/icons/favicon.svg" alt="STCP Live">
+            <span>STCP Live</span>
+        </a>
+        <h1 class="header-title">Favoritos</h1>
+        <div class="header-spacer"></div>
+    </header>
+
+    <main>
+        <div class="fav-panel-hint" style="padding: 12px 16px 0; font-size: 0.8rem; color: #94a3b8;">
+            Guarda as tuas paragens favoritas para acesso rápido.
+        </div>
+        <ul class="fav-list" id="fav-list" style="list-style:none; padding:0;"></ul>
+        <p class="fav-empty" id="fav-empty" style="display:none">
+            Ainda não tens favoritos.<br>Abre uma paragem e clica na ⭐ para guardar.
+        </p>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Navegação principal">
+        <a class="bottom-nav-item" href="/" title="Mapa de Autocarros">
+            <img src="./resources/icons/busmap.png" alt="" aria-hidden="true">
+            <span>Autocarros</span>
+        </a>
+        <a class="bottom-nav-item" href="stopsmap" title="Mapa de Paragens">
+            <img src="./resources/icons/paragem.png" alt="" aria-hidden="true">
+            <span>Paragens</span>
+        </a>
+        <a class="bottom-nav-item" href="lines" title="Linhas STCP">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="10" cy="10" r="5" fill="currentColor" stroke="none"/>
+                <circle cx="38" cy="18" r="5" fill="currentColor" stroke="none"/>
+                <circle cx="20" cy="25" r="5" fill="currentColor" stroke="none"/>
+                <circle cx="38" cy="38" r="5" fill="currentColor" stroke="none"/>
+                <path d="M10 10 C30 10 38 10 38 18 C38 26 10 22 10 30 C0 38 38 38 38 38" fill="none"/>
+            </svg>
+            <span>Linhas</span>
+        </a>
+        <a class="bottom-nav-item active" href="favourites" title="Favoritos">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            <span>Favoritos</span>
+        </a>
+        <a class="bottom-nav-item" href="settings" title="Definições">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <span>Definições</span>
+        </a>
+    </nav>
+</div>
+
+<script type="module">
+    import { favouritesManager } from './src/services/FavouritesManager.js';
+    // renderizar lista idêntica ao FavouritesPanel._renderList()
+    function render(list) {
+        const ul = document.getElementById('fav-list');
+        const empty = document.getElementById('fav-empty');
+        ul.innerHTML = '';
+        if (!list || list.length === 0) {
+            ul.style.display = 'none'; empty.style.display = 'block'; return;
+        }
+        ul.style.display = ''; empty.style.display = 'none';
+        list.forEach(fav => {
+            const li = document.createElement('li');
+            li.className = 'fav-item';
+            li.innerHTML = `
+          <a class="fav-item-link" href="${fav.url}" title="Abrir ${fav.name}">
+            <span class="fav-item-name">${fav.name}</span>
+          </a>
+          <button class="fav-item-remove" data-id="${fav.id}" aria-label="Remover ${fav.name}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+            </svg>
+          </button>`;
+            li.querySelector('.fav-item-remove').addEventListener('click', () => favouritesManager.remove(fav.id));
+            ul.appendChild(li);
+        });
+    }
+    render(favouritesManager.getAll());
+    favouritesManager.onChange(render);
+</script>
+</body>
+</html>

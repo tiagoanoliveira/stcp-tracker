@@ -58,13 +58,9 @@ import { StopMarkerManager }      from '../map/markers/StopMarkerManager.js';
 import { BusMarkerManager }       from '../map/markers/BusMarkerManager.js';
 import { LineOverlayManager }     from '../map/LineOverlayManager.js';
 import { createCenterControl }    from '../map/controls/CenterControl.js';
-import { createBusMapControl }    from '../map/controls/BusMapControl.js';
-import { createLinesControl }     from '../map/controls/LinesControl.js';
-import { createTutorialControl }  from '../map/controls/TutorialControl.js';
 import { NextArrivals }           from '../ui/components/NextArrivals.js';
 import { LoadingSpinner }         from '../ui/components/LoadingSpinner.js';
 import { RouteFilterBar }         from '../ui/components/RouteFilterBar.js';
-import { FavouritesPanel }        from '../ui/components/FavouritesPanel.js';
 import { TutorialModal }          from '../ui/components/TutorialModal.js';
 import { favouritesManager }      from '../services/FavouritesManager.js';
 import { iconCache }              from '../ui/design/iconCache.js';
@@ -86,12 +82,8 @@ export class StopsMapApp {
     this.busMarkerManager    = null;
     this.lineOverlayManager  = null;
     this.routeFilterBar      = null;
-    this.favouritesPanel     = null;
     this.tutorialModal       = null;
     this.centerControl       = null;
-    this.busMapControl       = null;
-    this.linesControl        = null;
-    this.tutorialControl     = null;
     this.nextArrivals        = null;
     this.loadingOverlay      = null;
 
@@ -150,12 +142,6 @@ export class StopsMapApp {
       this.centerControl = createCenterControl(this.mapManager.map, () => this.mapManager.getUserPosition());
       this.centerControl.addTo(this.mapManager.map);
 
-      this.busMapControl = createBusMapControl(this.mapManager.map);
-      this.busMapControl.addTo(this.mapManager.map);
-
-      this.tutorialControl = createTutorialControl(this.mapManager.map, () => this.tutorialModal?.open());
-      this.tutorialControl.addTo(this.mapManager.map);
-
       this.stopMarkerManager  = new StopMarkerManager(this.mapManager.map);
       this.busMarkerManager   = new BusMarkerManager(this.mapManager.map);
       this.lineOverlayManager = new LineOverlayManager(this.mapManager.map);
@@ -175,9 +161,6 @@ export class StopsMapApp {
       this.nextArrivals.onIsFavourite(stopId => favouritesManager.isFavourite(stopId));
 
       this.lineOverlayManager.onStopClick(stop => this.handleStopClick(stop));
-
-      this.favouritesPanel = new FavouritesPanel();
-      this.favouritesPanel.mount();
 
       this.routeFilterBar = new RouteFilterBar('route-filter-bar');
       this.routeFilterBar.mount();
@@ -849,8 +832,6 @@ export class StopsMapApp {
       baseUrl: window.location.pathname
     });
     this.nextArrivals.refreshFavouriteBtn();
-    this.favouritesPanel.refresh();
-    if (added) { this.favouritesPanel.open(); setTimeout(() => this.favouritesPanel.close(), 1800); }
   }
 
   /**
@@ -882,7 +863,6 @@ export class StopsMapApp {
     if (this.lineOverlayManager) this.lineOverlayManager.clearAll();
     if (this.routeFilterBar)     this.routeFilterBar.destroy();
     if (this.nextArrivals)       this.nextArrivals.destroy();
-    if (this.favouritesPanel)    this.favouritesPanel.destroy();
     if (this.tutorialModal)      this.tutorialModal.destroy();
     if (this.mapManager)         this.mapManager.cleanup();
     if (REALTIME_BUSES_ENABLED)  mqttVehicleService.stop();

@@ -20,13 +20,9 @@ import { LastUpdateDisplay }      from '../ui/components/LastUpdateDisplay.js';
 import { LoadingSpinner }         from '../ui/components/LoadingSpinner.js';
 import { RouteFilterBar }         from '../ui/components/RouteFilterBar.js';
 import { NextArrivals }           from '../ui/components/NextArrivals.js';
-import { FavouritesPanel }        from '../ui/components/FavouritesPanel.js';
 import { favouritesManager }      from '../services/FavouritesManager.js';
 import { TutorialModal }          from '../ui/components/TutorialModal.js';
 import { createCenterControl }    from '../map/controls/CenterControl.js';
-import { createStopsControl }     from '../map/controls/StopsControl.js';
-import { createLinesControl }     from '../map/controls/LinesControl.js';
-import { createTutorialControl }  from '../map/controls/TutorialControl.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
 
@@ -40,13 +36,9 @@ export class BusMapApp {
     this.lineOverlayManager = null;
     this.routeFilterBar     = null;
     this.nextArrivals       = null;
-    this.favouritesPanel    = null;
     this.tutorialModal      = null;
     this.lastUpdateDisplay  = new LastUpdateDisplay();
     this.centerControl      = null;
-    this.stopsControl       = null;
-    this.linesControl       = null;
-    this.tutorialControl    = null;
     this.loadingOverlay     = null;
 
     this._routeDirMap       = new Map();
@@ -103,20 +95,14 @@ export class BusMapApp {
       );
       this.centerControl.addTo(this.mapManager.map);
 
-      this.stopsControl = createStopsControl(this.mapManager.map);
-      this.stopsControl.addTo(this.mapManager.map);
-
-      this.linesControl = createLinesControl(this.mapManager.map);
-      this.linesControl.addTo(this.mapManager.map);
-
-      this.tutorialControl = createTutorialControl(this.mapManager.map, () => this.tutorialModal?.open());
-      this.tutorialControl.addTo(this.mapManager.map);
-
       this.busMarkerManager   = new BusMarkerManager(this.mapManager.map);
       this.lineOverlayManager = new LineOverlayManager(this.mapManager.map);
 
       this.tutorialModal = new TutorialModal({ page: 'busmap' });
       this.tutorialModal.mount();
+
+      const tutorialBtn = document.getElementById('tutorial-btn');
+      if (tutorialBtn) tutorialBtn.addEventListener('click', () => this.tutorialModal?.open());
 
       this.nextArrivals = new NextArrivals();
       this.nextArrivals.create();
@@ -128,9 +114,6 @@ export class BusMapApp {
       this.nextArrivals.onFilterChange(selected => this._handleArrivalFilterChange(selected));
 
       this.lineOverlayManager.onStopClick(stop => this._handleStopClick(stop));
-
-      this.favouritesPanel = new FavouritesPanel();
-      this.favouritesPanel.mount();
 
       this.routeFilterBar = new RouteFilterBar('route-filter-bar');
       this.routeFilterBar.mount();
@@ -826,7 +809,6 @@ export class BusMapApp {
     if (wasFav) favouritesManager.removeFavourite(stopId);
     else        await favouritesManager.addFavourite(stopId);
     this.nextArrivals.refreshFavouriteBtn();
-    this.favouritesPanel?.refresh();
   }
 
   // ─── URL ──────────────────────────────────────────────────────────────────────
