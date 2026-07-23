@@ -70,7 +70,7 @@
   <link rel="stylesheet" href="./src/ui/styles/announcement.css">
   <link rel="stylesheet" href="./src/ui/styles/map-popup.css">
 
-  <link rel="shortcut icon" href="./resources/favicon.svg">
+  <link rel="shortcut icon" href="./resources/icons/favicon.svg">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-BYVRR1K1R2"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -83,7 +83,7 @@
   <div id="map"></div>
 
   <a href="/" class="logo-overlay" title="Recarregar página">
-    <img src="./resources/favicon.svg" alt="STCP Live Map Logo">
+    <img src="./resources/icons/favicon.svg" alt="STCP Live Map Logo">
     <span class="logo-text">STCP Live</span>
   </a>
 
@@ -114,6 +114,16 @@
     import { BusMapApp } from './src/pages/BusMapApp.js';
     const app = new BusMapApp({ mapElementId: 'map', refreshInterval: 5000 });
     app.initialize();
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err =>
+                console.warn('SW registration failed:', err)
+        );
+      });
+    }
   </script>
 </body>
 </html>
