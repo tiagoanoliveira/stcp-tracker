@@ -1,2 +1,14 @@
-.idea
+# IDEs e Editores
 /.idea
+
+# Ficheiros e Pastas de Compilação
+/build/
+manifest-checksum.txt
+
+# Pacotes Finais (Artefactos do Build)
+*.apk
+*.aab
+*.idsig
+
+# Chave de Assinatura (Segurança: Guardar sempre um backup fora do Git!)
+android.keystore
