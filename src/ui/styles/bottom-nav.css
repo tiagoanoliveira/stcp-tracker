@@ -59,13 +59,13 @@
 }
 
 /* Ajuste do mapa para não ficar tapado pela barra */
-.leaflet-bottom.leaflet-right { bottom: 70px; }
-.leaflet-bottom.leaflet-left  { bottom: 70px; }
+.leaflet-bottom.leaflet-right { bottom: 60px; }
+.leaflet-bottom.leaflet-left  { bottom: 60px; }
 
 @media (max-width: 768px) {
     .bottom-nav { height: 56px; }
     .leaflet-bottom.leaflet-right,
-    .leaflet-bottom.leaflet-left { bottom: 66px; }
+    .leaflet-bottom.leaflet-left { bottom: 50px; }
 }
 
 @media (max-width: 480px) {
@@ -74,14 +74,14 @@
     .bottom-nav-item svg,
     .bottom-nav-item img { width: 25px; height: 25px; }
     .leaflet-bottom.leaflet-right,
-    .leaflet-bottom.leaflet-left { bottom: 64px; }
+    .leaflet-bottom.leaflet-left { bottom: 45px; }
 }
 
 .map-action-btn {
     position: absolute;
-    left: 20px;
+    left: 12px;
     z-index: 1000;
-    width: 44px; height: 44px;
+    width: 40px; height: 40px;
     border-radius: 12px;
     background: rgba(255,255,255,0.95);
     box-shadow: 0 4px 12px rgba(0,0,0,.15);
@@ -91,6 +91,6 @@
     text-decoration: none; transition: all 0.2s ease;
 }
 /* Posicionar: tutorial acima do fino */
-#tutorial-btn       { bottom: 130px; } /* acima da bottom-nav */
-.map-action-btn--beer { bottom: 80px; }
+#tutorial-btn       { bottom: 110px; } /* acima da bottom-nav */
+.map-action-btn--beer { bottom: 60px; }
 .map-action-btn:hover { background: #fff; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.2); }
