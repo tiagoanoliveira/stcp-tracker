@@ -1,4 +1,4 @@
-package pt.tiagoanoliveira.stcp.twa;
+package pt.tiagoanoliveira.portolive.twa;
 
 
 import com.google.androidbrowserhelper.locationdelegation.LocationDelegationExtraCommandHandler;

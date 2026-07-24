@@ -21,11 +21,11 @@ plugins {
 }
 
 def twaManifest = [
-    applicationId: 'pt.tiagoanoliveira.stcp.twa',
+    applicationId: 'pt.tiagoanoliveira.portolive.twa',
     hostName: 'portolive.tiagoanoliveira.pt', // The domain being opened in the TWA.
     launchUrl: '/', // The start path for the TWA. Must be relative to the domain.
-    name: 'Porto Live', // The application name.
-    launcherName: 'STCP', // The name shown on the Android Launcher.
+    name: 'Porto Live Transportes', // The application name.
+    launcherName: 'Porto Live', // The name shown on the Android Launcher.
     themeColor: '#0072C6', // The color used for the status bar.
     themeColorDark: '#000000', // The color used for the dark status bar.
     navigationColor: '#000000', // The color used for the navigation bar.
@@ -52,13 +52,13 @@ def twaManifest = [
 
 android {
     compileSdkVersion 36
-    namespace "pt.tiagoanoliveira.stcp.twa"
+    namespace "pt.tiagoanoliveira.portolive.twa"
     defaultConfig {
-        applicationId "pt.tiagoanoliveira.stcp.twa"
+        applicationId "pt.tiagoanoliveira.portolive.twa"
         minSdkVersion 21
         targetSdkVersion 35
-        versionCode 3
-        versionName "3"
+        versionCode 4
+        versionName "4"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name

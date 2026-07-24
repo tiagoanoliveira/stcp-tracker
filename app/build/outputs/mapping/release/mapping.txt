@@ -3,8 +3,8 @@
 # min_api: 21
 # common_typos_disable
 # {"id":"com.android.tools.r8.mapping","version":"2.2"}
-# pg_map_id: 3dfba4f
-# pg_map_hash: SHA-256 3dfba4fc6893368aeef91790f9c3d6cf6ad4dafbb7a9a7495942df63a92d7400
+# pg_map_id: 9356aeb
+# pg_map_hash: SHA-256 9356aeb8ae759cf145e351fcae34e755c6cb1f7a30e0f903051f85ebbcd01ebb
 android.support.customtabs.ICustomTabsCallback -> a.a:
 # {"id":"sourceFile","fileName":"ICustomTabsCallback.java"}
     java.lang.String DESCRIPTOR -> a
@@ -37338,16 +37338,16 @@ kotlinx.coroutines.JobKt__JobKt -> x0.c:
       # {"id":"com.android.tools.r8.residualsignature","signature":"(Lp0/a;Ljava/util/concurrent/CancellationException;)V"}
     6:9:void cancel$default(kotlin.coroutines.CoroutineContext,java.util.concurrent.CancellationException,int,java.lang.Object):563:563 -> b
       # {"id":"com.android.tools.r8.residualsignature","signature":"(Lp0/a;Ljava/util/concurrent/CancellationException;ILjava/lang/Object;)V"}
-pt.tiagoanoliveira.stcp.twa.Application -> pt.tiagoanoliveira.stcp.twa.Application:
+pt.tiagoanoliveira.portolive.twa.Application -> pt.tiagoanoliveira.portolive.twa.Application:
 # {"id":"sourceFile","fileName":"Application.java"}
     1:4:void <init>():20:20 -> <init>
     1:4:void onCreate():26:26 -> onCreate
-pt.tiagoanoliveira.stcp.twa.DelegationService -> pt.tiagoanoliveira.stcp.twa.DelegationService:
+pt.tiagoanoliveira.portolive.twa.DelegationService -> pt.tiagoanoliveira.portolive.twa.DelegationService:
 # {"id":"sourceFile","fileName":"DelegationService.java"}
     1:4:void <init>():7:7 -> <init>
     1:3:void onCreate():11:11 -> onCreate
     4:12:void onCreate():14:14 -> onCreate
-pt.tiagoanoliveira.stcp.twa.LauncherActivity -> pt.tiagoanoliveira.stcp.twa.LauncherActivity:
+pt.tiagoanoliveira.portolive.twa.LauncherActivity -> pt.tiagoanoliveira.portolive.twa.LauncherActivity:
 # {"id":"sourceFile","fileName":"LauncherActivity.java"}
     1:4:void <init>():25:25 -> <init>
     1:5:android.net.Uri getLaunchingUrl():48:48 -> i

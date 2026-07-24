@@ -11,7 +11,7 @@
     <color name="navigationDividerColorDark">#000000</color>
     <color name="shortcut_background">#F5F5F5</color>
     <integer name="splashScreenFadeOutDuration">300</integer>
-    <string name="appName" translatable="false">Porto Live</string>
+    <string name="appName" translatable="false">Porto Live Transportes</string>
     <string name="assetStatements">
     [{
         \"relation\": [\"delegate_permission/common.handle_all_urls\"],
@@ -27,8 +27,8 @@
     <string name="generatorApp" translatable="false">bubblewrap-cli</string>
     <string name="hostName" translatable="false">portolive.tiagoanoliveira.pt</string>
     <string name="launchUrl" translatable="false">https://portolive.tiagoanoliveira.pt/</string>
-    <string name="launcherName" translatable="false">STCP</string>
+    <string name="launcherName" translatable="false">Porto Live</string>
     <string name="orientation" translatable="false">portrait-primary</string>
-    <string name="providerAuthority" translatable="false">pt.tiagoanoliveira.stcp.twa.fileprovider</string>
+    <string name="providerAuthority" translatable="false">pt.tiagoanoliveira.portolive.twa.fileprovider</string>
     <string name="webManifestUrl" translatable="false">https://portolive.tiagoanoliveira.pt/manifest.json</string>
 </resources>
