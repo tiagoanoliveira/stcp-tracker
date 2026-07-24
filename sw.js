@@ -1,9 +1,9 @@
 /**
- * Service Worker - STCP Live Tracker
+ * Service Worker - Porto Live Tracker
  * Cache estratégico para funcionamento offline
  */
 
-const CACHE_NAME = 'stcp-live-v3.9.2';
+const CACHE_NAME = 'porto-live-v3.9.2';
 
 // Ficheiros essenciais para cachear
 const urlsToCache = [

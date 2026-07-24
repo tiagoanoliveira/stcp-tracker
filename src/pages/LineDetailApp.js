@@ -24,7 +24,7 @@ let route     = { id: routeId, number: routeNumber, name: '', color: '#187EC2', 
 
 function applyHero() {
   const bg = route.color || '#187EC2';
-  document.title = 'Linha ' + route.number + ' - STCP Live';
+  document.title = 'Linha ' + route.number + ' - Porto Live';
   heroEl.style.setProperty('--rc', bg);
   document.documentElement.style.setProperty('--rc', bg);
   badgeEl.textContent = route.number;

@@ -22,9 +22,9 @@ plugins {
 
 def twaManifest = [
     applicationId: 'pt.tiagoanoliveira.stcp.twa',
-    hostName: 'stcp.tiagoanoliveira.pt', // The domain being opened in the TWA.
+    hostName: 'portolive.tiagoanoliveira.pt', // The domain being opened in the TWA.
     launchUrl: '/', // The start path for the TWA. Must be relative to the domain.
-    name: 'STCP Tracker', // The application name.
+    name: 'Porto Live', // The application name.
     launcherName: 'STCP', // The name shown on the Android Launcher.
     themeColor: '#0072C6', // The color used for the status bar.
     themeColorDark: '#000000', // The color used for the dark status bar.
@@ -76,12 +76,12 @@ android {
             // The URL the Web Manifest for the Progressive Web App that the TWA points to. This
             // is used by Chrome OS and Meta Quest to open the Web version of the PWA instead of
             // the TWA, as it will probably give a better user experience for non-mobile devices.
-            resValue "string", "webManifestUrl", 'https://stcp.tiagoanoliveira.pt/manifest.json'
+            resValue "string", "webManifestUrl", 'https://portolive.tiagoanoliveira.pt/manifest.json'
         
 
         
             // This is used by Meta Quest.
-            resValue "string", "fullScopeUrl", 'https://stcp.tiagoanoliveira.pt/'
+            resValue "string", "fullScopeUrl", 'https://portolive.tiagoanoliveira.pt/'
         
 
         

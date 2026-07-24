@@ -16,8 +16,8 @@ const IMG = (src, alt = '') =>
 const STEPS = {
   busmap: [
     {
-      icon: IMG('favicon.svg', 'STCP Live'),
-      title: 'Bem-vindo ao STCP Live!',
+      icon: IMG('favicon.svg', 'Porto Live'),
+      title: 'Bem-vindo ao Porto Live!',
       body: 'Este mapa mostra a localização em <strong>tempo real</strong> de todos os autocarros STCP no Porto. Os autocarros actualizam-se automaticamente a cada 5 segundos - ou assim que as novas localizações forem fornecidas.'
     },
     {
@@ -58,7 +58,7 @@ const STEPS = {
   ],
   stopsmap: [
     {
-      icon: IMG('favicon.svg', 'STCP Live'),
+      icon: IMG('favicon.svg', 'Porto Live'),
       title: 'Bem-vindo ao mapa de paragens!',
       body: 'Aqui podes explorar todas as paragens STCP do Porto. O mapa centra-se automaticamente na tua localização e mostra as paragens mais próximas da área visível.'
     },

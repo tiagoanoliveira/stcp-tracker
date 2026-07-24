@@ -1,5 +1,5 @@
 /**
- * LinesApp.js - Pagina de listagem de linhas STCP
+ * LinesApp.js - Pagina de listagem de Linhas do Porto
  */
 import { apiService } from '../core/apiService.js';
 

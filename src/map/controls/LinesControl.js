@@ -1,5 +1,5 @@
 /**
- * LinesControl - Botão para navegar para a página de linhas STCP.
+ * LinesControl - Botão para navegar para a página de Linhas do Porto.
  * Posiciona-se entre o controlo de paragens/autocarros e o tutorial.
  */
 
@@ -11,8 +11,8 @@ export function createLinesControl(map, linesUrl = 'lines') {
       const container = L.DomUtil.create('div', 'leaflet-control-lines');
       const btn = L.DomUtil.create('button', 'lines-map-btn', container);
       btn.type  = 'button';
-      btn.title = 'Ver linhas STCP';
-      btn.setAttribute('aria-label', 'Ver linhas STCP');
+      btn.title = 'Ver Linhas do Porto';
+      btn.setAttribute('aria-label', 'Ver Linhas do Porto');
 
       btn.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none"

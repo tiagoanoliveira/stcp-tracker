@@ -1,5 +1,5 @@
 /**
- * Feature Flags — opções de comportamento do STCP Tracker.
+ * Feature Flags — opções de comportamento do Porto live.
  *
  * Para ativar/desativar uma funcionalidade basta alterar o valor para
  * true ou false. Não são necessárias mais alterações no código.

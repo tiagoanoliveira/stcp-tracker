@@ -18,7 +18,7 @@ const STCP_FAST_VEHICLES_URL = 'https://stcp.live/api/vehicles';
 const UNIR_VEHICLES_URL = 'https://unir.live/api/vehicles';
 
 // ---------------------------------------------------------------------------
-// Lista completa de linhas STCP com cores oficiais.
+// Lista completa de Linhas do Porto com cores oficiais.
 // Mantida aqui porque a STCP não expõe endpoint de listagem fiável.
 // Actualizar manualmente quando novas linhas forem criadas.
 // ---------------------------------------------------------------------------
