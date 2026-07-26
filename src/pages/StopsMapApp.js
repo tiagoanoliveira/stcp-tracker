@@ -135,10 +135,10 @@ export class StopsMapApp {
         );
       }
       
-      // Aviso temporário — STCP
+      // Aviso temporário — 200
       AnnouncementBanner.show(
-        'Estamos a fazer alterações com o objetivo de te trazer mais informação e mais exata. Por essa razão poderás detetar falhas no acesso à informação. Pedimos desculpa pelo incomodo, seremos breves. Hora estimada de conclusão dos trabalhos: 00:30',
-        { type: 'info', id: 'stcp-warning', dismissible: false }
+        'Por motivos desconhecidos a linha 200 não está a apresentar dados em tempo real - verifique o horário planeado nas próximas chegadas.',
+        { type: 'warning', id: '200-warning', dismissible: false }
       );
      
       await scheduleService.loadScheduleData();
