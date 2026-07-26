@@ -75,12 +75,24 @@ class ApiService {
   normalizeRoute(route) {
     if (!route) return null;
 
-    const operator = route.operator ?? route.source ?? this.inferRouteOperator(route);
+    const rawId =
+        String(route.route_id || route.id || route.number || route.route_short_name || '').trim();
+
+    const rawNumber =
+        String(route.number || route.route_short_name || route.route_id || route.id || '').trim();
+
+    const operator = route.operator ?? route.source ?? this.inferRouteOperator({
+      ...route,
+      id: rawId,
+      number: rawNumber,
+    });
 
     return {
-      id: String(route.id ?? route.route_id ?? route.number ?? ''),
-      number: String(route.number ?? route.route_short_name ?? route.id ?? ''),
-      name: String(route.name ?? route.route_long_name ?? route.number ?? ''),
+      ...route,
+      id: rawId,
+      routeId: rawId,
+      number: rawNumber,
+      name: String(route.name ?? route.route_long_name ?? rawNumber).trim(),
       color: this.normalizeColor(route.color ?? route.route_color, '#187EC2'),
       text_color: this.normalizeColor(route.text_color ?? route.route_text_color, '#FFFFFF'),
       textcolor: this.normalizeColor(route.text_color ?? route.route_text_color, '#FFFFFF'),

@@ -41,8 +41,8 @@ class RouteService {
     const explicit = String(route.operator ?? route.source ?? '').toLowerCase();
     if (explicit) return explicit;
 
-    const id = String(route.id ?? route.route_id ?? '');
-    const number = String(route.number ?? route.route_short_name ?? '');
+    const id = String(route.routeId || route.id || route.route_id || route.number || route.route_short_name || '').trim();
+    const number = String(route.number || route.route_short_name || route.routeId || route.id || route.route_id || '').trim();
 
     if (id === 'MB1' || number === 'MB1' || number.startsWith('MB')) return 'metrobus';
     if (/^\d{4,}$/.test(number) || /^\d{4,}$/.test(id)) return 'unir';
@@ -52,8 +52,8 @@ class RouteService {
   _normalizeRoute(route) {
     if (!route) return null;
 
-    const id = String(route.id ?? route.route_id ?? route.number ?? '');
-    const number = String(route.number ?? route.route_short_name ?? id);
+    const id = String(route.routeId || route.id || route.route_id || route.number || route.route_short_name || '').trim();
+    const number = String(route.number || route.route_short_name || route.routeId || route.id || route.route_id || '').trim();
     const operator = this._inferOperator(route);
 
     return {
