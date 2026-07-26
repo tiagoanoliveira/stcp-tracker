@@ -1,5 +1,5 @@
 // src/services/routeOverlayService.js
-import { routeService } from './routeService.js';
+import {routeService} from './routeService.js';
 
 function getRouteNumber(routeObj) {
     return String(routeObj?.id ?? routeObj?.number ?? '');
@@ -167,7 +167,7 @@ export async function fetchRouteOverlay(routeObj) {
  * para preservar consistência com o estado selecionado.
  */
 export async function buildOverlays(routeObjs = []) {
-    const overlays = await Promise.all(
+    return await Promise.all(
         routeObjs.map(async routeObj => {
             try {
                 return await fetchRouteOverlay(routeObj);
@@ -177,8 +177,6 @@ export async function buildOverlays(routeObjs = []) {
             }
         })
     );
-
-    return overlays;
 }
 
 const routeOverlayService = {

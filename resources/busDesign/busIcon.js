@@ -21,7 +21,7 @@ export function createBusIcon(line, colors, customTexts) {
       V 1.7
       A 0.7 0.7 0 0 1 1.2 1
       Z"
-      stroke="#18d8d0" stroke-width="0.7" fill="none"/>
+      stroke="#00a6f0" stroke-width="0.7" fill="none"/>
     <path d="M 1.7 1.6
       H 14.8
       A 0.5 0.6 0 0 1 15.3 2.2
@@ -32,10 +32,10 @@ export function createBusIcon(line, colors, customTexts) {
       Z" 
       stroke="#fff" stroke-width="0.4"  
       fill="${colorSet.busColor}"/>
-    <rect x="3.5" y="0.3" width="3" height="0.6" rx="0.1" stroke="#18d8d0" stroke-width="0.4" fill="none"/>
-    <rect x="10" y="0.3" width="3" height="0.6" rx="0.1" stroke="#18d8d0" stroke-width="0.4" fill="none"/>
-    <circle cx="5" cy="6.5" r="1" stroke="#18d8d0" stroke-width="0.7" fill="none"/>
-    <circle cx="11.5" cy="6.5" r="1" stroke="#18d8d0" stroke-width="0.7" fill="none"/>
+    <rect x="3.5" y="0.3" width="3" height="0.6" rx="0.1" stroke="#00a6f0" stroke-width="0.4" fill="none"/>
+    <rect x="10" y="0.3" width="3" height="0.6" rx="0.1" stroke="#00a6f0" stroke-width="0.4" fill="none"/>
+    <circle cx="5" cy="6.5" r="1" stroke="#00a6f0" stroke-width="0.7" fill="none"/>
+    <circle cx="11.5" cy="6.5" r="1" stroke="#00a6f0" stroke-width="0.7" fill="none"/>
     <text x="8.5" y="4" text-anchor="middle" alignment-baseline="middle" font-family="Calibri" font-size="4" font-weight="bold" fill="${colorSet.textColor}">${displayText}</text>
   </svg>`;
 
