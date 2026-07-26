@@ -533,32 +533,45 @@ export class BusMapApp {
   }
 
   async _handleArrivalFilterChange(selectedInPanel) {
-    const effectiveFilter = selectedInPanel.size > 0 ? selectedInPanel : routeFilterState.selectedRoutes;
+    const effectiveFilter =
+        selectedInPanel.size > 0 ? selectedInPanel : routeFilterState.selectedRoutes;
 
     const resolvedDirMap = new Map();
-    await Promise.all(Array.from(effectiveFilter).map(async routeNum => {
-      const routeObj = (this.routeFilterBar?.routes || []).find(r => String(r.number) === String(routeNum));
-      const routeId  = String(routeObj?.id || routeNum);
-      const dir      = await this._resolveDirectionForStop(routeId);
-      resolvedDirMap.set(String(routeNum), dir);
-    }));
 
-    // Guardar no estado global para que outros consumidores (onVehicleUpdate)
-    // usem sempre a direção correta.
+    await Promise.all(
+        Array.from(effectiveFilter).map(async routeNum => {
+          const routeObj = (this.routeFilterBar?.routes || []).find(
+              r => String(r.number) === String(routeNum)
+          );
+
+          const routeId = String(routeObj?.id ?? routeNum);
+          const dir = await this._resolveDirectionForStop(routeId);
+          resolvedDirMap.set(String(routeNum), dir);
+        })
+    );
+
     routeFilterState.updateDirections(resolvedDirMap);
-
     this.busMarkerManager.filterByRoutes(effectiveFilter, resolvedDirMap);
 
     if (selectedInPanel.size > 0) {
       const routesToFetch = Array.from(selectedInPanel).map(routeNum => {
-        const routeObj = (this.routeFilterBar?.routes || []).find(r => String(r.number) === String(routeNum));
+        const routeObj = (this.routeFilterBar?.routes || []).find(
+            r => String(r.number) === String(routeNum)
+        );
+
         return {
-          routeId:    String(routeObj?.id || routeNum),
-          direction:  resolvedDirMap.get(String(routeNum)) ?? 0,
-          color:      routeObj?.color      || '#187EC2',
-          text_color: routeObj?.text_color || '#FFFFFF',
+          ...routeObj,
+          id: String(routeObj?.id ?? routeNum),
+          routeId: String(routeObj?.id ?? routeNum),
+          number: String(routeObj?.number ?? routeNum),
+          direction: resolvedDirMap.get(String(routeNum)) ?? 0,
+          color: routeObj?.color || '#187EC2',
+          text_color: routeObj?.text_color || routeObj?.textcolor || '#FFFFFF',
+          operator: routeObj?.operator ?? routeObj?.source ?? null,
+          source: routeObj?.source ?? routeObj?.operator ?? null,
         };
       });
+
       const overlayData = await routeOverlayService.buildOverlays(routesToFetch);
       this.lineOverlayManager.setRoutes(overlayData);
     } else {
@@ -616,7 +629,7 @@ export class BusMapApp {
     if (!this._currentStopId) return 0;
     try {
       const stopsDir0 = await routeService.fetchRouteStops(routeId, 0);
-      const stopIds0  = (stopsDir0?.stops || []).map(s => String(s.stop_id));
+      const stopIds0 = (stopsDir0?.stops || []).map(s => String(s.stop_id ?? s.stopid));
       return stopIds0.includes(String(this._currentStopId)) ? 0 : 1;
     } catch (e) {
       console.warn(`⚠️ Erro ao verificar direção da linha ${routeId} para a paragem ${this._currentStopId}:`, e);
@@ -808,26 +821,27 @@ export class BusMapApp {
     const activeRoutes = routeFilterState.selectedRoutes;
 
     if (activeRoutes.size > 0) {
-      // Re-aplicar filtros e overlays ativos
       this.busMarkerManager.filterByRoutes(activeRoutes, routeFilterState.dirMap);
 
-      // Restaurar shapes e stops das linhas filtradas
-      const routeObjs = routeFilterState.selectedRouteObjs;
-      const routesToFetch = routeObjs.map(r => ({
-        routeId:    String(r.id || r.number),
-        direction:  r.direction ?? 0,
-        color:      r.color      || '#187EC2',
-        text_color: r.text_color || '#FFFFFF'
-      }));
-
       try {
+        const routeObjs = (routeFilterState.selectedRouteObjs || []).map(r => ({
+          ...r,
+          id: String(r.id ?? r.routeId ?? r.number),
+          routeId: String(r.id ?? r.routeId ?? r.number),
+          number: String(r.number ?? r.id ?? r.routeId),
+          direction: Number(r.direction ?? 0),
+          color: r.color || '#187EC2',
+          text_color: r.text_color || r.textcolor || '#FFFFFF',
+          operator: r.operator ?? r.source ?? null,
+          source: r.source ?? r.operator ?? null,
+        }));
+
         const overlayData = await routeOverlayService.buildOverlays(routeObjs);
         this.lineOverlayManager.setRoutes(overlayData);
       } catch (err) {
         console.warn('Erro ao restaurar overlays:', err);
       }
     } else {
-      // Sem filtros ativos - limpar overlays
       this.lineOverlayManager.clearAll();
     }
 
