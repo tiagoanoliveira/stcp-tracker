@@ -111,11 +111,6 @@ async function fetchStcpOverlay(routeObj) {
     const routeId = getRouteNumber(routeObj);
     const direction = getRouteDirection(routeObj);
 
-    if (!routeId) {
-        console.warn('[STCP] routeId vazio, overlay ignorado:', routeObj);
-        return normalizeOverlay(routeObj);
-    }
-
     const overlays = await routeService.fetchMultipleRoutesOverlay([{
         routeId,
         direction,
@@ -136,19 +131,32 @@ async function fetchStcpOverlay(routeObj) {
  */
 async function fetchUnirOverlay(routeObj) {
     const routeId = getRouteNumber(routeObj);
-    const res = await fetch(`./resources/unir-gtfs/shapes/${routeId}.json`);
+    const direction = getRouteDirection(routeObj); // 0 ou 1
 
+    const res = await fetch(`./resources/unir-gtfs/shapes/${routeId}.json`);
     if (!res.ok) {
         return normalizeOverlay(routeObj);
     }
 
     const payload = await res.json();
-    const shapes = normalizeUnirShapesPayload(payload);
 
-    return normalizeOverlay(routeObj, {
-        shapes,
-        stops: [],
-    });
+    // O ficheiro tem formato: { route_id, shapes: [{ shape_id, coordinates }] }
+    // shape_id: "rt:XXXX:0:1" → direção 0, "rt:XXXX:0:2" → direção 1
+    let coordinatesArray = [];
+    if (payload?.shapes && Array.isArray(payload.shapes)) {
+        // sufixo :1 = direção 0, sufixo :2 = direção 1
+        const targetSuffix = direction === 1 ? ':2' : ':1';
+        const shapeEntry = payload.shapes.find(s => s.shape_id?.endsWith(targetSuffix))
+            ?? payload.shapes[0]; // fallback à primeira
+        if (shapeEntry?.coordinates) {
+            coordinatesArray = shapeEntry.coordinates;
+        }
+    }
+
+    // normalizeUnirShapesPayload já sabe tratar um array de {lat, lng, sequence}
+    const shapes = normalizeUnirShapesPayload(coordinatesArray);
+
+    return normalizeOverlay(routeObj, { shapes, stops: [] });
 }
 
 /**
