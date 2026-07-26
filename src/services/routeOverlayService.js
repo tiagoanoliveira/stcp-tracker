@@ -2,7 +2,7 @@
 import {routeService} from './routeService.js';
 
 function getRouteNumber(routeObj) {
-    return String(routeObj?.id ?? routeObj?.number ?? '');
+    return String(routeObj?.routeId ?? routeObj?.id ?? routeObj?.number ?? '');
 }
 
 function getRouteDirection(routeObj) {
@@ -110,6 +110,11 @@ function normalizeUnirShapesPayload(payload) {
 async function fetchStcpOverlay(routeObj) {
     const routeId = getRouteNumber(routeObj);
     const direction = getRouteDirection(routeObj);
+
+    if (!routeId) {
+        console.warn('[STCP] routeId vazio, overlay ignorado:', routeObj);
+        return normalizeOverlay(routeObj);
+    }
 
     const overlays = await routeService.fetchMultipleRoutesOverlay([{
         routeId,
