@@ -468,12 +468,16 @@ export class BusMapApp {
 
   async _handleRouteFilterChange(selected, routeObjs) {
     routeFilterState.set(selected, routeObjs);
-    this._routeDirMap    = new Map(routeObjs.map(r => [String(r.number), r.direction ?? 0]));
-    
+    this._routeDirMap = new Map(
+        routeObjs.map(r => [String(r.number), r.direction ?? 0])
+    );
+
     if (selected.size === 0) {
       this.lineOverlayManager.clearAll();
+
       if (REALTIME_BUSES_ENABLED) {
         this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
+
         this._unirVehicles.forEach(bus => {
           this.busMarkerManager.setRouteForMarker(
               bus.id,
@@ -482,8 +486,10 @@ export class BusMapApp {
           );
           this.busMarkerManager.updateSingleBusMarker(bus);
         });
+
         this.busMarkerManager.filterByRoutes(new Set());
       }
+
       if (this.nextArrivals?.isVisible) {
         this.nextArrivals._renderArrivals();
       }
@@ -500,11 +506,19 @@ export class BusMapApp {
 
     const enrichedRouteObjs = routeObjs.map(r => ({
       ...r,
-      routeId: String(r.id || r.number),
+      id: String(r.id ?? r.routeId ?? r.number),
+      routeId: String(r.id ?? r.routeId ?? r.number),
+      number: String(r.number ?? r.id ?? r.routeId),
+      color: r.color || '#187EC2',
+      text_color: r.text_color || r.textcolor || '#FFFFFF',
+      operator: r.operator ?? r.source ?? null,
+      source: r.source ?? r.operator ?? null,
+      direction: Number(r.direction ?? 0),
     }));
+
     const overlayData = await routeOverlayService.buildOverlays(enrichedRouteObjs);
     this.lineOverlayManager.setRoutes(overlayData);
-    
+
     if (REALTIME_BUSES_ENABLED) {
       const visiblePositions = this.busMarkerManager.filterByRoutes(selected, this._routeDirMap);
       if (visiblePositions.length > 0) {
@@ -512,6 +526,7 @@ export class BusMapApp {
         return;
       }
     }
+
     if (this.lineOverlayManager.hasActiveLayers()) {
       this.lineOverlayManager.fitBounds();
     }
