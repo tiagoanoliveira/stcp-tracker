@@ -12,20 +12,16 @@
 /* Base comum */
 #filter-row {
   position: absolute;
-  left: 50%;
+  top: 88px; left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  display: flex;
-  align-items: center;
-  padding: 6px 14px;
+  width: 95%; max-width: 900px;
   background-color: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-radius: 28px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  height: 48px;
-  max-width: 95%;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 4px 8px;
 }
 
 /* index.html: header tem top:20px + height:56px + gap:12px = top:88px */
@@ -67,3 +63,24 @@
     top: 65px;
   }
 }
+
+.map-action-btn--filter {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px;
+  padding: 0;
+  background-color: rgba(255, 255, 255, 0.95);
+  color: #333;
+  border: none;
+  border-radius: 40%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.map-action-btn--filter:hover { background-color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.15); transform: translateY(-2px); }
+.map-action-btn--filter.active { background-color: #0072c6; color: #fff; }
+
+@media (max-width: 768px) { .map-action-btn--filter { top: 15px; width: 35px; height: 35px; } }

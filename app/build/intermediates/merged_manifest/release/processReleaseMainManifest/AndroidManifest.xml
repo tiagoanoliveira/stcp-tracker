@@ -22,9 +22,9 @@
      the abbreviated format.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="pt.tiagoanoliveira.portolive.twa"
-    android:versionCode="4"
-    android:versionName="4" >
+    package="pt.tiagoanoliveira.portolive"
+    android:versionCode="5"
+    android:versionName="5" >
 
     <uses-sdk
         android:minSdkVersion="21"
@@ -45,13 +45,13 @@
     </queries>
 
     <permission
-        android:name="pt.tiagoanoliveira.portolive.twa.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        android:name="pt.tiagoanoliveira.portolive.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         android:protectionLevel="signature" />
 
-    <uses-permission android:name="pt.tiagoanoliveira.portolive.twa.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+    <uses-permission android:name="pt.tiagoanoliveira.portolive.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
 
     <application
-        android:name="pt.tiagoanoliveira.portolive.twa.Application"
+        android:name="pt.tiagoanoliveira.portolive.Application"
         android:allowBackup="true"
         android:appComponentFactory="androidx.core.app.CoreComponentFactory"
         android:extractNativeLibs="true"
@@ -86,7 +86,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name="pt.tiagoanoliveira.portolive.twa.LauncherActivity"
+            android:name="pt.tiagoanoliveira.portolive.LauncherActivity"
             android:alwaysRetainTaskState="true"
             android:exported="true"
             android:label="@string/launcherName" >
@@ -165,7 +165,7 @@
         </provider>
 
         <service
-            android:name="pt.tiagoanoliveira.portolive.twa.DelegationService"
+            android:name="pt.tiagoanoliveira.portolive.DelegationService"
             android:enabled="@bool/enableNotification"
             android:exported="@bool/enableNotification" >
             <meta-data
@@ -192,7 +192,7 @@
 
         <provider
             android:name="androidx.startup.InitializationProvider"
-            android:authorities="pt.tiagoanoliveira.portolive.twa.androidx-startup"
+            android:authorities="pt.tiagoanoliveira.portolive.androidx-startup"
             android:exported="false" >
             <meta-data
                 android:name="androidx.emoji2.text.EmojiCompatInitializer"

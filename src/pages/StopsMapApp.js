@@ -66,6 +66,7 @@ import { favouritesManager }      from '../services/FavouritesManager.js';
 import { iconCache }              from '../ui/design/iconCache.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
+import { wireFilterToggleButton } from '../ui/components/filterBarToggle.js';
 
 // ─── Helpers de debug ──────────────────────────────────────────────────────────
 // Activar com: localStorage.setItem('BUS_DEBUG', '1') e recarregar.
@@ -164,6 +165,7 @@ export class StopsMapApp {
 
       this.routeFilterBar = new RouteFilterBar('route-filter-bar');
       this.routeFilterBar.mount();
+      wireFilterToggleButton(this.routeFilterBar, 'filter-row');
       this.routeFilterBar.setLoading(true);
       this.routeFilterBar.onFilterChange((selected, routeObjs) =>
         this._handleGlobalRouteFilterChange(selected, routeObjs)

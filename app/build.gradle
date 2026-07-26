@@ -21,7 +21,7 @@ plugins {
 }
 
 def twaManifest = [
-    applicationId: 'pt.tiagoanoliveira.portolive.twa',
+    applicationId: 'pt.tiagoanoliveira.portolive',
     hostName: 'portolive.tiagoanoliveira.pt', // The domain being opened in the TWA.
     launchUrl: '/', // The start path for the TWA. Must be relative to the domain.
     name: 'Porto Live Transportes', // The application name.
@@ -52,13 +52,13 @@ def twaManifest = [
 
 android {
     compileSdkVersion 36
-    namespace "pt.tiagoanoliveira.portolive.twa"
+    namespace "pt.tiagoanoliveira.portolive"
     defaultConfig {
-        applicationId "pt.tiagoanoliveira.portolive.twa"
+        applicationId "pt.tiagoanoliveira.portolive"
         minSdkVersion 21
         targetSdkVersion 35
-        versionCode 4
-        versionName "4"
+        versionCode 5
+        versionName "5"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name

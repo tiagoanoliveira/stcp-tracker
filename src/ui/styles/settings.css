@@ -273,3 +273,23 @@
         font-size: 11.5px;
     }
 }
+.settings-toggle-label {
+    font-size: 13px; font-weight: 600; color: #1a1a2e;
+}
+.settings-toggle-list { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
+.settings-toggle-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px; background: #f5f7fa; border-radius: 12px; cursor: pointer;
+}
+.settings-toggle-input { display: none; }
+.settings-toggle-slider {
+    width: 40px; height: 20px; background: #ccc; border-radius: 999px;
+    position: relative; transition: background .2s; flex-shrink: 0;
+}
+.settings-toggle-slider::after {
+    content: ''; position: absolute; top: 1px; left: 1px;
+    width: 16px; height: 16px; background: #fff; border-radius: 50%;
+    transition: transform .2s; box-shadow: 0 1px 4px rgba(0,0,0,.3);
+}
+.settings-toggle-input:checked + .settings-toggle-slider { background: #0072c6; }
+.settings-toggle-input:checked + .settings-toggle-slider::after { transform: translateX(20px); }

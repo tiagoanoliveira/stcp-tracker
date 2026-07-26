@@ -9,9 +9,9 @@
 -keep class com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity { <init>(); }
 -keep class com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity { <init>(); }
 -keep class com.google.androidbrowserhelper.trusted.WebViewFallbackActivity { <init>(); }
--keep class pt.tiagoanoliveira.portolive.twa.Application { <init>(); }
--keep class pt.tiagoanoliveira.portolive.twa.DelegationService { <init>(); }
--keep class pt.tiagoanoliveira.portolive.twa.LauncherActivity { <init>(); }
+-keep class pt.tiagoanoliveira.portolive.Application { <init>(); }
+-keep class pt.tiagoanoliveira.portolive.DelegationService { <init>(); }
+-keep class pt.tiagoanoliveira.portolive.LauncherActivity { <init>(); }
 -keep class android.widget.Space { <init>(android.content.Context, android.util.AttributeSet); }
 
 -keep class androidx.appcompat.app.AlertController$RecycleListView { <init>(android.content.Context, android.util.AttributeSet); }

@@ -25,6 +25,7 @@ import { TutorialModal }          from '../ui/components/TutorialModal.js';
 import { createCenterControl }    from '../map/controls/CenterControl.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
+import { wireFilterToggleButton } from '../ui/components/filterBarToggle.js';
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -117,6 +118,8 @@ export class BusMapApp {
 
       this.routeFilterBar = new RouteFilterBar('route-filter-bar');
       this.routeFilterBar.mount();
+      wireFilterToggleButton(this.routeFilterBar, 'filter-row');
+
       this.routeFilterBar.setLoading(true);
       this.routeFilterBar.onFilterChange((selected, routeObjs) =>
         this._handleRouteFilterChange(selected, routeObjs)
@@ -480,6 +483,47 @@ export class BusMapApp {
       color:      r.color      || '#187EC2',
       text_color: r.text_color || '#FFFFFF'
     }));
+
+    // Separar linhas UNIR das STCP
+    const unirRoutes  = routeObjs.filter(r => parseInt(String(r.id || r.number), 10) >= 1000);
+    const stcpRoutes  = routeObjs.filter(r => parseInt(String(r.id || r.number), 10) < 1000);
+
+    // Para UNIR: carregar shape local em vez de chamar routeService
+    const unirOverlays = await Promise.all(unirRoutes.map(async r => {
+      const routeNum = String(r.id || r.number);
+      try {
+        const resp = await fetch(`./resources/unir-gtfs/shapes/${routeNum}.json`);
+        if (!resp.ok) return null;
+        const geojson = await resp.json();
+        // geojson tem array de coordenadas [{lat, lon, seq}] ou GeoJSON LineString
+        const coords = Array.isArray(geojson)
+            ? geojson.map(p => [p.shape_pt_lat ?? p.lat, p.shape_pt_lon ?? p.lon])
+            : (geojson.geometry?.coordinates || []).map(([lng, lat]) => [lat, lng]);
+        return {
+          routeId:    routeNum,
+          color:      r.color      || '#FF8C00',
+          text_color: r.text_color || '#FFFFFF',
+          direction:  r.direction  ?? 0,
+          shapes: [{ points: coords }],
+          stops:  []
+        };
+      } catch { return null; }
+    })).then(res => res.filter(Boolean));
+
+    // Para STCP: comportamento existente
+    const stcpRoutesToFetch = stcpRoutes.map(r => ({
+      routeId:    String(r.id || r.number),
+      direction:  r.direction ?? 0,
+      color:      r.color      || '#187EC2',
+      text_color: r.text_color || '#FFFFFF'
+    }));
+
+    const stcpOverlayData = stcpRoutesToFetch.length > 0
+        ? await routeService.fetchMultipleRoutesOverlay(stcpRoutesToFetch)
+        : [];
+
+    this.lineOverlayManager.setRoutes([...stcpOverlayData, ...unirOverlays]);
+
     const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
     this.lineOverlayManager.setRoutes(overlayData);
 

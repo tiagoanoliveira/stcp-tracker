@@ -34,44 +34,34 @@
     </header>
 
     <main class="settings-main">
-        <section class="settings-section settings-section--placeholder" aria-labelledby="personalizacao-title">
+        <section class="settings-section" aria-labelledby="filtros-title">
             <div class="settings-section-header">
-                <h2 id="personalizacao-title" class="settings-section-title">Personalização da app</h2>
+                <h2 id="filtros-title" class="settings-section-title">Filtros de linha</h2>
                 <p class="settings-section-subtitle">
-                    Zona reservada para futuras preferências do utilizador.
+                    Comportamento da barra de filtros e grupos de linhas.
                 </p>
             </div>
 
-            <div class="settings-placeholder-card">
-                <div class="settings-placeholder-icon" aria-hidden="true">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33
-                       1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33
-                       l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3
-                       a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06
-                       a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3
-                       a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06
-                       a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21
-                       a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                    </svg>
-                </div>
+            <div class="settings-toggle-list">
 
-                <div class="settings-placeholder-content">
-                    <h3>Em breve</h3>
-                    <p>
-                        Aqui poderás ajustar opções como o comportamento do mapa, preferências visuais,
-                        filtros por defeito, gestão de favoritos e outras configurações da aplicação.
-                    </p>
-                </div>
-            </div>
+                <label class="settings-toggle-item">
+                    <span class="settings-toggle-label">Barra de filtros aberta por defeito</span>
+                    <input type="checkbox" id="setting-filter-bar-open" class="settings-toggle-input">
+                    <span class="settings-toggle-slider"></span>
+                </label>
 
-            <div class="settings-future-list" aria-label="Possíveis opções futuras">
-                <div class="settings-future-item">Tema visual</div>
-                <div class="settings-future-item">Filtros por defeito</div>
-                <div class="settings-future-item">Preferências do mapa</div>
-                <div class="settings-future-item">Gestão de notificações</div>
+                <label class="settings-toggle-item">
+                    <span class="settings-toggle-label">Grupos STCP expandidos por defeito</span>
+                    <input type="checkbox" id="setting-stcp-expanded" class="settings-toggle-input">
+                    <span class="settings-toggle-slider"></span>
+                </label>
+
+                <label class="settings-toggle-item">
+                    <span class="settings-toggle-label">Grupos UNIR expandidos por defeito</span>
+                    <input type="checkbox" id="setting-unir-expanded" class="settings-toggle-input">
+                    <span class="settings-toggle-slider"></span>
+                </label>
+
             </div>
         </section>
 
@@ -164,5 +154,23 @@
         </a>
     </nav>
 </div>
+
+<script type="module">
+    import { getSetting, setSetting, SETTINGS_KEYS } from './src/config/filterSettings.js';
+
+    const map = [
+        { id: 'setting-filter-bar-open', key: SETTINGS_KEYS.FILTER_BAR_OPEN,       def: true },
+        { id: 'setting-stcp-expanded',   key: SETTINGS_KEYS.STCP_GROUPS_EXPANDED,  def: true },
+        { id: 'setting-unir-expanded',   key: SETTINGS_KEYS.UNIR_GROUPS_EXPANDED,  def: false },
+    ];
+
+    map.forEach(({ id, key, def }) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.checked = getSetting(key, def);
+        el.addEventListener('change', () => setSetting(key, el.checked));
+    });
+</script>
+
 </body>
 </html>
