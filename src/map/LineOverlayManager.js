@@ -37,10 +37,6 @@ export class LineOverlayManager {
     this._layers.set(key, { polyline, stopMarkers });
   }
 
-  removeRoute(routeId, direction) {
-    this._removeLayers(`${routeId}:${direction}`);
-  }
-
   clearAll() {
     for (const key of this._layers.keys()) this._removeLayers(key);
   }
@@ -51,9 +47,22 @@ export class LineOverlayManager {
       if (!newKeys.has(key)) this._removeLayers(key);
     }
     routeDataList.forEach(r => {
-      const direction  = r.direction ?? 0;
-      const coords     = r.shape?.coordinates || [];
-      const routeStops = r.stops?.stops || [];
+      const direction = r.direction ?? 0;
+
+      const coords =
+          Array.isArray(r.shapes) && r.shapes.length > 0
+              ? r.shapes.flatMap(s =>
+                  Array.isArray(s.points)
+                      ? s.points.map(([lat, lng]) => ({ lat, lng }))
+                      : []
+              )
+              : (Array.isArray(r.shape?.coordinates) ? r.shape.coordinates : []);
+
+      const routeStops =
+          Array.isArray(r.stops)
+              ? r.stops
+              : (Array.isArray(r.stops?.stops) ? r.stops.stops : []);
+
       this.addRoute(r.routeId, direction, r.color, r.text_color, coords, routeStops);
     });
   }

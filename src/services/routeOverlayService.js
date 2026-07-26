@@ -122,7 +122,19 @@ async function fetchStcpOverlay(routeObj) {
         return normalizeOverlay(routeObj);
     }
 
-    return normalizeOverlay(routeObj, overlays[0]);
+    const raw = overlays[0];
+
+    const shapesForOverlay = raw.shape?.coordinates?.length
+        ? [{ points: (raw.shape.coordinates).map(c => [c.lat, c.lng]) }]
+        : (Array.isArray(raw.shapes) ? raw.shapes : []);
+
+    const stopsForOverlay = Array.isArray(raw.stops?.stops)
+        ? raw.stops.stops
+        : Array.isArray(raw.stops)
+            ? raw.stops
+            : [];
+
+    return normalizeOverlay(routeObj, { shapes: shapesForOverlay, stops: stopsForOverlay });
 }
 
 /**
