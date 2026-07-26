@@ -3,7 +3,7 @@
  * Compatível com o proxy unificado STCP / UNIR / MetroBus.
  */
 
-import { mqttVehicleService } from '../services/mqttVehicleService.js';
+import { mqttVehicleService } from './mqttVehicleService';
 
 class ApiService {
   constructor() {
