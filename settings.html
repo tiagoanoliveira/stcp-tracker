@@ -65,6 +65,22 @@
             </div>
         </section>
 
+        <section class="settings-section" aria-labelledby="operadoras-title">
+            <div class="settings-section-header">
+                <h2 id="operadoras-title" class="settings-section-title">Operadoras</h2>
+                <p class="settings-section-subtitle">
+                    Define quais as operadoras visíveis no mapa. A STCP está sempre ativa.
+                </p>
+            </div>
+            <div class="settings-toggle-list">
+                <label class="settings-toggle-item">
+                    <span class="settings-toggle-label">Mostrar UNIR</span>
+                    <input type="checkbox" id="setting-show-unir" class="settings-toggle-input">
+                    <span class="settings-toggle-slider"></span>
+                </label>
+            </div>
+        </section>
+
         <section class="settings-section" aria-labelledby="info-title">
             <div class="settings-section-header">
                 <h2 id="info-title" class="settings-section-title">Informações e apoio</h2>
@@ -162,6 +178,7 @@
         { id: 'setting-filter-bar-open', key: SETTINGS_KEYS.FILTER_BAR_OPEN,       def: true },
         { id: 'setting-stcp-expanded',   key: SETTINGS_KEYS.STCP_GROUPS_EXPANDED,  def: true },
         { id: 'setting-unir-expanded',   key: SETTINGS_KEYS.UNIR_GROUPS_EXPANDED,  def: false },
+        { id: 'setting-show-unir', key: SETTINGS_KEYS.SHOW_UNIR, def: true },
     ];
 
     map.forEach(({ id, key, def }) => {

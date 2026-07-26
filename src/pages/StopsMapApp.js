@@ -411,7 +411,11 @@ export class StopsMapApp {
     }
 
     this._lineFilterMode = true;
-    const overlayData = await routeOverlayService.buildOverlays(routeObjs);
+    const enrichedRouteObjs = routeObjs.map(r => ({
+      ...r,
+      routeId: String(r.id || r.number),
+    }));
+    const overlayData = await routeOverlayService.buildOverlays(enrichedRouteObjs);
     this.lineOverlayManager.setRoutes(overlayData);
 
     if (this.nextArrivals?.isVisible) {

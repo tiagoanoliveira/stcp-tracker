@@ -27,6 +27,7 @@ import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
 import { wireFilterToggleButton } from '../ui/components/filterBarToggle.js';
 import routeOverlayService from '../services/routeOverlayService.js';
+import {getSetting, SETTINGS_KEYS} from "../config/filterSettings.js";
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -304,6 +305,13 @@ export class BusMapApp {
 
   startUnirRefresh() {
     const doFetch = async () => {
+      const showUnir = getSetting(SETTINGS_KEYS.SHOW_UNIR, true);
+      if (!showUnir) {
+        // Limpar marcadores UNIR existentes
+        this._unirVehicles.forEach(bus => this.busMarkerManager.removeBusMarker?.(bus.id));
+        this._unirVehicles = [];
+        return;
+      }
       try {
         const raw = await apiService.fetchUnirVehicles();
         const processed = vehicleService.processBusDataBatch(raw);
@@ -312,10 +320,14 @@ export class BusMapApp {
         // Só actualizar marcadores se não houver paragem seleccionada
         // (quando há paragem, o _loadStopArrivals trata do mapa)
         if (!this._currentStopId) {
+          const activeFilter = routeFilterState.selectedRoutes;
           processed.forEach(bus => {
+            const vehicleLine = String(bus.displayLine || bus.line || '');
+            // Se há filtro ativo e este veículo não está na seleção, ignorar
+            if (activeFilter.size > 0 && !activeFilter.has(vehicleLine)) return;
             this.busMarkerManager.setRouteForMarker(
                 bus.id,
-                bus.displayLine || bus.line || '',
+                vehicleLine,
                 bus.direction
             );
             this.busMarkerManager.updateSingleBusMarker(bus);
@@ -457,11 +469,19 @@ export class BusMapApp {
   async _handleRouteFilterChange(selected, routeObjs) {
     routeFilterState.set(selected, routeObjs);
     this._routeDirMap    = new Map(routeObjs.map(r => [String(r.number), r.direction ?? 0]));
-
+    
     if (selected.size === 0) {
       this.lineOverlayManager.clearAll();
       if (REALTIME_BUSES_ENABLED) {
         this.busMarkerManager.updateBusMarkers(this._allProcessedBuses);
+        this._unirVehicles.forEach(bus => {
+          this.busMarkerManager.setRouteForMarker(
+              bus.id,
+              String(bus.displayLine || bus.line || ''),
+              bus.direction
+          );
+          this.busMarkerManager.updateSingleBusMarker(bus);
+        });
         this.busMarkerManager.filterByRoutes(new Set());
       }
       if (this.nextArrivals?.isVisible) {
@@ -478,7 +498,11 @@ export class BusMapApp {
       this.nextArrivals._renderArrivals();
     }
 
-    const overlayData = await routeOverlayService.buildOverlays(routeObjs);
+    const enrichedRouteObjs = routeObjs.map(r => ({
+      ...r,
+      routeId: String(r.id || r.number),
+    }));
+    const overlayData = await routeOverlayService.buildOverlays(enrichedRouteObjs);
     this.lineOverlayManager.setRoutes(overlayData);
     
     if (REALTIME_BUSES_ENABLED) {

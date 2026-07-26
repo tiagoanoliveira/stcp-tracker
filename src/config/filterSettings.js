@@ -4,6 +4,7 @@ export const SETTINGS_KEYS = {
     STCP_GROUPS_EXPANDED:   'setting_stcpGroupsExpanded',   // bool
     UNIR_GROUPS_EXPANDED:   'setting_unirGroupsExpanded',   // bool
     UNIR_SUBLOTS_EXPANDED:  'setting_unirSublotsExpanded',  // bool
+    SHOW_UNIR:              'setting_showUnir',              // bool
 };
 
 export function getSetting(key, defaultValue) {

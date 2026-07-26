@@ -58,7 +58,6 @@ export class RouteFilterBar {
     this._stcpExpanded = new Set();   // grupos STCP expandidos ex: '2', '3', ...
     this._unirExpanded = new Set();   // lotes UNIR expandidos ex: '1', '2', ...
     this._unirSubExpanded = new Set(); // não necessário por ora
-    this._filterBarOpen = getSetting(SETTINGS_KEYS.FILTER_BAR_OPEN, true);
   }
 
   mount() {
@@ -68,11 +67,8 @@ export class RouteFilterBar {
       return;
     }
 
-    this._filterBarOpen = getSetting(SETTINGS_KEYS.FILTER_BAR_OPEN, true);
-
     this.container.innerHTML = `
-    <div class="rfb-inner" id="rfb-inner-${this.containerId}" 
-         style="display: ${this._filterBarOpen ? 'flex' : 'none'}">
+    <div class="rfb-inner" id="rfb-inner-${this.containerId}">
       <span class="rfb-label">Filtrar por:</span>
       <div class="rfb-chips" id="rfb-chips-${this.containerId}"></div>
       <button class="rfb-clear-btn" id="rfb-clear-${this.containerId}" 
@@ -141,7 +137,8 @@ export class RouteFilterBar {
     this._renderStcpGroups(chipsEl, stcpRoutes);
 
     // --- Separador + bloco UNIR ---
-    if (unirRoutes.length > 0) {
+    const showUnir = getSetting(SETTINGS_KEYS.SHOW_UNIR, true);
+    if (unirRoutes.length > 0 && showUnir) {
       this._renderUnirGroups(chipsEl, unirRoutes);
     }
 
@@ -151,7 +148,8 @@ export class RouteFilterBar {
 
   /** Identifica linhas UNIR: número >= 1000 */
   _isUnirRoute(route) {
-    return parseInt(String(route.number), 10) >= 1000;
+    const num = parseInt(String(route.number ?? route.id ?? ''), 10);
+    return !isNaN(num) && num >= 1000;
   }
 
   /** Render STCP em grupos (2XX, 3XX, etc.) */
@@ -161,7 +159,7 @@ export class RouteFilterBar {
     // Agrupa por prefixo numérico (primeiro dígito) + 'M' (nocturnas)
     const groups = {};
     stcpRoutes.forEach(route => {
-      const num = String(route.number);
+      const num = String(route.number ?? route.id);
       let prefix;
       if (/M$/i.test(num)) {
         prefix = 'XM';
@@ -188,12 +186,10 @@ export class RouteFilterBar {
         return;
       }
 
-      const isExpanded = this._stcpExpanded.has(prefix)
-          ? true
-          : (defaultExpanded ? !this._stcpExpanded.has(`__collapsed__${prefix}`) : this._stcpExpanded.has(prefix));
-
-      // Lógica simplificada: estado de expansão individual por prefix
-      const expanded = this._stcpExpanded.has(prefix);
+      const defaultExpanded = getSetting(SETTINGS_KEYS.STCP_GROUPS_EXPANDED, true);
+      const expanded = this._stcpExpanded.has(prefix)
+          ? !this._stcpExpanded.has(`__collapsed__${prefix}`)
+          : defaultExpanded;
 
       if (!expanded) {
         // Mostrar chip de grupo colapsado
@@ -206,6 +202,7 @@ export class RouteFilterBar {
         groupChip.style.borderColor = groupColor;
         groupChip.addEventListener('click', () => {
           this._stcpExpanded.add(prefix);
+          this._stcpExpanded.delete(`__collapsed__${prefix}`);
           this._render();
         });
         chipsEl.appendChild(groupChip);
@@ -220,6 +217,7 @@ export class RouteFilterBar {
         collapseBtn.style.borderColor = groupColor;
         collapseBtn.addEventListener('click', () => {
           this._stcpExpanded.delete(prefix);
+          this._stcpExpanded.add(`__collapsed__${prefix}`);
           this._render();
         });
         chipsEl.appendChild(collapseBtn);
@@ -252,7 +250,7 @@ export class RouteFilterBar {
     // Agrupar por milhar (1XXX, 2XXX, ...)
     const lots = {};
     unirRoutes.forEach(route => {
-      const lot = String(Math.floor(parseInt(String(route.number), 10) / 1000));
+      const lot = String(Math.floor(parseInt(String(route.number ?? route.id), 10) / 1000));
       if (!lots[lot]) lots[lot] = [];
       lots[lot].push(route);
     });
@@ -281,15 +279,15 @@ export class RouteFilterBar {
 
   /** Cria e adiciona um chip individual (comportamento igual ao render actual) */
   _appendChip(chipsEl, route) {
-    const entry      = this.selected.get(route.number);
+    const entry      = this.selected.get(route.number ?? route.id);
     const isActive   = Boolean(entry);
     const direction  = entry?.direction ?? 0;
-    const isCircular = CIRCULAR_LINES.has(String(route.number));
-    const night      = isNightLine(route.number);
+    const isCircular = CIRCULAR_LINES.has(String(route.number ?? route.id));
+    const night      = isNightLine(route.number ?? route.id);
 
     const chip = document.createElement('div');
     chip.className    = `rfb-chip${isActive ? ' active' : ''}`;
-    chip.dataset.line = String(route.number);
+    chip.dataset.line = String(route.number ?? route.id);
     chip.dataset.nightLine = night ? 'true' : 'false';
 
     const mainBtn = document.createElement('button');
@@ -356,20 +354,20 @@ export class RouteFilterBar {
   // ---------------------------------------------------------------------------
 
   _toggleRoute(route) {
-    if (this.selected.has(route.number)) {
-      this.selected.delete(route.number);
+    if (this.selected.has(route.number ?? route.id)) {
+      this.selected.delete(route.number ?? route.id);
     } else {
-      this.selected.set(route.number, { route, direction: 0 });
+      this.selected.set(route.number ?? route.id, { route, direction: 0 });
     }
     this._render();
     this._emit();
   }
 
   _toggleDirection(route) {
-    const entry = this.selected.get(route.number);
+    const entry = this.selected.get(route.number ?? route.id);
     if (!entry) return;
     entry.direction = entry.direction === 0 ? 1 : 0;
-    this.selected.set(route.number, entry);
+    this.selected.set(route.number ?? route.id, entry);
     this._render();
     this._emit();
   }
