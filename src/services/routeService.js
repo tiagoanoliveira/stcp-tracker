@@ -1,162 +1,293 @@
 /**
- * routeService - Acesso aos dados de linhas (shape, paragens, listagem)
- * Suporta rotas STCP normais (via proxy) e rotas custom (dados locais).
- * Todos os resultados são cacheados em memória para evitar pedidos repetidos.
+ * Core API Service - centraliza todas as chamadas API
+ * Compatível com o proxy unificado STCP / UNIR / MetroBus.
  */
 
-import { apiService }        from '../core/apiService.js';
-import {
-  CUSTOM_ROUTES_LIST,
-  getCustomRouteShape,
-  getCustomRouteStops,
-} from '../data/customRoutes.js';
+import { mqttVehicleService } from '../services/mqttVehicleService.js';
 
-// Set com IDs das rotas custom para lookup O(1)
-const CUSTOM_ROUTE_IDS = new Set(CUSTOM_ROUTES_LIST.map(r => r.id));
-
-class RouteService {
+class ApiService {
   constructor() {
-    // Cache em memória: chave -> { data, ts }
-    this._cache = new Map();
-    this._TTL = 60 * 60 * 1000; // 1 hora (igual ao worker)
+    this.proxyUrl = 'https://stcp-worker.tiagoanoliveira.pt';
+    this.retries = 3;
+    this.delayMs = 500;
+    this.timeoutMs = 10000;
+
+    // 'mqtt' = produção normal
+    // 'primary' = polling /vehicles
+    this.vehiclesSource = 'mqtt';
   }
 
-  _cacheKey(type, routeId, directionId) {
-    return `${type}:${routeId}:${directionId}`;
+  setVehiclesSource(source) {
+    if (['primary', 'mqtt'].includes(source)) {
+      this.vehiclesSource = source;
+    }
   }
 
-  _fromCache(key) {
-    const entry = this._cache.get(key);
-    if (!entry) return null;
-    if (Date.now() - entry.ts > this._TTL) { this._cache.delete(key); return null; }
-    return entry.data;
+  getVehiclesSource() {
+    return this.vehiclesSource;
   }
 
-  _toCache(key, data) {
-    this._cache.set(key, { data, ts: Date.now() });
+  buildUrl(path, params = null) {
+    const url = new URL(`${this.proxyUrl}${path}`);
+    if (params && typeof params === 'object') {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          url.searchParams.set(key, value);
+        }
+      });
+    }
+    return url.toString();
+  }
+
+  async fetchWithRetry(
+      url,
+      options = {},
+      retries = this.retries,
+      delayMs = this.delayMs,
+      timeoutMs = this.timeoutMs
+  ) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          headers: {
+            Accept: 'application/json',
+            ...(options.headers || {}),
+          },
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        return await response.json();
+      } catch (error) {
+        if (i === retries - 1) throw error;
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  normalizeVehiclesResponse(data) {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.vehicles)) return data.vehicles;
+    return [];
+  }
+
+  normalizeStopsResponse(data) {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.stops)) return data.stops;
+    return [];
+  }
+
+  normalizeRoutesResponse(data) {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.routes)) return data.routes;
+    return [];
   }
 
   /**
-   * Obter shape (polyline) de uma linha numa direcção.
-   * Para rotas custom, devolve os dados locais sem chamada de rede.
-   * @param {string} routeId  - ex: '200', '1M', 'MB1'
-   * @param {0|1}    direction - 0 = ida, 1 = volta
-   * @returns {Promise<{route_id, direction_id, coordinates: [{lat,lng,sequence}]}>}
+   * Veículos em tempo real — preferencialmente via MQTT.
    */
-  async fetchRouteShape(routeId, direction = 0) {
-    if (CUSTOM_ROUTE_IDS.has(routeId)) {
-      return getCustomRouteShape(routeId);
+  async fetchBusData() {
+    const source = this.getVehiclesSource();
+
+    if (source === 'mqtt') {
+      return mqttVehicleService.getAllVehicles();
     }
 
-    const key = this._cacheKey('shape', routeId, direction);
-    const cached = this._fromCache(key);
-    if (cached) return cached;
-
     try {
-      const data = await apiService.fetchWithRetry(
-        `${apiService.proxyUrl}/route/${routeId}/shape?direction_id=${direction}`
+      const data = await this.fetchWithRetry(
+          this.buildUrl('/vehicles'),
+          {},
+          this.retries,
+          this.delayMs,
+          8000
       );
-      this._toCache(key, data);
-      return data;
-    } catch (e) {
-      console.error(`❌ Erro ao obter shape da linha ${routeId} dir ${direction}:`, e);
+      return this.normalizeVehiclesResponse(data);
+    } catch (error) {
+      console.error('❌ Erro ao obter dados dos veículos:', error);
+      return [];
+    }
+  }
+
+  async fetchUnirVehicles() {
+    try {
+      const data = await this.fetchWithRetry(
+          this.buildUrl('/vehicles/unir'),
+          {},
+          this.retries,
+          this.delayMs,
+          5000
+      );
+      return this.normalizeVehiclesResponse(data);
+    } catch (error) {
+      console.warn('⚠️ Erro ao obter veículos UNIR:', error);
+      return [];
+    }
+  }
+
+  async fetchStopRealtime(stopId) {
+    try {
+      return await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/realtime`));
+    } catch (error) {
+      console.warn(`⚠️ fetchStopRealtime(${stopId}) falhou`, error);
       return null;
     }
   }
 
-  /**
-   * Obter paragens de uma linha numa direcção.
-   * Para rotas custom, devolve os dados locais sem chamada de rede.
-   * @returns {Promise<{route_id, direction_id, stops: [{stop_id,stop_name,latitude,longitude,stop_sequence}]}>}
-   */
-  async fetchRouteStops(routeId, direction = 0) {
-    if (CUSTOM_ROUTE_IDS.has(routeId)) {
-      return getCustomRouteStops(routeId);
-    }
-
-    const key = this._cacheKey('stops', routeId, direction);
-    const cached = this._fromCache(key);
-    if (cached) return cached;
-
+  async fetchStopRoutes(stopId) {
     try {
-      const data = await apiService.fetchWithRetry(
-        `${apiService.proxyUrl}/route/${routeId}/stops?direction_id=${direction}`
+      const data = await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/routes`));
+      return {
+        routes: this.normalizeRoutesResponse(data),
+      };
+    } catch (error) {
+      console.error(`❌ Erro ao obter rotas da paragem ${stopId}:`, error);
+      return { routes: [] };
+    }
+  }
+
+  async fetchStopSchedule(stopId, routeId, serviceId) {
+    try {
+      return await this.fetchWithRetry(
+          this.buildUrl(`/${encodeURIComponent(stopId)}/schedule`, {
+            route_id: routeId,
+            service_id: serviceId,
+          })
       );
-      this._toCache(key, data);
-      return data;
-    } catch (e) {
-      console.error(`❌ Erro ao obter paragens da linha ${routeId} dir ${direction}:`, e);
+    } catch (error) {
+      console.error(`❌ Erro ao obter schedule de ${routeId} (${serviceId}) para ${stopId}:`, error);
       return null;
     }
   }
 
-  /**
-   * Obter shape E paragens de uma linha em paralelo.
-   * @returns {Promise<{shape, stops}>}
-   */
-  async fetchRouteOverlayData(routeId, direction = 0) {
-    const [shapeResult, stopsResult] = await Promise.allSettled([
-      this.fetchRouteShape(routeId, direction),
-      this.fetchRouteStops(routeId, direction)
-    ]);
-    return {
-      shape: shapeResult.status === 'fulfilled' ? shapeResult.value : null,
-      stops: stopsResult.status === 'fulfilled' ? stopsResult.value : null
-    };
+  async fetchStopServices(stopId, date) {
+    try {
+      return await this.fetchWithRetry(
+          this.buildUrl(`/${encodeURIComponent(stopId)}/services`, { date })
+      );
+    } catch (error) {
+      console.error(`❌ Erro ao obter serviços da paragem ${stopId} para ${date}:`, error);
+      return null;
+    }
   }
 
-  /**
-   * Obter shape E paragens para múltiplas linhas em paralelo.
-   * @param {Array<{routeId, direction, color, text_color}>} routes
-   * @returns {Promise<Array<{routeId, direction, color, text_color, shape, stops}>>}
-   */
-  async fetchMultipleRoutesOverlay(routes) {
-    const results = await Promise.allSettled(
-      routes.map(r => this.fetchRouteOverlayData(r.routeId, r.direction ?? 0)
-        .then(data => ({ ...r, ...data }))
-      )
-    );
-    return results
-      .filter(r => r.status === 'fulfilled')
-      .map(r => r.value);
+  async fetchStopInfo(stopId) {
+    try {
+      return await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/info`));
+    } catch (error) {
+      console.error(`❌ Erro ao obter info da paragem ${stopId}:`, error);
+      return null;
+    }
   }
 
-  /**
-   * Listar todas as linhas disponíveis.
-   * Combina a lista do proxy com as rotas custom locais.
-   * @returns {Promise<Array<{id, number, name, color, text_color}>>}
-   */
+  async fetchNearbyStops(lat, lng, radius) {
+    try {
+      const data = await this.fetchWithRetry(
+          this.buildUrl(`/nearby/${lat}/${lng}/${radius}`)
+      );
+      return {
+        ...data,
+        stops: this.normalizeStopsResponse(data),
+      };
+    } catch (error) {
+      console.error(`❌ Erro ao obter paragens próximas (${lat}, ${lng}, ${radius}m):`, error);
+      return { stops: [] };
+    }
+  }
+
+  async fetchSearchStops(query, limit = 100) {
+    try {
+      const data = await this.fetchWithRetry(
+          this.buildUrl('/search', {
+            q: query.trim(),
+            limit,
+          })
+      );
+      return {
+        ...data,
+        stops: this.normalizeStopsResponse(data),
+      };
+    } catch (error) {
+      console.error(`❌ Erro ao pesquisar paragens "${query}":`, error);
+      return { stops: [] };
+    }
+  }
+
+  async fetchRouteSchedule(routeId, serviceId, directionId = 0) {
+    try {
+      return await this.fetchWithRetry(
+          this.buildUrl(`/route/${encodeURIComponent(routeId)}/schedule`, {
+            service_id: serviceId,
+            direction_id: directionId,
+          })
+      );
+    } catch (error) {
+      console.error(
+          `❌ Erro ao obter schedule da rota ${routeId} (${serviceId}, dir ${directionId}):`,
+          error
+      );
+      return null;
+    }
+  }
+
+  async fetchRouteShape(routeId, directionId = 0) {
+    try {
+      return await this.fetchWithRetry(
+          this.buildUrl(`/route/${encodeURIComponent(routeId)}/shape`, {
+            direction_id: directionId,
+          })
+      );
+    } catch (error) {
+      console.error(`❌ Erro ao obter shape da rota ${routeId} dir ${directionId}:`, error);
+      return null;
+    }
+  }
+
+  async fetchRouteStops(routeId, directionId = 0) {
+    try {
+      return await this.fetchWithRetry(
+          this.buildUrl(`/route/${encodeURIComponent(routeId)}/stops`, {
+            direction_id: directionId,
+          })
+      );
+    } catch (error) {
+      console.error(`❌ Erro ao obter paragens da rota ${routeId} dir ${directionId}:`, error);
+      return null;
+    }
+  }
+
   async fetchRoutesList() {
-    const key = 'routes_list';
-    const cached = this._fromCache(key);
-    if (cached) return cached;
-
     try {
-      const data = await apiService.fetchWithRetry(
-        `${apiService.proxyUrl}/routes/list`
-      );
-      const remoteRoutes = data?.routes || [];
-      // Juntar rotas custom que ainda não estejam na lista remota
-      const remoteIds = new Set(remoteRoutes.map(r => r.id));
-      const merged = [
-        ...remoteRoutes,
-        ...CUSTOM_ROUTES_LIST.filter(r => !remoteIds.has(r.id)),
-      ];
-      this._toCache(key, merged);
-      return merged;
-    } catch (e) {
-      console.error('❌ Erro ao obter lista de linhas:', e);
-      // Fallback: pelo menos as rotas custom ficam disponíveis
-      return [...CUSTOM_ROUTES_LIST];
+      const data = await this.fetchWithRetry(this.buildUrl('/routes/list'));
+      return this.normalizeRoutesResponse(data);
+    } catch (error) {
+      console.error('❌ Erro ao obter lista de rotas:', error);
+      return [];
     }
   }
 
-  /**
-   * Limpar cache (útil em testes ou após reload forçado).
-   */
-  clearCache() {
-    this._cache.clear();
+  async fetchJSON(filePath) {
+    try {
+      const response = await fetch(filePath);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.error(`❌ Erro ao carregar ${filePath}:`, error);
+      return filePath.includes('calendar') ? {} : [];
+    }
+  }
+
+  async fetchCalendarData() {
+    return await this.fetchJSON('./resources/calendar.json');
   }
 }
 
-export const routeService = new RouteService();
+export const apiService = new ApiService();

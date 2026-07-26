@@ -1,29 +1,24 @@
 /**
- * Core API Service - Centraliza todas as chamadas API
- *
- * FONTES DE VEÍCULOS:
- *   'mqtt'     - Porto Digital MQTT/WebSocket (event-driven, sem polling) — ÚNICA fonte activa
- *
- * A WebSocket liga sempre antes do site acabar de carregar, por isso não é necessário bootstrap via REST.
- * Se o MQTT demorar, o mqttVehicleService emite 'mqtt:noDataTimeout' e o
- * UI mostra um banner de aviso.
+ * Core API Service - centraliza todas as chamadas API
+ * Compatível com o proxy unificado STCP / UNIR / MetroBus.
  */
 
 import { mqttVehicleService } from '../services/mqttVehicleService.js';
 
 class ApiService {
   constructor() {
-    this.proxyUrl  = 'https://stcp-worker.tiagoanoliveira.pt';
-    this.retries   = 3;
-    this.delayMs   = 500;
+    this.proxyUrl = 'https://stcp-worker.tiagoanoliveira.pt';
+    this.retries = 3;
+    this.delayMs = 500;
     this.timeoutMs = 10000;
 
-    // Fonte de veículos: apenas 'mqtt' em produção
+    // 'mqtt' = produção normal
+    // 'primary' = polling /vehicles
     this.vehiclesSource = 'mqtt';
   }
 
   setVehiclesSource(source) {
-    if (['primary', 'fallback', 'mqtt'].includes(source)) {
+    if (['primary', 'mqtt'].includes(source)) {
       this.vehiclesSource = source;
     }
   }
@@ -32,55 +27,92 @@ class ApiService {
     return this.vehiclesSource;
   }
 
-  async fetchWithRetry(url, options = {}, retries = this.retries, delayMs = this.delayMs, timeoutMs = this.timeoutMs) {
+  buildUrl(path, params = null) {
+    const url = new URL(`${this.proxyUrl}${path}`);
+    if (params && typeof params === 'object') {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          url.searchParams.set(key, value);
+        }
+      });
+    }
+    return url.toString();
+  }
+
+  async fetchWithRetry(
+      url,
+      options = {},
+      retries = this.retries,
+      delayMs = this.delayMs,
+      timeoutMs = this.timeoutMs
+  ) {
     for (let i = 0; i < retries; i++) {
       try {
         const controller = new AbortController();
-        const timeoutId  = setTimeout(() => controller.abort(), timeoutMs);
-        const response   = await fetch(url, { ...options, signal: controller.signal });
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          headers: {
+            Accept: 'application/json',
+            ...(options.headers || {}),
+          },
+        });
+
         clearTimeout(timeoutId);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         return await response.json();
       } catch (error) {
         if (i === retries - 1) throw error;
-        await new Promise(res => setTimeout(res, delayMs));
+        await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }
   }
 
+  normalizeVehiclesResponse(data) {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.vehicles)) return data.vehicles;
+    return [];
+  }
+
+  normalizeStopsResponse(data) {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.stops)) return data.stops;
+    return [];
+  }
+
+  normalizeRoutesResponse(data) {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.routes)) return data.routes;
+    return [];
+  }
+
   /**
-   * Veículos em tempo real — exclusivamente via MQTT.
-   * Devolve o snapshot em memória actualizado pelo mqttVehicleService.
-   * Enquanto o MQTT ainda não tiver dados, devolve [] e o UI aguarda
-   * pelo evento 'mqtt:vehicleUpdate' para renderizar.
+   * Veículos em tempo real — preferencialmente via MQTT.
    */
   async fetchBusData() {
     const source = this.getVehiclesSource();
 
     if (source === 'mqtt') {
-      // Devolve snapshot em memória — pode ser [] nos primeiros segundos.
-      // O mqttVehicleService emite 'mqtt:noDataTimeout' se passarem 15s sem dados.
       return mqttVehicleService.getAllVehicles();
     }
 
-    // Modo polling (mantido apenas para debug manual)
     try {
-      const path = source === 'fallback' ? '/vehicles/fiware' : '/vehicles';
       const data = await this.fetchWithRetry(
-        `${this.proxyUrl}${path}`,
-        {},
-        this.retries,
-        this.delayMs,
-        8000
+          this.buildUrl('/vehicles'),
+          {},
+          this.retries,
+          this.delayMs,
+          8000
       );
-      const vehicles = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.vehicles)
-          ? data.vehicles
-          : [];
-      return vehicles;
+      return this.normalizeVehiclesResponse(data);
     } catch (error) {
-      console.error('❌ Erro ao obter dados dos autocarros:', error);
+      console.error('❌ Erro ao obter dados dos veículos:', error);
       return [];
     }
   }
@@ -88,44 +120,48 @@ class ApiService {
   async fetchUnirVehicles() {
     try {
       const data = await this.fetchWithRetry(
-          `${this.proxyUrl}/vehicles/unir`,
+          this.buildUrl('/vehicles/unir'),
           {},
           this.retries,
           this.delayMs,
-          3000
+          5000
       );
-      const vehicles = Array.isArray(data?.vehicles) ? data.vehicles : [];
-      return vehicles;
+      return this.normalizeVehiclesResponse(data);
     } catch (error) {
       console.warn('⚠️ Erro ao obter veículos UNIR:', error);
       return [];
     }
   }
 
-  // ─── Paragens e rotas ──────────────────────────────────────────────────────
-
   async fetchStopRealtime(stopId) {
     try {
-      return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/realtime`);
+      return await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/realtime`));
     } catch (error) {
-      console.warn(`⚠️ fetchStopRealtime(${stopId}) falhou — usando apenas MQTT TripUpdate`, error);
+      console.warn(`⚠️ fetchStopRealtime(${stopId}) falhou`, error);
       return null;
     }
   }
 
   async fetchStopRoutes(stopId) {
     try {
-      return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/routes`);
+      const data = await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/routes`));
+      return {
+        routes: this.normalizeRoutesResponse(data),
+      };
     } catch (error) {
       console.error(`❌ Erro ao obter rotas da paragem ${stopId}:`, error);
-      return { display_routes: [], dropdown_routes: [] };
+      return { routes: [] };
     }
   }
 
   async fetchStopSchedule(stopId, routeId, serviceId) {
     try {
-      const encodedServiceId = encodeURIComponent(serviceId);
-      return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/schedule?route_id=${routeId}&service_id=${encodedServiceId}`);
+      return await this.fetchWithRetry(
+          this.buildUrl(`/${encodeURIComponent(stopId)}/schedule`, {
+            route_id: routeId,
+            service_id: serviceId,
+          })
+      );
     } catch (error) {
       console.error(`❌ Erro ao obter schedule de ${routeId} (${serviceId}) para ${stopId}:`, error);
       return null;
@@ -134,7 +170,9 @@ class ApiService {
 
   async fetchStopServices(stopId, date) {
     try {
-      return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/services?date=${date}`);
+      return await this.fetchWithRetry(
+          this.buildUrl(`/${encodeURIComponent(stopId)}/services`, { date })
+      );
     } catch (error) {
       console.error(`❌ Erro ao obter serviços da paragem ${stopId} para ${date}:`, error);
       return null;
@@ -143,7 +181,7 @@ class ApiService {
 
   async fetchStopInfo(stopId) {
     try {
-      return await this.fetchWithRetry(`${this.proxyUrl}/${stopId}/info`);
+      return await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/info`));
     } catch (error) {
       console.error(`❌ Erro ao obter info da paragem ${stopId}:`, error);
       return null;
@@ -152,7 +190,13 @@ class ApiService {
 
   async fetchNearbyStops(lat, lng, radius) {
     try {
-      return await this.fetchWithRetry(`${this.proxyUrl}/nearby/${lat}/${lng}/${radius}`);
+      const data = await this.fetchWithRetry(
+          this.buildUrl(`/nearby/${lat}/${lng}/${radius}`)
+      );
+      return {
+        ...data,
+        stops: this.normalizeStopsResponse(data),
+      };
     } catch (error) {
       console.error(`❌ Erro ao obter paragens próximas (${lat}, ${lng}, ${radius}m):`, error);
       return { stops: [] };
@@ -161,20 +205,72 @@ class ApiService {
 
   async fetchSearchStops(query, limit = 100) {
     try {
-      return await this.fetchWithRetry(`${this.proxyUrl}/search?q=${encodeURIComponent(query.trim())}&limit=${limit}`);
+      const data = await this.fetchWithRetry(
+          this.buildUrl('/search', {
+            q: query.trim(),
+            limit,
+          })
+      );
+      return {
+        ...data,
+        stops: this.normalizeStopsResponse(data),
+      };
     } catch (error) {
       console.error(`❌ Erro ao pesquisar paragens "${query}":`, error);
       return { stops: [] };
     }
   }
 
-  async fetchRouteSchedule(routeId, serviceId, directionId) {
+  async fetchRouteSchedule(routeId, serviceId, directionId = 0) {
     try {
-      const encodedServiceId = encodeURIComponent(serviceId);
-      return await this.fetchWithRetry(`${this.proxyUrl}/route/${routeId}/schedule?service_id=${encodedServiceId}&direction_id=${directionId}`);
+      return await this.fetchWithRetry(
+          this.buildUrl(`/route/${encodeURIComponent(routeId)}/schedule`, {
+            service_id: serviceId,
+            direction_id: directionId,
+          })
+      );
     } catch (error) {
-      console.error(`❌ Erro ao obter schedule da rota ${routeId} (${serviceId}, dir ${directionId}):`, error);
+      console.error(
+          `❌ Erro ao obter schedule da rota ${routeId} (${serviceId}, dir ${directionId}):`,
+          error
+      );
       return null;
+    }
+  }
+
+  async fetchRouteShape(routeId, directionId = 0) {
+    try {
+      return await this.fetchWithRetry(
+          this.buildUrl(`/route/${encodeURIComponent(routeId)}/shape`, {
+            direction_id: directionId,
+          })
+      );
+    } catch (error) {
+      console.error(`❌ Erro ao obter shape da rota ${routeId} dir ${directionId}:`, error);
+      return null;
+    }
+  }
+
+  async fetchRouteStops(routeId, directionId = 0) {
+    try {
+      return await this.fetchWithRetry(
+          this.buildUrl(`/route/${encodeURIComponent(routeId)}/stops`, {
+            direction_id: directionId,
+          })
+      );
+    } catch (error) {
+      console.error(`❌ Erro ao obter paragens da rota ${routeId} dir ${directionId}:`, error);
+      return null;
+    }
+  }
+
+  async fetchRoutesList() {
+    try {
+      const data = await this.fetchWithRetry(this.buildUrl('/routes/list'));
+      return this.normalizeRoutesResponse(data);
+    } catch (error) {
+      console.error('❌ Erro ao obter lista de rotas:', error);
+      return [];
     }
   }
 
