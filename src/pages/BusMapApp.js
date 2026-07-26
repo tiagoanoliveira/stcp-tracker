@@ -82,8 +82,8 @@ export class BusMapApp {
       
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'Por motivos desconhecidos a linha 200 não está a apresentar dados em tempo real - verifique o horário planeado nas próximas chegadas.',
-        { type: 'warning', id: 'stcp-warning', dismissible: false }
+        'Estamos a fazer alterações com o objetivo de te trazer mais informação e mais exata. Por essa razão poderás detetar falhas no acesso à informação. Pedimos desculpa pelo incomodo, seremos breves. Hora estimada de conclusão dos trabalhos: 20:00',
+        { type: 'info', id: 'stcp-warning', dismissible: false }
       );
       
       await scheduleService.loadScheduleData();
