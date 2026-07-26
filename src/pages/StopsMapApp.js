@@ -67,6 +67,7 @@ import { iconCache }              from '../ui/design/iconCache.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
 import { wireFilterToggleButton } from '../ui/components/filterBarToggle.js';
+import routeOverlayService from '../services/routeOverlayService.js';
 
 // ─── Helpers de debug ──────────────────────────────────────────────────────────
 // Activar com: localStorage.setItem('BUS_DEBUG', '1') e recarregar.
@@ -410,13 +411,7 @@ export class StopsMapApp {
     }
 
     this._lineFilterMode = true;
-    const routesToFetch = routeObjs.map(r => ({
-      routeId:    String(r.id || r.number),
-      direction:  r.direction ?? 0,
-      color:      r.color      || '#187EC2',
-      text_color: r.text_color || '#FFFFFF'
-    }));
-    const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
+    const overlayData = await routeOverlayService.buildOverlays(routeObjs);
     this.lineOverlayManager.setRoutes(overlayData);
 
     if (this.nextArrivals?.isVisible) {
@@ -722,7 +717,7 @@ export class StopsMapApp {
           }));
 
       if (routeObjs.length > 0) {
-        const overlayData = await routeService.fetchMultipleRoutesOverlay(routeObjs);
+        const overlayData = await routeOverlayService.buildOverlays(routeObjs);
         this.lineOverlayManager.setRoutes(overlayData);
       }
     }

@@ -26,6 +26,7 @@ import { createCenterControl }    from '../map/controls/CenterControl.js';
 import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
 import { wireFilterToggleButton } from '../ui/components/filterBarToggle.js';
+import routeOverlayService from '../services/routeOverlayService.js';
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -477,56 +478,9 @@ export class BusMapApp {
       this.nextArrivals._renderArrivals();
     }
 
-    const routesToFetch = routeObjs.map(r => ({
-      routeId:    String(r.id || r.number),
-      direction:  r.direction ?? 0,
-      color:      r.color      || '#187EC2',
-      text_color: r.text_color || '#FFFFFF'
-    }));
-
-    // Separar linhas UNIR das STCP
-    const unirRoutes  = routeObjs.filter(r => parseInt(String(r.id || r.number), 10) >= 1000);
-    const stcpRoutes  = routeObjs.filter(r => parseInt(String(r.id || r.number), 10) < 1000);
-
-    // Para UNIR: carregar shape local em vez de chamar routeService
-    const unirOverlays = await Promise.all(unirRoutes.map(async r => {
-      const routeNum = String(r.id || r.number);
-      try {
-        const resp = await fetch(`./resources/unir-gtfs/shapes/${routeNum}.json`);
-        if (!resp.ok) return null;
-        const geojson = await resp.json();
-        // geojson tem array de coordenadas [{lat, lon, seq}] ou GeoJSON LineString
-        const coords = Array.isArray(geojson)
-            ? geojson.map(p => [p.shape_pt_lat ?? p.lat, p.shape_pt_lon ?? p.lon])
-            : (geojson.geometry?.coordinates || []).map(([lng, lat]) => [lat, lng]);
-        return {
-          routeId:    routeNum,
-          color:      r.color      || '#FF8C00',
-          text_color: r.text_color || '#FFFFFF',
-          direction:  r.direction  ?? 0,
-          shapes: [{ points: coords }],
-          stops:  []
-        };
-      } catch { return null; }
-    })).then(res => res.filter(Boolean));
-
-    // Para STCP: comportamento existente
-    const stcpRoutesToFetch = stcpRoutes.map(r => ({
-      routeId:    String(r.id || r.number),
-      direction:  r.direction ?? 0,
-      color:      r.color      || '#187EC2',
-      text_color: r.text_color || '#FFFFFF'
-    }));
-
-    const stcpOverlayData = stcpRoutesToFetch.length > 0
-        ? await routeService.fetchMultipleRoutesOverlay(stcpRoutesToFetch)
-        : [];
-
-    this.lineOverlayManager.setRoutes([...stcpOverlayData, ...unirOverlays]);
-
-    const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
+    const overlayData = await routeOverlayService.buildOverlays(routeObjs);
     this.lineOverlayManager.setRoutes(overlayData);
-
+    
     if (REALTIME_BUSES_ENABLED) {
       const visiblePositions = this.busMarkerManager.filterByRoutes(selected, this._routeDirMap);
       if (visiblePositions.length > 0) {
@@ -566,7 +520,7 @@ export class BusMapApp {
           text_color: routeObj?.text_color || '#FFFFFF',
         };
       });
-      const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
+      const overlayData = await routeOverlayService.buildOverlays(routesToFetch);
       this.lineOverlayManager.setRoutes(overlayData);
     } else {
       this.lineOverlayManager.clearAll();
@@ -828,7 +782,7 @@ export class BusMapApp {
       }));
 
       try {
-        const overlayData = await routeService.fetchMultipleRoutesOverlay(routesToFetch);
+        const overlayData = await routeOverlayService.buildOverlays(routeObjs);
         this.lineOverlayManager.setRoutes(overlayData);
       } catch (err) {
         console.warn('Erro ao restaurar overlays:', err);
