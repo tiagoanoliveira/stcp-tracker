@@ -130,8 +130,9 @@ export class RouteFilterBar {
     }
 
     // Separar rotas STCP e UNIR
-    const stcpRoutes = this.routes.filter(r => !this._isUnirRoute(r));
-    const unirRoutes = this.routes.filter(r => this._isUnirRoute(r));
+    const unirRoutes = this.routes.filter(r => this.isUnirRoute(r));
+    const metrobusRoutes = this.routes.filter(r => this.isMetrobusRoute(r));
+    const stcpRoutes = this.routes.filter(r => !this.isUnirRoute(r) && !this.isMetrobusRoute(r));
 
     // --- Bloco STCP ---
     this._renderStcpGroups(chipsEl, stcpRoutes);
@@ -147,9 +148,23 @@ export class RouteFilterBar {
   }
 
   /** Identifica linhas UNIR: número >= 1000 */
-  _isUnirRoute(route) {
-    const num = parseInt(String(route.number ?? route.id ?? ''), 10);
-    return !isNaN(num) && num >= 1000;
+  isUnirRoute(route) {
+    const operator = String(route.operator ?? route.source ?? '').toLowerCase();
+    if (operator === 'unir') return true;
+
+    const id = String(route.id ?? '');
+    const number = String(route.number ?? '');
+
+    return /^\d{4,}$/.test(number) || /^\d{4,}$/.test(id);
+  }
+
+  isMetrobusRoute(route) {
+    const operator = String(route.operator ?? route.source ?? '').toLowerCase();
+    if (operator === 'metrobus') return true;
+
+    const id = String(route.id ?? '');
+    const number = String(route.number ?? '');
+    return id === 'MB1' || number === 'MB1' || number.startsWith('MB');
   }
 
   /** Render STCP em grupos (2XX, 3XX, etc.) */

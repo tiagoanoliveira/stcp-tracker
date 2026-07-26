@@ -1,8 +1,3 @@
-/**
- * Core API Service - centraliza todas as chamadas API
- * Compatível com o proxy unificado STCP / UNIR / MetroBus.
- */
-
 import { mqttVehicleService } from '../services/mqttVehicleService.js';
 
 class ApiService {
@@ -11,9 +6,6 @@ class ApiService {
     this.retries = 3;
     this.delayMs = 500;
     this.timeoutMs = 10000;
-
-    // 'mqtt' = produção normal
-    // 'primary' = polling /vehicles
     this.vehiclesSource = 'mqtt';
   }
 
@@ -29,7 +21,7 @@ class ApiService {
 
   buildUrl(path, params = null) {
     const url = new URL(`${this.proxyUrl}${path}`);
-    if (params && typeof params === 'object') {
+    if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
           url.searchParams.set(key, value);
@@ -74,6 +66,68 @@ class ApiService {
     }
   }
 
+  normalizeColor(value, fallback = '#187EC2') {
+    if (!value) return fallback;
+    const v = String(value).trim();
+    return v.startsWith('#') ? v : `#${v}`;
+  }
+
+  normalizeRoute(route) {
+    if (!route) return null;
+
+    const operator = route.operator ?? route.source ?? this.inferRouteOperator(route);
+
+    return {
+      id: String(route.id ?? route.route_id ?? route.number ?? ''),
+      number: String(route.number ?? route.route_short_name ?? route.id ?? ''),
+      name: String(route.name ?? route.route_long_name ?? route.number ?? ''),
+      color: this.normalizeColor(route.color ?? route.route_color, '#187EC2'),
+      text_color: this.normalizeColor(route.text_color ?? route.route_text_color, '#FFFFFF'),
+      textcolor: this.normalizeColor(route.text_color ?? route.route_text_color, '#FFFFFF'),
+      operator,
+      source: operator,
+    };
+  }
+
+  inferRouteOperator(route) {
+    const explicit = String(route.operator ?? route.source ?? '').toLowerCase();
+    if (explicit) return explicit;
+
+    const id = String(route.id ?? '');
+    const number = String(route.number ?? '');
+
+    if (id === 'MB1' || number === 'MB1' || number.startsWith('MB')) return 'metrobus';
+    if (/^\d{4,}$/.test(number) || /^\d{4,}$/.test(id)) return 'unir';
+    return 'stcp';
+  }
+
+  normalizeStop(stop) {
+    if (!stop) return null;
+
+    const stopId = String(stop.stop_id ?? stop.stopid ?? stop.id ?? stop.code ?? '');
+    const stopCode = String(stop.stop_code ?? stop.stopcode ?? stop.code ?? stopId);
+    const stopName = String(stop.stop_name ?? stop.stopname ?? stop.name ?? stopId);
+    const latitude = Number(stop.latitude ?? stop.stop_lat ?? stop.lat);
+    const longitude = Number(stop.longitude ?? stop.stop_lon ?? stop.lon ?? stop.lng);
+
+    return {
+      ...stop,
+      stop_id: stopId,
+      stopid: stopId,
+      stop_code: stopCode,
+      stopcode: stopCode,
+      stop_name: stopName,
+      stopname: stopName,
+      latitude,
+      longitude,
+      operator: stop.operator ?? stop.source ?? 'stcp',
+      source: stop.source ?? stop.operator ?? 'stcp',
+      routes: Array.isArray(stop.routes)
+          ? stop.routes.map(route => this.normalizeRoute(route)).filter(Boolean)
+          : [],
+    };
+  }
+
   normalizeVehiclesResponse(data) {
     if (Array.isArray(data)) return data;
     if (Array.isArray(data?.vehicles)) return data.vehicles;
@@ -81,35 +135,22 @@ class ApiService {
   }
 
   normalizeStopsResponse(data) {
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.stops)) return data.stops;
-    return [];
+    const stops = Array.isArray(data) ? data : Array.isArray(data?.stops) ? data.stops : [];
+    return stops.map(stop => this.normalizeStop(stop)).filter(Boolean);
   }
 
   normalizeRoutesResponse(data) {
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.routes)) return data.routes;
-    return [];
+    const routes = Array.isArray(data) ? data : Array.isArray(data?.routes) ? data.routes : [];
+    return routes.map(route => this.normalizeRoute(route)).filter(Boolean);
   }
 
-  /**
-   * Veículos em tempo real — preferencialmente via MQTT.
-   */
   async fetchBusData() {
-    const source = this.getVehiclesSource();
-
-    if (source === 'mqtt') {
+    if (this.vehiclesSource === 'mqtt') {
       return mqttVehicleService.getAllVehicles();
     }
 
     try {
-      const data = await this.fetchWithRetry(
-          this.buildUrl('/vehicles'),
-          {},
-          this.retries,
-          this.delayMs,
-          8000
-      );
+      const data = await this.fetchWithRetry(this.buildUrl('/vehicles'), {}, this.retries, this.delayMs, 8000);
       return this.normalizeVehiclesResponse(data);
     } catch (error) {
       console.error('❌ Erro ao obter dados dos veículos:', error);
@@ -119,13 +160,7 @@ class ApiService {
 
   async fetchUnirVehicles() {
     try {
-      const data = await this.fetchWithRetry(
-          this.buildUrl('/vehicles/unir'),
-          {},
-          this.retries,
-          this.delayMs,
-          5000
-      );
+      const data = await this.fetchWithRetry(this.buildUrl('/vehicles/unir'), {}, this.retries, this.delayMs, 5000);
       return this.normalizeVehiclesResponse(data);
     } catch (error) {
       console.warn('⚠️ Erro ao obter veículos UNIR:', error);
@@ -145,9 +180,7 @@ class ApiService {
   async fetchStopRoutes(stopId) {
     try {
       const data = await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/routes`));
-      return {
-        routes: this.normalizeRoutesResponse(data),
-      };
+      return { routes: this.normalizeRoutesResponse(data) };
     } catch (error) {
       console.error(`❌ Erro ao obter rotas da paragem ${stopId}:`, error);
       return { routes: [] };
@@ -168,20 +201,10 @@ class ApiService {
     }
   }
 
-  async fetchStopServices(stopId, date) {
-    try {
-      return await this.fetchWithRetry(
-          this.buildUrl(`/${encodeURIComponent(stopId)}/services`, { date })
-      );
-    } catch (error) {
-      console.error(`❌ Erro ao obter serviços da paragem ${stopId} para ${date}:`, error);
-      return null;
-    }
-  }
-
   async fetchStopInfo(stopId) {
     try {
-      return await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/info`));
+      const data = await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/info`));
+      return this.normalizeStop(data);
     } catch (error) {
       console.error(`❌ Erro ao obter info da paragem ${stopId}:`, error);
       return null;
@@ -190,13 +213,8 @@ class ApiService {
 
   async fetchNearbyStops(lat, lng, radius) {
     try {
-      const data = await this.fetchWithRetry(
-          this.buildUrl(`/nearby/${lat}/${lng}/${radius}`)
-      );
-      return {
-        ...data,
-        stops: this.normalizeStopsResponse(data),
-      };
+      const data = await this.fetchWithRetry(this.buildUrl(`/nearby/${lat}/${lng}/${radius}`));
+      return { ...data, stops: this.normalizeStopsResponse(data) };
     } catch (error) {
       console.error(`❌ Erro ao obter paragens próximas (${lat}, ${lng}, ${radius}m):`, error);
       return { stops: [] };
@@ -206,15 +224,9 @@ class ApiService {
   async fetchSearchStops(query, limit = 100) {
     try {
       const data = await this.fetchWithRetry(
-          this.buildUrl('/search', {
-            q: query.trim(),
-            limit,
-          })
+          this.buildUrl('/search', { q: query.trim(), limit })
       );
-      return {
-        ...data,
-        stops: this.normalizeStopsResponse(data),
-      };
+      return { ...data, stops: this.normalizeStopsResponse(data) };
     } catch (error) {
       console.error(`❌ Erro ao pesquisar paragens "${query}":`, error);
       return { stops: [] };
@@ -230,10 +242,7 @@ class ApiService {
           })
       );
     } catch (error) {
-      console.error(
-          `❌ Erro ao obter schedule da rota ${routeId} (${serviceId}, dir ${directionId}):`,
-          error
-      );
+      console.error(`❌ Erro ao obter schedule da rota ${routeId} (${serviceId}, dir ${directionId}):`, error);
       return null;
     }
   }
@@ -253,11 +262,18 @@ class ApiService {
 
   async fetchRouteStops(routeId, directionId = 0) {
     try {
-      return await this.fetchWithRetry(
+      const data = await this.fetchWithRetry(
           this.buildUrl(`/route/${encodeURIComponent(routeId)}/stops`, {
             direction_id: directionId,
           })
       );
+
+      if (!data?.stops) return data;
+
+      return {
+        ...data,
+        stops: data.stops.map(stop => this.normalizeStop(stop)).filter(Boolean),
+      };
     } catch (error) {
       console.error(`❌ Erro ao obter paragens da rota ${routeId} dir ${directionId}:`, error);
       return null;
@@ -273,21 +289,9 @@ class ApiService {
       return [];
     }
   }
-
-  async fetchJSON(filePath) {
-    try {
-      const response = await fetch(filePath);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      return await response.json();
-    } catch (error) {
-      console.error(`❌ Erro ao carregar ${filePath}:`, error);
-      return filePath.includes('calendar') ? {} : [];
-    }
-  }
-
-  async fetchCalendarData() {
-    return await this.fetchJSON('./resources/calendar.json');
-  }
 }
 
-export const apiService = new ApiService();
+const apiService = new ApiService();
+
+export { apiService, ApiService };
+export default apiService;

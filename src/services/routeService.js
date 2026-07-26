@@ -1,293 +1,291 @@
 /**
- * Core API Service - centraliza todas as chamadas API
- * Compatível com o proxy unificado STCP / UNIR / MetroBus.
+ * routeService - gestão e normalização de rotas/overlays
  */
 
-import { mqttVehicleService } from './mqttVehicleService';
+import { apiService } from '../core/apiService.js';
 
-class ApiService {
+class RouteService {
   constructor() {
-    this.proxyUrl = 'https://stcp-worker.tiagoanoliveira.pt';
-    this.retries = 3;
-    this.delayMs = 500;
-    this.timeoutMs = 10000;
-
-    // 'mqtt' = produção normal
-    // 'primary' = polling /vehicles
-    this.vehiclesSource = 'mqtt';
+    this.cache = new Map();
+    this.cacheTtlMs = 60 * 60 * 1000;
   }
 
-  setVehiclesSource(source) {
-    if (['primary', 'mqtt'].includes(source)) {
-      this.vehiclesSource = source;
+  _cacheKey(type, routeId, directionId = 0, extra = '') {
+    return `${type}:${String(routeId)}:${Number(directionId)}:${extra}`;
+  }
+
+  _getCache(key) {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+
+    if (Date.now() - entry.ts > this.cacheTtlMs) {
+      this.cache.delete(key);
+      return null;
     }
+
+    return entry.data;
   }
 
-  getVehiclesSource() {
-    return this.vehiclesSource;
+  _setCache(key, data) {
+    this.cache.set(key, { ts: Date.now(), data });
+    return data;
   }
 
-  buildUrl(path, params = null) {
-    const url = new URL(`${this.proxyUrl}${path}`);
-    if (params && typeof params === 'object') {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          url.searchParams.set(key, value);
-        }
-      });
+  _normalizeColor(value, fallback = '#187EC2') {
+    if (!value) return fallback;
+    const str = String(value).trim();
+    return str.startsWith('#') ? str : `#${str}`;
+  }
+
+  _inferOperator(route = {}) {
+    const explicit = String(route.operator ?? route.source ?? '').toLowerCase();
+    if (explicit) return explicit;
+
+    const id = String(route.id ?? route.route_id ?? '');
+    const number = String(route.number ?? route.route_short_name ?? '');
+
+    if (id === 'MB1' || number === 'MB1' || number.startsWith('MB')) return 'metrobus';
+    if (/^\d{4,}$/.test(number) || /^\d{4,}$/.test(id)) return 'unir';
+    return 'stcp';
+  }
+
+  _normalizeRoute(route) {
+    if (!route) return null;
+
+    const id = String(route.id ?? route.route_id ?? route.number ?? '');
+    const number = String(route.number ?? route.route_short_name ?? id);
+    const operator = this._inferOperator(route);
+
+    return {
+      ...route,
+      id,
+      routeId: id,
+      number,
+      name: String(route.name ?? route.route_long_name ?? number),
+      color: this._normalizeColor(route.color ?? route.route_color, '#187EC2'),
+      text_color: this._normalizeColor(route.text_color ?? route.route_text_color, '#FFFFFF'),
+      textcolor: this._normalizeColor(route.text_color ?? route.route_text_color, '#FFFFFF'),
+      operator,
+      source: operator,
+    };
+  }
+
+  _normalizeStop(stop, idx = 0) {
+    if (!stop) return null;
+
+    const stopId = String(stop.stop_id ?? stop.stopid ?? stop.id ?? stop.code ?? '');
+    const stopCode = String(stop.stop_code ?? stop.stopcode ?? stop.code ?? stopId);
+    const stopName = String(stop.stop_name ?? stop.stopname ?? stop.name ?? stopId);
+    const latitude = Number(stop.latitude ?? stop.stop_lat ?? stop.lat);
+    const longitude = Number(stop.longitude ?? stop.stop_lon ?? stop.lon ?? stop.lng);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+    return {
+      ...stop,
+      stop_id: stopId,
+      stopid: stopId,
+      stop_code: stopCode,
+      stopcode: stopCode,
+      stop_name: stopName,
+      stopname: stopName,
+      latitude,
+      longitude,
+      stop_sequence: Number(stop.stop_sequence ?? idx + 1),
+    };
+  }
+
+  _normalizeStopsPayload(payload) {
+    const rawStops = Array.isArray(payload?.stops)
+        ? payload.stops
+        : Array.isArray(payload)
+            ? payload
+            : [];
+
+    return {
+      ...payload,
+      stops: rawStops.map((stop, idx) => this._normalizeStop(stop, idx)).filter(Boolean),
+    };
+  }
+
+  _normalizeShapePayload(payload) {
+    if (!payload) return { coordinates: [] };
+
+    if (Array.isArray(payload)) {
+      return {
+        coordinates: payload
+            .map((p, idx) => ({
+              lat: Number(p.shape_pt_lat ?? p.lat ?? p.latitude),
+              lng: Number(p.shape_pt_lon ?? p.lon ?? p.lng ?? p.longitude),
+              sequence: Number(p.shape_pt_sequence ?? p.sequence ?? idx + 1),
+            }))
+            .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng)),
+      };
     }
-    return url.toString();
-  }
 
-  async fetchWithRetry(
-      url,
-      options = {},
-      retries = this.retries,
-      delayMs = this.delayMs,
-      timeoutMs = this.timeoutMs
-  ) {
-    for (let i = 0; i < retries; i++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-        const response = await fetch(url, {
-          ...options,
-          signal: controller.signal,
-          headers: {
-            Accept: 'application/json',
-            ...(options.headers || {}),
-          },
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        return await response.json();
-      } catch (error) {
-        if (i === retries - 1) throw error;
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      }
+    if (Array.isArray(payload.coordinates)) {
+      return {
+        ...payload,
+        coordinates: payload.coordinates
+            .map((p, idx) => {
+              if (Array.isArray(p)) {
+                return {
+                  lat: Number(p[0]),
+                  lng: Number(p[1]),
+                  sequence: idx + 1,
+                };
+              }
+              return {
+                lat: Number(p.lat ?? p.latitude),
+                lng: Number(p.lng ?? p.lon ?? p.longitude),
+                sequence: Number(p.sequence ?? idx + 1),
+              };
+            })
+            .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng)),
+      };
     }
+
+    if (payload?.geometry?.type === 'LineString' && Array.isArray(payload.geometry.coordinates)) {
+      return {
+        ...payload,
+        coordinates: payload.geometry.coordinates
+            .map(([lng, lat], idx) => ({
+              lat: Number(lat),
+              lng: Number(lng),
+              sequence: idx + 1,
+            }))
+            .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng)),
+      };
+    }
+
+    if (payload?.geometry?.type === 'MultiLineString' && Array.isArray(payload.geometry.coordinates)) {
+      const coords = payload.geometry.coordinates.flatMap(line =>
+          line.map(([lng, lat]) => ({ lat: Number(lat), lng: Number(lng) }))
+      );
+
+      return {
+        ...payload,
+        coordinates: coords
+            .map((p, idx) => ({ ...p, sequence: idx + 1 }))
+            .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng)),
+      };
+    }
+
+    if (payload?.type === 'Feature' && payload?.geometry) {
+      return this._normalizeShapePayload(payload.geometry);
+    }
+
+    if (payload?.type === 'FeatureCollection' && Array.isArray(payload.features)) {
+      const feature = payload.features.find(f =>
+          ['LineString', 'MultiLineString'].includes(f?.geometry?.type)
+      );
+      return feature ? this._normalizeShapePayload(feature.geometry) : { coordinates: [] };
+    }
+
+    return {
+      ...payload,
+      coordinates: [],
+    };
   }
 
-  normalizeVehiclesResponse(data) {
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.vehicles)) return data.vehicles;
-    return [];
-  }
+  async fetchRoutesList(forceRefresh = false) {
+    const key = 'routes:list';
 
-  normalizeStopsResponse(data) {
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.stops)) return data.stops;
-    return [];
-  }
-
-  normalizeRoutesResponse(data) {
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.routes)) return data.routes;
-    return [];
-  }
-
-  /**
-   * Veículos em tempo real — preferencialmente via MQTT.
-   */
-  async fetchBusData() {
-    const source = this.getVehiclesSource();
-
-    if (source === 'mqtt') {
-      return mqttVehicleService.getAllVehicles();
+    if (!forceRefresh) {
+      const cached = this._getCache(key);
+      if (cached) return cached;
     }
 
     try {
-      const data = await this.fetchWithRetry(
-          this.buildUrl('/vehicles'),
-          {},
-          this.retries,
-          this.delayMs,
-          8000
-      );
-      return this.normalizeVehiclesResponse(data);
+      const routes = await apiService.fetchRoutesList();
+      const normalized = (Array.isArray(routes) ? routes : [])
+          .map(route => this._normalizeRoute(route))
+          .filter(Boolean);
+
+      return this._setCache(key, normalized);
     } catch (error) {
-      console.error('❌ Erro ao obter dados dos veículos:', error);
+      console.error('❌ routeService.fetchRoutesList falhou:', error);
       return [];
     }
   }
 
-  async fetchUnirVehicles() {
+  async fetchRouteShape(routeId, directionId = 0, forceRefresh = false) {
+    const key = this._cacheKey('shape', routeId, directionId);
+
+    if (!forceRefresh) {
+      const cached = this._getCache(key);
+      if (cached) return cached;
+    }
+
     try {
-      const data = await this.fetchWithRetry(
-          this.buildUrl('/vehicles/unir'),
-          {},
-          this.retries,
-          this.delayMs,
-          5000
-      );
-      return this.normalizeVehiclesResponse(data);
+      const payload = await apiService.fetchRouteShape(routeId, directionId);
+      const normalized = this._normalizeShapePayload(payload);
+      return this._setCache(key, normalized);
     } catch (error) {
-      console.warn('⚠️ Erro ao obter veículos UNIR:', error);
-      return [];
+      console.error(`❌ routeService.fetchRouteShape(${routeId}, ${directionId}) falhou:`, error);
+      return { coordinates: [] };
     }
   }
 
-  async fetchStopRealtime(stopId) {
-    try {
-      return await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/realtime`));
-    } catch (error) {
-      console.warn(`⚠️ fetchStopRealtime(${stopId}) falhou`, error);
-      return null;
-    }
-  }
+  async fetchRouteStops(routeId, directionId = 0, forceRefresh = false) {
+    const key = this._cacheKey('stops', routeId, directionId);
 
-  async fetchStopRoutes(stopId) {
-    try {
-      const data = await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/routes`));
-      return {
-        routes: this.normalizeRoutesResponse(data),
-      };
-    } catch (error) {
-      console.error(`❌ Erro ao obter rotas da paragem ${stopId}:`, error);
-      return { routes: [] };
+    if (!forceRefresh) {
+      const cached = this._getCache(key);
+      if (cached) return cached;
     }
-  }
 
-  async fetchStopSchedule(stopId, routeId, serviceId) {
     try {
-      return await this.fetchWithRetry(
-          this.buildUrl(`/${encodeURIComponent(stopId)}/schedule`, {
-            route_id: routeId,
-            service_id: serviceId,
-          })
-      );
+      const payload = await apiService.fetchRouteStops(routeId, directionId);
+      const normalized = this._normalizeStopsPayload(payload);
+      return this._setCache(key, normalized);
     } catch (error) {
-      console.error(`❌ Erro ao obter schedule de ${routeId} (${serviceId}) para ${stopId}:`, error);
-      return null;
-    }
-  }
-
-  async fetchStopServices(stopId, date) {
-    try {
-      return await this.fetchWithRetry(
-          this.buildUrl(`/${encodeURIComponent(stopId)}/services`, { date })
-      );
-    } catch (error) {
-      console.error(`❌ Erro ao obter serviços da paragem ${stopId} para ${date}:`, error);
-      return null;
-    }
-  }
-
-  async fetchStopInfo(stopId) {
-    try {
-      return await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/info`));
-    } catch (error) {
-      console.error(`❌ Erro ao obter info da paragem ${stopId}:`, error);
-      return null;
-    }
-  }
-
-  async fetchNearbyStops(lat, lng, radius) {
-    try {
-      const data = await this.fetchWithRetry(
-          this.buildUrl(`/nearby/${lat}/${lng}/${radius}`)
-      );
-      return {
-        ...data,
-        stops: this.normalizeStopsResponse(data),
-      };
-    } catch (error) {
-      console.error(`❌ Erro ao obter paragens próximas (${lat}, ${lng}, ${radius}m):`, error);
+      console.error(`❌ routeService.fetchRouteStops(${routeId}, ${directionId}) falhou:`, error);
       return { stops: [] };
     }
   }
 
-  async fetchSearchStops(query, limit = 100) {
-    try {
-      const data = await this.fetchWithRetry(
-          this.buildUrl('/search', {
-            q: query.trim(),
-            limit,
-          })
-      );
-      return {
-        ...data,
-        stops: this.normalizeStopsResponse(data),
-      };
-    } catch (error) {
-      console.error(`❌ Erro ao pesquisar paragens "${query}":`, error);
-      return { stops: [] };
-    }
+  async fetchRouteOverlay(routeObj, forceRefresh = false) {
+    const route = this._normalizeRoute(routeObj);
+    if (!route) return null;
+
+    const direction = Number(route.direction ?? 0);
+
+    const [shape, stops] = await Promise.all([
+      this.fetchRouteShape(route.routeId, direction, forceRefresh),
+      this.fetchRouteStops(route.routeId, direction, forceRefresh),
+    ]);
+
+    return {
+      routeId: route.routeId,
+      id: route.id,
+      number: route.number,
+      name: route.name,
+      color: route.color,
+      text_color: route.text_color,
+      textcolor: route.textcolor,
+      operator: route.operator,
+      source: route.source,
+      direction,
+      shape,
+      stops,
+    };
   }
 
-  async fetchRouteSchedule(routeId, serviceId, directionId = 0) {
-    try {
-      return await this.fetchWithRetry(
-          this.buildUrl(`/route/${encodeURIComponent(routeId)}/schedule`, {
-            service_id: serviceId,
-            direction_id: directionId,
-          })
-      );
-    } catch (error) {
-      console.error(
-          `❌ Erro ao obter schedule da rota ${routeId} (${serviceId}, dir ${directionId}):`,
-          error
-      );
-      return null;
-    }
+  async fetchMultipleRoutesOverlay(routeObjs = [], forceRefresh = false) {
+    const results = await Promise.all(
+        (routeObjs || []).map(routeObj => this.fetchRouteOverlay(routeObj, forceRefresh))
+    );
+
+    return results.filter(Boolean);
   }
 
-  async fetchRouteShape(routeId, directionId = 0) {
-    try {
-      return await this.fetchWithRetry(
-          this.buildUrl(`/route/${encodeURIComponent(routeId)}/shape`, {
-            direction_id: directionId,
-          })
-      );
-    } catch (error) {
-      console.error(`❌ Erro ao obter shape da rota ${routeId} dir ${directionId}:`, error);
-      return null;
-    }
-  }
-
-  async fetchRouteStops(routeId, directionId = 0) {
-    try {
-      return await this.fetchWithRetry(
-          this.buildUrl(`/route/${encodeURIComponent(routeId)}/stops`, {
-            direction_id: directionId,
-          })
-      );
-    } catch (error) {
-      console.error(`❌ Erro ao obter paragens da rota ${routeId} dir ${directionId}:`, error);
-      return null;
-    }
-  }
-
-  async fetchRoutesList() {
-    try {
-      const data = await this.fetchWithRetry(this.buildUrl('/routes/list'));
-      return this.normalizeRoutesResponse(data);
-    } catch (error) {
-      console.error('❌ Erro ao obter lista de rotas:', error);
-      return [];
-    }
-  }
-
-  async fetchJSON(filePath) {
-    try {
-      const response = await fetch(filePath);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      return await response.json();
-    } catch (error) {
-      console.error(`❌ Erro ao carregar ${filePath}:`, error);
-      return filePath.includes('calendar') ? {} : [];
-    }
-  }
-
-  async fetchCalendarData() {
-    return await this.fetchJSON('./resources/calendar.json');
+  clearCache() {
+    this.cache.clear();
   }
 }
 
-export const apiService = new ApiService();
+const routeService = new RouteService();
+
+export { routeService, RouteService };
+export default routeService;
