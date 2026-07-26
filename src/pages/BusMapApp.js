@@ -82,7 +82,7 @@ export class BusMapApp {
       
       // Aviso temporário — STCP
       AnnouncementBanner.show(
-        'Estamos a fazer alterações com o objetivo de te trazer mais informação e mais exata. Por essa razão poderás detetar falhas no acesso à informação. Pedimos desculpa pelo incomodo, seremos breves. Hora estimada de conclusão dos trabalhos: 22:00',
+        'Estamos a fazer alterações com o objetivo de te trazer mais informação e mais exata. Por essa razão poderás detetar falhas no acesso à informação. Pedimos desculpa pelo incomodo, seremos breves. Hora estimada de conclusão dos trabalhos: 00:30',
         { type: 'info', id: 'stcp-warning', dismissible: false }
       );
       
