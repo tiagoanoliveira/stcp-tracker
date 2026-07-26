@@ -139,36 +139,90 @@ async function fetchStcpOverlay(routeObj) {
 
 /**
  * Carrega overlay UNIR a partir dos ficheiros locais de shapes.
- * Por agora sem paragens.
  */
+// Pré-carregar unir-stops.json uma vez (no topo do ficheiro, fora das funções)
+let _unirStopsMap = null;
+async function _getUnirStopsMap() {
+    if (_unirStopsMap) return _unirStopsMap;
+    try {
+        const res = await fetch('./resources/stops/unir-stops.json');
+        if (!res.ok) { _unirStopsMap = new Map(); return _unirStopsMap; }
+        const arr = await res.json();
+        _unirStopsMap = new Map((arr || []).map(s => [String(s.stop_id), s]));
+    } catch {
+        _unirStopsMap = new Map();
+    }
+    return _unirStopsMap;
+}
+
 async function fetchUnirOverlay(routeObj) {
-    const routeId = getRouteNumber(routeObj);
+    const rawRouteId = getRouteNumber(routeObj);
+    // Extrair apenas o número da linha (ex: "rt:1001:0:1" → "1001", "1001" → "1001")
+    const routeId = String(rawRouteId).replace(/^rt:(\d+):.*$/, '$1');
     const direction = getRouteDirection(routeObj); // 0 ou 1
 
-    const res = await fetch(`./resources/unir-gtfs/shapes/${routeId}.json`);
-    if (!res.ok) {
-        return normalizeOverlay(routeObj);
-    }
-
-    const payload = await res.json();
-
-    // O ficheiro tem formato: { route_id, shapes: [{ shape_id, coordinates }] }
-    // shape_id: "rt:XXXX:0:1" → direção 0, "rt:XXXX:0:2" → direção 1
-    let coordinatesArray = [];
-    if (payload?.shapes && Array.isArray(payload.shapes)) {
-        // sufixo :1 = direção 0, sufixo :2 = direção 1
-        const targetSuffix = direction === 1 ? ':2' : ':1';
-        const shapeEntry = payload.shapes.find(s => s.shape_id?.endsWith(targetSuffix))
-            ?? payload.shapes[0]; // fallback à primeira
-        if (shapeEntry?.coordinates) {
-            coordinatesArray = shapeEntry.coordinates;
+    // ── 1. Carregar shape ──────────────────────────────────────────────────
+    let shapes = [];
+    try {
+        const res = await fetch(`./resources/unir-gtfs/shapes/${routeId}.json`);
+        if (res.ok) {
+            const payload = await res.json();
+            let coordinatesArray = [];
+            if (payload?.shapes && Array.isArray(payload.shapes)) {
+                // shape_id: "rt:XXXX:0:1" → dir 0 | "rt:XXXX:0:2" → dir 1
+                const targetSuffix = direction === 1 ? ':2' : ':1';
+                const shapeEntry = payload.shapes.find(s => s.shape_id?.endsWith(targetSuffix))
+                    ?? payload.shapes[0];
+                if (shapeEntry?.coordinates) {
+                    coordinatesArray = shapeEntry.coordinates;
+                }
+            }
+            shapes = normalizeUnirShapesPayload(coordinatesArray);
         }
+    } catch (e) {
+        console.warn('routeOverlayService: erro ao carregar shape UNIR', routeId, e);
     }
 
-    // normalizeUnirShapesPayload já sabe tratar um array de {lat, lng, sequence}
-    const shapes = normalizeUnirShapesPayload(coordinatesArray);
+    // ── 2. Carregar paragens ───────────────────────────────────────────────
+    // Ficheiro: stops/{routeId}_0_1.json (dir 0) ou stops/{routeId}_1_1.json (dir 1)
+    let stops = [];
+    try {
+        const correctDirection = direction + 1;
+        const stopFileName = `${routeId}_0_${correctDirection}`;
+        const stopsRes = await fetch(`./resources/unir-gtfs/stops/${stopFileName}.json`);
+        if (stopsRes.ok) {
+            const stopSeq = await stopsRes.json();
+            const stopsMap = await _getUnirStopsMap();
 
-    return normalizeOverlay(routeObj, { shapes, stops: [] });
+            stops = (stopSeq || [])
+                .map(entry => {
+                    const master = stopsMap.get(String(entry.id));
+                    if (!master) return null;
+                    return {
+                        stop_id:       String(entry.id),
+                        stopid:        String(entry.id),
+                        stop_code:     String(entry.id),
+                        stopcode:      String(entry.id),
+                        stop_name:     master.stop_name || String(entry.id),
+                        stopname:      master.stop_name || String(entry.id),
+                        latitude:      Number(master.stop_lat),
+                        longitude:     Number(master.stop_lon),
+                        stop_sequence: Number(entry.sequence),
+                        zone_id:       master.zone_id || null,
+                        operator:      'unir',
+                        source:        'unir',
+                    };
+                })
+                .filter(s => s && Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
+        } else if (direction === 0) {
+            // Fallback: tentar apenas a primeira variante com dir 0
+            console.warn(`[UNIR] Sem ficheiro de paragens para ${stopFileName}`);
+        }
+    } catch (e) {
+        console.warn('routeOverlayService: erro ao carregar paragens UNIR', routeId, direction, e);
+    }
+
+    return normalizeOverlay(routeObj, { shapes, stops });
 }
 
 /**
