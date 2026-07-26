@@ -504,17 +504,25 @@ export class BusMapApp {
       this.nextArrivals._renderArrivals();
     }
 
-    const enrichedRouteObjs = routeObjs.map(r => ({
-      ...r,
-      id: String(r.id ?? r.routeId ?? r.number),
-      routeId: String(r.id ?? r.routeId ?? r.number),
-      number: String(r.number ?? r.id ?? r.routeId),
-      color: r.color || '#187EC2',
-      text_color: r.text_color || r.textcolor || '#FFFFFF',
-      operator: r.operator ?? r.source ?? null,
-      source: r.source ?? r.operator ?? null,
-      direction: Number(r.direction ?? 0),
-    }));
+    const enrichedRouteObjs = routeObjs.map(r => {
+      const resolvedRouteId =
+          String(r.routeId || r.id || r.number || '').trim();
+
+      const resolvedNumber =
+          String(r.number || r.routeId || r.id || '').trim();
+
+      return {
+        ...r,
+        id: resolvedRouteId,
+        routeId: resolvedRouteId,
+        number: resolvedNumber,
+        color: r.color || '#187EC2',
+        text_color: r.text_color || r.textcolor || '#FFFFFF',
+        operator: r.operator ?? r.source ?? null,
+        source: r.source ?? r.operator ?? null,
+        direction: Number(r.direction ?? 0),
+      };
+    });
 
     const overlayData = await routeOverlayService.buildOverlays(enrichedRouteObjs);
     this.lineOverlayManager.setRoutes(overlayData);
@@ -559,11 +567,19 @@ export class BusMapApp {
             r => String(r.number) === String(routeNum)
         );
 
+        const resolvedRouteId = String(
+            routeObj?.routeId || routeObj?.id || routeObj?.number || routeNum || ''
+        ).trim();
+
+        const resolvedNumber = String(
+            routeObj?.number || routeObj?.routeId || routeObj?.id || routeNum || ''
+        ).trim();
+
         return {
           ...routeObj,
-          id: String(routeObj?.id ?? routeNum),
-          routeId: String(routeObj?.id ?? routeNum),
-          number: String(routeObj?.number ?? routeNum),
+          id: resolvedRouteId,
+          routeId: resolvedRouteId,
+          number: resolvedNumber,
           direction: resolvedDirMap.get(String(routeNum)) ?? 0,
           color: routeObj?.color || '#187EC2',
           text_color: routeObj?.text_color || routeObj?.textcolor || '#FFFFFF',
@@ -824,17 +840,25 @@ export class BusMapApp {
       this.busMarkerManager.filterByRoutes(activeRoutes, routeFilterState.dirMap);
 
       try {
-        const routeObjs = (routeFilterState.selectedRouteObjs || []).map(r => ({
-          ...r,
-          id: String(r.id ?? r.routeId ?? r.number),
-          routeId: String(r.id ?? r.routeId ?? r.number),
-          number: String(r.number ?? r.id ?? r.routeId),
-          direction: Number(r.direction ?? 0),
-          color: r.color || '#187EC2',
-          text_color: r.text_color || r.textcolor || '#FFFFFF',
-          operator: r.operator ?? r.source ?? null,
-          source: r.source ?? r.operator ?? null,
-        }));
+        const routeObjs = (routeFilterState.selectedRouteObjs || []).map(r => {
+          const resolvedRouteId =
+              String(r.routeId || r.id || r.number || '').trim();
+
+          const resolvedNumber =
+              String(r.number || r.routeId || r.id || '').trim();
+
+          return {
+            ...r,
+            id: resolvedRouteId,
+            routeId: resolvedRouteId,
+            number: resolvedNumber,
+            direction: Number(r.direction ?? 0),
+            color: r.color || '#187EC2',
+            text_color: r.text_color || r.textcolor || '#FFFFFF',
+            operator: r.operator ?? r.source ?? null,
+            source: r.source ?? r.operator ?? null,
+          };
+        });
 
         const overlayData = await routeOverlayService.buildOverlays(routeObjs);
         this.lineOverlayManager.setRoutes(overlayData);
