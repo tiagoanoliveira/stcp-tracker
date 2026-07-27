@@ -68,7 +68,7 @@ import { AnnouncementBanner }     from '../ui/components/AnnouncementBanner.js';
 import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
 import { wireFilterToggleButton } from '../ui/components/filterBarToggle.js';
 import routeOverlayService from '../services/routeOverlayService.js';
-import {getUnirLineColor} from "../../resources/busDesign/busColors";
+import {getUnirLineColor} from "../../resources/busDesign/busColors.js";
 
 // ─── Helpers de debug ──────────────────────────────────────────────────────────
 // Activar com: localStorage.setItem('BUS_DEBUG', '1') e recarregar.
