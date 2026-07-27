@@ -124,24 +124,28 @@ export class LineOverlayManager {
   }
 
   _buildStopPopup(stop, lineColor) {
-    const isUnir = stop.operator === 'unir' || stop.source === 'unir';
-    const actionHtml = isUnir
-        ? `<p style="margin-top:8px;font-size:11px;color:#555;line-height:1.4;max-width: 190px; text-align: center;">
-           Horários da linha UNIR serão apresentados em breve aqui. Por agora podes visualizar a posição em tempo real dos veículos no mapa.
-         </p>`
-        : `<button class="stop-popup-arrivals-btn" style="
-          margin-top:8px;width:100%;padding:6px;
-          background:${lineColor};color:#fff;border:none;border-radius:12px;
-          font-size:12px;font-weight:600;cursor:pointer;
-          display:flex;align-items:center;justify-content:center;gap:4px;">
-          Próximos autocarros
-        </button>`;
-
     return `
       <div class="popup-line-stop" style="font-family:inherit;min-width:150px;padding:2px 0">
         <strong style="color:${lineColor};font-size:13px">${normalizeDestinationText(stop.stop_name)}</strong><br>
         <small style="color:#777">${stop.stop_code || stop.stop_id}</small><br>
-        ${actionHtml}
+         <button class="stop-popup-arrivals-btn" style="
+          margin-top:8px;
+          width:100%;
+          padding:6px;
+          background:${lineColor};
+          color:#fff;
+          border:none;
+          border-radius:12px;
+          font-size:12px;
+          font-weight:600;
+          cursor:pointer;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          gap:4px;
+        ">
+          Próximos autocarros
+        </button>
       </div>`;
   }
 

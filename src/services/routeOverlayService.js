@@ -57,7 +57,7 @@ function normalizeUnirShapesPayload(payload) {
         const points = payload
             .map(p => {
                 const lat = Number(p?.shape_pt_lat ?? p?.lat);
-                const lon = Number(p?.shape_pt_lon ?? p?.lon ?? p?.lng); // ← adicionar ?? p?.lng
+                const lon = Number(p?.shape_pt_lon ?? p?.lon ?? p?.lng);
                 return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
             })
             .filter(Boolean);
