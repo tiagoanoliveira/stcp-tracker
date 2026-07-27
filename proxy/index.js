@@ -296,18 +296,11 @@ async function handleStcpLiveVehicles() {
 }
 
 async function handleUnirVehicles() {
-  try {
-    const raw = await proxyRawRequest('https://unir.live/api/vehicles', 'vehicles_unir');
-    if (!raw.ok) return errorResponse('Erro ao obter veículos UNIR', raw.status);
-    const data = await raw.json();
-    const vehicles = Array.isArray(data) ? data
-        : Array.isArray(data?.vehicles) ? data.vehicles
-            : [];
-    return jsonResponse({ success: true, vehicles }, 'vehicles_unir', 'public, max-age=5');
-  } catch (err) {
-    console.error('[WORKER] handleUnirVehicles:', err);
-    return jsonResponse({ success: true, vehicles: [] }, 'vehicles_unir', 'no-store');
-  }
+  const raw = await proxyRawRequest('https://unir.live/api/vehicles', 'vehicles_unir');
+  if (!raw.ok) return errorResponse('Erro ao obter veículos UNIR', raw.status);
+  const data = await raw.json();
+  const vehicles = Array.isArray(data) ? data : Array.isArray(data?.vehicles) ? data.vehicles : [];
+  return jsonResponse({ success: true, vehicles, source: 'unir' }, 'vehicles_unir', 'public, max-age=5');
 }
 
 async function handleNearbyStops(lat, lng, radius) {
