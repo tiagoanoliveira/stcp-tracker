@@ -201,7 +201,8 @@ class VehicleService {
       const direction = this.extractDirection(bus);
       const tripId    = this.extractTripId(bus);
 
-      if (!line || direction == null) return null;
+      const source = bus.source || 'stcp';
+      if (source !== 'unir' && (!line || direction == null)) return null;
 
 
       // Destino: usar o valor do tópico se disponível, senão resolver preguiçosamente
@@ -217,18 +218,23 @@ class VehicleService {
       // busNumber: do tópico MQTT se disponível, senão do campo id
       const busNumber = bus.busNumber || bus.id || 'N/A';
 
+      const safeLine      = line || (source === 'unir' ? (bus.line || bus.route || '') : '');
+      const safeDirection = direction != null ? direction : (source === 'unir' ? 0 : null);
+
+      if (source !== 'unir' && (!safeLine || safeDirection == null)) return null;
+
       return {
         id:          String(bus.id),
-        line,
-        displayLine: displayLine,
+        line:        safeLine,
+        displayLine,
         latitude:    bus.lat,
         longitude:   bus.lng,
         nextStop:    bus.nextStop || null,
         busNumber,
         destination,
-        direction,
+        direction:   safeDirection,
         tripId,
-        source:      bus.source || 'stcp',
+        source,
       };
     }
 

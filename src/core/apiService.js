@@ -172,8 +172,17 @@ class ApiService {
 
   async fetchUnirVehicles() {
     try {
-      const data = await this.fetchWithRetry(this.buildUrl('/vehicles/unir'), {}, this.retries, this.delayMs, 5000);
-      return this.normalizeVehiclesResponse(data);
+      const data = await this.fetchWithRetry(
+          this.buildUrl('/vehicles/unir'),
+          {},
+          this.retries,
+          this.delayMs,
+          5000
+      );
+
+      const rawVehicles = this.normalizeVehiclesResponse(data);
+      // Marcar explicitamente a origem UNIR
+      return rawVehicles.map(v => ({ ...v, source: 'unir' }));
     } catch (error) {
       console.warn('⚠️ Erro ao obter veículos UNIR:', error);
       return [];

@@ -223,35 +223,26 @@ class PlannedArrivalsService {
   async getNextArrivals(stopId, maxMinutes = 60, forceRefresh = false) {
     const cacheKey = `${stopId}:${maxMinutes}`;
 
-    if (!forceRefresh) {
-      const cached = _cache.get(cacheKey);
-      if (cached && (Date.now() - cached.ts) < CACHE_TTL) {
-        _log(`cache HIT stopId:${stopId} idade:${Date.now() - cached.ts}ms`);
-        return cached.data;
-      }
-    } else {
-      _log(`forceRefresh=true — ignorar cache para stopId:${stopId}`);
-    }
-
-    const stopCode = await _resolveStopCode(stopId);
-    _log(`getNextArrivals stopId:${stopId} stopCode:${stopCode} maxMinutes:${maxMinutes}`);
-
-    // ── UNIR: usar horários estáticos do proxy ────────────────────────────────
+    // Detectar logo se é UNIR
     const stopInfo = stopService.getStopById(stopId);
     const isUnir   = stopInfo?.operator === 'unir' || String(stopId).startsWith('prg:');
 
     if (isUnir) {
-      const cacheKey = `${stopId}:${maxMinutes}`;
       if (!forceRefresh) {
         const cached = _cache.get(cacheKey);
-        if (cached && (Date.now() - cached.ts) < CACHE_TTL) return cached.data;
+        if (cached && (Date.now() - cached.ts) < CACHE_TTL) {
+          _log(`cache HIT UNIR stopId:${stopId} idade:${Date.now() - cached.ts}ms`);
+          return cached.data;
+        }
+      } else {
+        _log(`forceRefresh=true — ignorar cache UNIR para stopId:${stopId}`);
       }
+
       try {
         const data = await apiService.fetchWithRetry(
             apiService.buildUrl(`/${encodeURIComponent(stopId)}/schedule`)
         );
         const now = new Date();
-        const nowMs = now.getTime();
         const result = (data?.passages || []).map(p => ({
           route_short_name:  (data.lines?.[0] || p.trip_id?.split(':')?.[1] || ''),
           trip_id:           p.trip_id,
@@ -268,6 +259,7 @@ class PlannedArrivalsService {
           directionId:       null,
           _source:           'unir-gtfs',
         }));
+
         if (result.length > 0) {
           _cache.set(cacheKey, { data: result, ts: Date.now() });
         }
@@ -277,6 +269,21 @@ class PlannedArrivalsService {
         return [];
       }
     }
+
+    // --- Daqui para baixo fica como estava: STCP/Metrobus (OTP + realtime) ---
+
+    if (!forceRefresh) {
+      const cached = _cache.get(cacheKey);
+      if (cached && (Date.now() - cached.ts) < CACHE_TTL) {
+        _log(`cache HIT stopId:${stopId} idade:${Date.now() - cached.ts}ms`);
+        return cached.data;
+      }
+    } else {
+      _log(`forceRefresh=true — ignorar cache para stopId:${stopId}`);
+    }
+
+    const stopCode = await _resolveStopCode(stopId);
+    _log(`getNextArrivals stopId:${stopId} stopCode:${stopCode} maxMinutes:${maxMinutes}`);
 
     const t0 = performance.now();
     const [otpResult, rtResult] = await Promise.allSettled([

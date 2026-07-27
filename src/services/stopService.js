@@ -38,14 +38,16 @@ class StopService {
 
       const normalized = stops.map(s => {
         const stop = {
-          stop_id:   s.code || s.id,
-          stop_code: s.code,
-          stop_name: s.name,
+          stop_id:   s.stop_id || s.stop_code || s.id,
+          stop_code: s.stop_code || s.stop_id || s.id,
+          stop_name: s.stop_name || s.name,
           latitude:  s.latitude,
           longitude: s.longitude,
           distance:  s.distance,
           zone_id:   s.zone_id,
-          routes:    s.routes || []
+          routes:    s.routes || [],
+          operator:  s.operator,
+          source:    s.source,
         };
         this.allStopsCache.set(stop.stop_id, stop);
         return stop;

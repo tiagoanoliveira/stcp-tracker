@@ -28,6 +28,7 @@ import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
 import { wireFilterToggleButton } from '../ui/components/filterBarToggle.js';
 import routeOverlayService from '../services/routeOverlayService.js';
 import {getSetting, SETTINGS_KEYS} from "../config/filterSettings.js";
+import {getUnirLineColor} from "../../resources/busDesign/busColors";
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -611,9 +612,34 @@ export class BusMapApp {
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.mapManager.map.closePopup();
 
-    const [stopInfo] = await Promise.allSettled([apiService.fetchStopInfo(stop.stop_id)]);
-    const routes = stopInfo.status === 'fulfilled' && stopInfo.value?.routes
-      ? stopInfo.value.routes : (stop.routes || []);
+    const [stopInfo, unirSchedule] = await Promise.allSettled([
+      apiService.fetchStopInfo(stop.stop_id),
+      apiService.fetchStopScheduleUnir(stop.stop_id), // pode falhar tranquilamente para STCP
+    ]);
+
+    let routes = stop.routes || [];
+
+    if (stopInfo.status === 'fulfilled' && stopInfo.value) {
+      routes = stopInfo.value.routes || routes;
+    }
+
+    const isUnirStop =
+        (stopInfo.status === 'fulfilled' && stopInfo.value?.operator === 'unir') ||
+        String(stop.stop_id).startsWith('prg:');
+
+    if (isUnirStop && unirSchedule.status === 'fulfilled' && unirSchedule.value?.lines) {
+      const lines = unirSchedule.value.lines || [];
+      routes = lines.map(lineNum => ({
+        id:         String(lineNum),
+        number:     String(lineNum),
+        name:       `Linha ${lineNum}`,
+        color:      getUnirLineColor?.(lineNum) || '#187EC2',
+        text_color: '#FFFFFF',
+        operator:   'unir',
+        source:     'unir',
+      }));
+    }
+
     this.nextArrivals.setRoutes(routes);
 
     // Sincronizar filtros da barra global com a paragem
