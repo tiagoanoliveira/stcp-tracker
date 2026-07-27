@@ -561,26 +561,32 @@ async function handleStopRealtime(stopId, url) {
   );
 }
 
-async function handleStopSchedule(stopId, url) {
+async function loadUnirStopTimesAsset(fileKey, baseUrl) {
+  const assetUrl = new URL(`/resources/unir-gtfs/stop_times/${fileKey}.json`, baseUrl);
+  const res = await fetch(assetUrl.toString(), {
+    headers: { 'Accept': 'application/json' },
+  });
+
+  if (!res.ok) {
+    throw new Error(`UNIR stop_times asset não encontrado: ${fileKey}.json`);
+  }
+
+  return await res.json();
+}
+
+async function handleStopSchedule(stopId, url, request) {
   const stop = getStop(stopId);
 
-  // ── UNIR ──────────────────────────────────────────────────────────────────
   if (stop && stop.operator === 'unir') {
-    // O stopCode UNIR tem formato "prg:aro:5" → ficheiro "aro_5.json"
-    // A convenção do ficheiro é: retirar o prefixo "prg:", substituir ":" por "_"
-    const rawCode = stop.stop_code || stop.stop_id; // ex: "prg:aro:5"
-    const fileKey = rawCode.replace(/^prg:/, '').replace(/:/g, '_'); // → "aro_5"
+    const rawCode = stop.stop_code || stop.stop_id;
+    const fileKey = rawCode.replace(/^prg:/, '').replace(/:/g, '_');
 
     try {
-      // Carregar ficheiro de stop_times dinamicamente
-      const mod = await import(
-          `../resources/unir-gtfs/stop_times/${fileKey}.json`,
-          { assert: { type: 'json' } }
-          );
-      const data = mod.default ?? mod;
+      const data = await loadUnirStopTimesAsset(fileKey, request.url);
+
       const now = new Date();
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
-      const windowEnd  = nowMinutes + 120; // próximos 120 minutos
+      const windowEnd = nowMinutes + 120;
 
       const passages = [];
       for (const [hour, trips] of Object.entries(data.passages_by_hour || {})) {
@@ -589,37 +595,36 @@ async function handleStopSchedule(stopId, url) {
           if (totalMin >= nowMinutes && totalMin <= windowEnd) {
             passages.push({
               hour,
-              minute:           trip.minute,
-              trip_id:          trip.trip_id,
-              destination:      trip.destination,
-              arrival_time:     trip.arrival_time,
-              departure_time:   trip.departure_time,
-              stop_sequence:    trip.stop_sequence,
+              minute: trip.minute,
+              trip_id: trip.trip_id,
+              destination: trip.destination,
+              arrival_time: trip.arrival_time,
+              departure_time: trip.departure_time,
+              stop_sequence: trip.stop_sequence,
             });
           }
         }
       }
 
       return jsonResponse({
-        success:  true,
-        stop_id:  String(stopId),
+        success: true,
+        stop_id: String(stopId),
         stop_name: stop.stop_name,
         stop_code: stop.stop_code,
         operator: 'unir',
-        source:   'unir',
-        lines:    data.lines || [],
+        source: 'unir',
+        lines: data.lines || [],
         passages,
       }, 'stop_schedule', 'public, max-age=60');
     } catch (err) {
-      // Ficheiro não existe ou vazio → devolver estrutura vazia
       return jsonResponse({
-        success:  true,
-        stop_id:  String(stopId),
+        success: true,
+        stop_id: String(stopId),
         stop_name: stop.stop_name,
         stop_code: stop.stop_code,
         operator: 'unir',
-        source:   'unir',
-        lines:    [],
+        source: 'unir',
+        lines: [],
         passages: [],
       }, 'stop_schedule', 'public, max-age=60');
     }
@@ -728,7 +733,7 @@ async function handleRequest(request) {
     if (endpoint === 'info') return await handleStopInfo(stopId);
     if (endpoint === 'routes') return await handleStopRoutes(stopId);
     if (endpoint === 'realtime') return await handleStopRealtime(stopId, url);
-    if (endpoint === 'schedule') return await handleStopSchedule(stopId, url);
+    if (endpoint === 'schedule') return await handleStopSchedule(stopId, url, request);
 
     return errorResponse(`Endpoint inválido: ${endpoint}. Use: realtime, routes, schedule, info ou services`, 400);
   } catch (error) {
