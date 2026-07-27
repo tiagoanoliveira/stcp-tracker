@@ -91,7 +91,17 @@ class VehicleService {
    *  - Formato FIWARE bruto (Broker):    annotation "stcp:route:"
    */
   extractLineNumber(bus) {
-    if (bus.routeId) return String(bus.routeId);
+    if (bus.routeId) {
+      const raw = String(bus.routeId);
+
+      // UNIR: "6017:0" -> "6017"
+      if ((bus.source || '').toLowerCase() === 'unir') {
+        return raw.split(':')[0];
+      }
+
+      return raw;
+    }
+
     return this.extractAnnotation(bus, 'stcp:route:');
   }
 
