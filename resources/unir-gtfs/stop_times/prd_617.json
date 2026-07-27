@@ -1,0 +1,70 @@
+{
+  "lines": [
+    "42412",
+    "4246",
+    "7323"
+  ],
+  "passages_by_hour": {
+    "06": [
+      {
+        "minute": "07",
+        "trip_id": "4246:8011:0:1:0600",
+        "arrival_time": "06:07:03",
+        "departure_time": "06:07:03",
+        "stop_sequence": 8
+      },
+      {
+        "minute": "40",
+        "trip_id": "4:7323:0:1:0635",
+        "arrival_time": "06:40:17",
+        "departure_time": "06:40:17",
+        "stop_sequence": 8
+      }
+    ],
+    "07": [
+      {
+        "minute": "35",
+        "trip_id": "4:7323:0:1:0730",
+        "arrival_time": "07:35:17",
+        "departure_time": "07:35:17",
+        "stop_sequence": 8
+      }
+    ],
+    "12": [
+      {
+        "minute": "45",
+        "trip_id": "4:7323:0:1:1240",
+        "arrival_time": "12:45:17",
+        "departure_time": "12:45:17",
+        "stop_sequence": 8
+      }
+    ],
+    "13": [
+      {
+        "minute": "52",
+        "trip_id": "4246:8011:0:1:1345",
+        "arrival_time": "13:52:03",
+        "departure_time": "13:52:03",
+        "stop_sequence": 8
+      }
+    ],
+    "17": [
+      {
+        "minute": "50",
+        "trip_id": "4:7323:0:1:1745",
+        "arrival_time": "17:50:17",
+        "departure_time": "17:50:17",
+        "stop_sequence": 8
+      }
+    ],
+    "18": [
+      {
+        "minute": "55",
+        "trip_id": "42412:7323:0:1:1850",
+        "arrival_time": "18:55:17",
+        "departure_time": "18:55:17",
+        "stop_sequence": 8
+      }
+    ]
+  }
+}

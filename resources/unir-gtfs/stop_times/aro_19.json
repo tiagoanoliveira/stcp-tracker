@@ -1,0 +1,35 @@
+{
+  "lines": [
+    "1006",
+    "2001"
+  ],
+  "passages_by_hour": {
+    "06": [
+      {
+        "minute": "45",
+        "trip_id": "A-U:1006:1:2:0640",
+        "arrival_time": "06:45:23",
+        "departure_time": "06:45:23",
+        "stop_sequence": 5
+      }
+    ],
+    "07": [
+      {
+        "minute": "23",
+        "trip_id": "SMF_E-U:2001:0:1:0710",
+        "arrival_time": "07:23:50",
+        "departure_time": "07:23:50",
+        "stop_sequence": 7
+      }
+    ],
+    "12": [
+      {
+        "minute": "45",
+        "trip_id": "E-U:1006:0:2:1240",
+        "arrival_time": "12:45:23",
+        "departure_time": "12:45:23",
+        "stop_sequence": 5
+      }
+    ]
+  }
+}

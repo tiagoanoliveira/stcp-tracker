@@ -1,0 +1,44 @@
+{
+  "lines": [
+    "2004",
+    "2023"
+  ],
+  "passages_by_hour": {
+    "07": [
+      {
+        "minute": "06",
+        "trip_id": "SMF_E-U:2004:0:1:0700",
+        "arrival_time": "07:06:10",
+        "departure_time": "07:06:10",
+        "stop_sequence": 7
+      }
+    ],
+    "12": [
+      {
+        "minute": "34",
+        "trip_id": "SMF_E-U:2004:1:1:1230",
+        "arrival_time": "12:34:35",
+        "departure_time": "12:34:35",
+        "stop_sequence": 7
+      }
+    ],
+    "13": [
+      {
+        "minute": "20",
+        "trip_id": "SMF_E-U:2023:0:2:1255",
+        "arrival_time": "13:20:18",
+        "departure_time": "13:20:18",
+        "stop_sequence": 30
+      }
+    ],
+    "18": [
+      {
+        "minute": "08",
+        "trip_id": "SMF_E-U:2023:0:2:1735",
+        "arrival_time": "18:08:00",
+        "departure_time": "18:08:00",
+        "stop_sequence": 30
+      }
+    ]
+  }
+}

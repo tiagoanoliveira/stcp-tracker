@@ -1,0 +1,60 @@
+{
+  "lines": [
+    "2002",
+    "2006"
+  ],
+  "passages_by_hour": {
+    "07": [
+      {
+        "minute": "32",
+        "trip_id": "A-U:2002:0:2:0705",
+        "arrival_time": "07:32:39",
+        "departure_time": "07:32:39",
+        "stop_sequence": 35
+      }
+    ],
+    "13": [
+      {
+        "minute": "13",
+        "trip_id": "SMF_E-U:2002:1:2:1250",
+        "arrival_time": "13:13:00",
+        "departure_time": "13:13:00",
+        "stop_sequence": 23
+      },
+      {
+        "minute": "40",
+        "trip_id": "SMF_E-U:2006:0:2:1340",
+        "arrival_time": "13:40:00",
+        "departure_time": "13:40:00",
+        "stop_sequence": 1
+      }
+    ],
+    "14": [
+      {
+        "minute": "34",
+        "trip_id": "SMF_FE-U:2002:0:2:1405",
+        "arrival_time": "14:34:29",
+        "departure_time": "14:34:29",
+        "stop_sequence": 35
+      }
+    ],
+    "16": [
+      {
+        "minute": "40",
+        "trip_id": "SMF_E-U:2006:0:2:1640",
+        "arrival_time": "16:40:00",
+        "departure_time": "16:40:00",
+        "stop_sequence": 1
+      }
+    ],
+    "18": [
+      {
+        "minute": "30",
+        "trip_id": "SMF_E-U:2006:0:2:1830",
+        "arrival_time": "18:30:00",
+        "departure_time": "18:30:00",
+        "stop_sequence": 1
+      }
+    ]
+  }
+}

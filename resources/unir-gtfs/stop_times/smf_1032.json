@@ -1,0 +1,88 @@
+{
+  "lines": [
+    "2003",
+    "2045"
+  ],
+  "passages_by_hour": {
+    "09": [
+      {
+        "minute": "47",
+        "trip_id": "A-U:2003:0:1:0930",
+        "arrival_time": "09:47:45",
+        "departure_time": "09:47:45",
+        "stop_sequence": 19
+      }
+    ],
+    "13": [
+      {
+        "minute": "18",
+        "trip_id": "A-DFXPN:2003:1:1:1300",
+        "arrival_time": "13:18:36",
+        "departure_time": "13:18:36",
+        "stop_sequence": 19
+      },
+      {
+        "minute": "18",
+        "trip_id": "A-S:2003:1:1:1300",
+        "arrival_time": "13:18:36",
+        "departure_time": "13:18:36",
+        "stop_sequence": 19
+      },
+      {
+        "minute": "48",
+        "trip_id": "SMF_E-U:2045:0:2:1330",
+        "arrival_time": "13:48:00",
+        "departure_time": "13:48:00",
+        "stop_sequence": 14
+      },
+      {
+        "minute": "48",
+        "trip_id": "A-U:2003:0:1:1330",
+        "arrival_time": "13:48:45",
+        "departure_time": "13:48:45",
+        "stop_sequence": 19
+      }
+    ],
+    "17": [
+      {
+        "minute": "08",
+        "trip_id": "SMF_E-U:2045:0:2:1650",
+        "arrival_time": "17:08:00",
+        "departure_time": "17:08:00",
+        "stop_sequence": 14
+      }
+    ],
+    "18": [
+      {
+        "minute": "18",
+        "trip_id": "A-DFXPN:2003:1:1:1800",
+        "arrival_time": "18:18:36",
+        "departure_time": "18:18:36",
+        "stop_sequence": 19
+      },
+      {
+        "minute": "18",
+        "trip_id": "A-S:2003:1:1:1800",
+        "arrival_time": "18:18:36",
+        "departure_time": "18:18:36",
+        "stop_sequence": 19
+      },
+      {
+        "minute": "50",
+        "trip_id": "A-U:2003:0:1:1830",
+        "arrival_time": "18:50:45",
+        "departure_time": "18:50:45",
+        "stop_sequence": 19
+      }
+    ],
+    "19": [
+      {
+        "minute": "08",
+        "trip_id": "SMF_E-U:2045:0:2:1850",
+        "arrival_time": "19:08:00",
+        "departure_time": "19:08:00",
+        "stop_sequence": 14
+      }
+    ]
+  }
+}

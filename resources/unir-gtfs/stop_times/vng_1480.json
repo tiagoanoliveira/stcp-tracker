@@ -1,0 +1,33 @@
+{
+  "lines": [
+    "2002",
+    "9035"
+  ],
+  "passages_by_hour": {
+    "07": [
+      {
+        "minute": "05",
+        "trip_id": "A-U:2002:0:2:0705",
+        "arrival_time": "07:05:00",
+        "departure_time": "07:05:00",
+        "stop_sequence": 1
+      },
+      {
+        "minute": "40",
+        "trip_id": "AU:9035:1:1:0740",
+        "arrival_time": "07:40:00",
+        "departure_time": "07:40:00",
+        "stop_sequence": 1
+      }
+    ],
+    "14": [
+      {
+        "minute": "05",
+        "trip_id": "SMF_FE-U:2002:0:2:1405",
+        "arrival_time": "14:05:00",
+        "departure_time": "14:05:00",
+        "stop_sequence": 1
+      }
+    ]
+  }
+}

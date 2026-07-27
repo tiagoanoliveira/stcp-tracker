@@ -1,0 +1,573 @@
+{
+  "lines": [
+    "3005",
+    "3006",
+    "3302"
+  ],
+  "passages_by_hour": {
+    "06": [
+      {
+        "minute": "12",
+        "trip_id": "AU:3005:0:1:0530",
+        "arrival_time": "06:12:17",
+        "departure_time": "06:12:17",
+        "stop_sequence": 33
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:0630",
+        "arrival_time": "06:45:59",
+        "departure_time": "06:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "07": [
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:0700",
+        "arrival_time": "07:15:59",
+        "departure_time": "07:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "28",
+        "trip_id": "AU:3006:0:1:0630",
+        "arrival_time": "07:28:17",
+        "departure_time": "07:28:17",
+        "stop_sequence": 50
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:0730",
+        "arrival_time": "07:45:59",
+        "departure_time": "07:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "08": [
+      {
+        "minute": "08",
+        "trip_id": "AU:3006:1:1:0720",
+        "arrival_time": "08:08:17",
+        "departure_time": "08:08:17",
+        "stop_sequence": 41
+      },
+      {
+        "minute": "12",
+        "trip_id": "AU:3005:0:1:0730",
+        "arrival_time": "08:12:17",
+        "departure_time": "08:12:17",
+        "stop_sequence": 33
+      },
+      {
+        "minute": "15",
+        "trip_id": "AD:3302:0:1:0800",
+        "arrival_time": "08:15:59",
+        "departure_time": "08:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AS:3302:0:1:0800",
+        "arrival_time": "08:15:59",
+        "departure_time": "08:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:0800",
+        "arrival_time": "08:15:59",
+        "departure_time": "08:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "38",
+        "trip_id": "AD:3006:2:1:0800",
+        "arrival_time": "08:38:17",
+        "departure_time": "08:38:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "38",
+        "trip_id": "AS:3006:2:1:0800",
+        "arrival_time": "08:38:17",
+        "departure_time": "08:38:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "42",
+        "trip_id": "AS:3005:0:1:0800",
+        "arrival_time": "08:42:17",
+        "departure_time": "08:42:17",
+        "stop_sequence": 33
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:0830",
+        "arrival_time": "08:45:59",
+        "departure_time": "08:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "09": [
+      {
+        "minute": "15",
+        "trip_id": "AS:3302:0:1:0900",
+        "arrival_time": "09:15:59",
+        "departure_time": "09:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:0900",
+        "arrival_time": "09:15:59",
+        "departure_time": "09:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "23",
+        "trip_id": "AU:3006:2:1:0845",
+        "arrival_time": "09:23:17",
+        "departure_time": "09:23:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:0930",
+        "arrival_time": "09:45:59",
+        "departure_time": "09:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "10": [
+      {
+        "minute": "15",
+        "trip_id": "AD:3302:0:1:1000",
+        "arrival_time": "10:15:59",
+        "departure_time": "10:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AS:3302:0:1:1000",
+        "arrival_time": "10:15:59",
+        "departure_time": "10:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:1000",
+        "arrival_time": "10:15:59",
+        "departure_time": "10:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "23",
+        "trip_id": "AU:3006:2:1:0945",
+        "arrival_time": "10:23:17",
+        "departure_time": "10:23:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "38",
+        "trip_id": "AS:3006:2:1:1000",
+        "arrival_time": "10:38:17",
+        "departure_time": "10:38:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "42",
+        "trip_id": "AU:3005:0:1:1000",
+        "arrival_time": "10:42:17",
+        "departure_time": "10:42:17",
+        "stop_sequence": 33
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:1030",
+        "arrival_time": "10:45:59",
+        "departure_time": "10:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "11": [
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:1100",
+        "arrival_time": "11:15:59",
+        "departure_time": "11:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "23",
+        "trip_id": "AU:3006:2:1:1045",
+        "arrival_time": "11:23:17",
+        "departure_time": "11:23:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:1130",
+        "arrival_time": "11:45:59",
+        "departure_time": "11:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "12": [
+      {
+        "minute": "15",
+        "trip_id": "AS:3302:0:1:1200",
+        "arrival_time": "12:15:59",
+        "departure_time": "12:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:1200",
+        "arrival_time": "12:15:59",
+        "departure_time": "12:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "42",
+        "trip_id": "AS:3005:0:1:1200",
+        "arrival_time": "12:42:17",
+        "departure_time": "12:42:17",
+        "stop_sequence": 33
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:1230",
+        "arrival_time": "12:45:59",
+        "departure_time": "12:45:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "53",
+        "trip_id": "AU:3006:1:1:1205",
+        "arrival_time": "12:53:17",
+        "departure_time": "12:53:17",
+        "stop_sequence": 41
+      }
+    ],
+    "13": [
+      {
+        "minute": "02",
+        "trip_id": "AU:3005:0:1:1220",
+        "arrival_time": "13:02:17",
+        "departure_time": "13:02:17",
+        "stop_sequence": 33
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:1300",
+        "arrival_time": "13:15:59",
+        "departure_time": "13:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "23",
+        "trip_id": "AU:3006:2:1:1245",
+        "arrival_time": "13:23:17",
+        "departure_time": "13:23:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:1330",
+        "arrival_time": "13:45:59",
+        "departure_time": "13:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "14": [
+      {
+        "minute": "15",
+        "trip_id": "AS:3302:0:1:1400",
+        "arrival_time": "14:15:59",
+        "departure_time": "14:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:1400",
+        "arrival_time": "14:15:59",
+        "departure_time": "14:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "38",
+        "trip_id": "AD:3006:2:1:1400",
+        "arrival_time": "14:38:17",
+        "departure_time": "14:38:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "38",
+        "trip_id": "AS:3006:2:1:1400",
+        "arrival_time": "14:38:17",
+        "departure_time": "14:38:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:1430",
+        "arrival_time": "14:45:59",
+        "departure_time": "14:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "15": [
+      {
+        "minute": "02",
+        "trip_id": "AU:3005:0:1:1420",
+        "arrival_time": "15:02:17",
+        "departure_time": "15:02:17",
+        "stop_sequence": 33
+      },
+      {
+        "minute": "15",
+        "trip_id": "AD:3302:0:1:1500",
+        "arrival_time": "15:15:59",
+        "departure_time": "15:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:1500",
+        "arrival_time": "15:15:59",
+        "departure_time": "15:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "18",
+        "trip_id": "AU:3006:1:1:1430",
+        "arrival_time": "15:18:17",
+        "departure_time": "15:18:17",
+        "stop_sequence": 41
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:1530",
+        "arrival_time": "15:45:59",
+        "departure_time": "15:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "16": [
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:1600",
+        "arrival_time": "16:15:59",
+        "departure_time": "16:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "23",
+        "trip_id": "AU:3006:2:1:1545",
+        "arrival_time": "16:23:17",
+        "departure_time": "16:23:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:1630",
+        "arrival_time": "16:45:59",
+        "departure_time": "16:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "17": [
+      {
+        "minute": "02",
+        "trip_id": "AU:3005:0:1:1620",
+        "arrival_time": "17:02:17",
+        "departure_time": "17:02:17",
+        "stop_sequence": 33
+      },
+      {
+        "minute": "15",
+        "trip_id": "AS:3302:0:1:1700",
+        "arrival_time": "17:15:59",
+        "departure_time": "17:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:1700",
+        "arrival_time": "17:15:59",
+        "departure_time": "17:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "23",
+        "trip_id": "AU:3006:2:1:1645",
+        "arrival_time": "17:23:17",
+        "departure_time": "17:23:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "38",
+        "trip_id": "AS:3006:2:1:1700",
+        "arrival_time": "17:38:17",
+        "departure_time": "17:38:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:1730",
+        "arrival_time": "17:45:59",
+        "departure_time": "17:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "18": [
+      {
+        "minute": "15",
+        "trip_id": "AS:3302:0:1:1800",
+        "arrival_time": "18:15:59",
+        "departure_time": "18:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:1800",
+        "arrival_time": "18:15:59",
+        "departure_time": "18:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "23",
+        "trip_id": "AU:3006:2:1:1745",
+        "arrival_time": "18:23:17",
+        "departure_time": "18:23:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:1830",
+        "arrival_time": "18:45:59",
+        "departure_time": "18:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "19": [
+      {
+        "minute": "02",
+        "trip_id": "AU:3005:0:1:1820",
+        "arrival_time": "19:02:17",
+        "departure_time": "19:02:17",
+        "stop_sequence": 33
+      },
+      {
+        "minute": "15",
+        "trip_id": "AD:3302:0:1:1900",
+        "arrival_time": "19:15:59",
+        "departure_time": "19:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AS:3302:0:1:1900",
+        "arrival_time": "19:15:59",
+        "departure_time": "19:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:1900",
+        "arrival_time": "19:15:59",
+        "departure_time": "19:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "23",
+        "trip_id": "AU:3006:2:1:1845",
+        "arrival_time": "19:23:17",
+        "departure_time": "19:23:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "38",
+        "trip_id": "AD:3006:2:1:1900",
+        "arrival_time": "19:38:17",
+        "departure_time": "19:38:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "38",
+        "trip_id": "AS:3006:2:1:1900",
+        "arrival_time": "19:38:17",
+        "departure_time": "19:38:17",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:1930",
+        "arrival_time": "19:45:59",
+        "departure_time": "19:45:59",
+        "stop_sequence": 9
+      }
+    ],
+    "20": [
+      {
+        "minute": "15",
+        "trip_id": "AS:3302:0:1:2000",
+        "arrival_time": "20:15:59",
+        "departure_time": "20:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:2000",
+        "arrival_time": "20:15:59",
+        "departure_time": "20:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "42",
+        "trip_id": "AS:3005:0:1:2000",
+        "arrival_time": "20:42:17",
+        "departure_time": "20:42:17",
+        "stop_sequence": 33
+      },
+      {
+        "minute": "45",
+        "trip_id": "AU:3302:0:1:2030",
+        "arrival_time": "20:45:59",
+        "departure_time": "20:45:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "58",
+        "trip_id": "AU:3006:2:1:2020",
+        "arrival_time": "20:58:17",
+        "departure_time": "20:58:17",
+        "stop_sequence": 32
+      }
+    ],
+    "21": [
+      {
+        "minute": "02",
+        "trip_id": "AU:3005:0:1:2020",
+        "arrival_time": "21:02:17",
+        "departure_time": "21:02:17",
+        "stop_sequence": 33
+      },
+      {
+        "minute": "15",
+        "trip_id": "AS:3302:0:1:2100",
+        "arrival_time": "21:15:59",
+        "departure_time": "21:15:59",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "15",
+        "trip_id": "AU:3302:0:1:2100",
+        "arrival_time": "21:15:59",
+        "departure_time": "21:15:59",
+        "stop_sequence": 9
+      }
+    ]
+  }
+}

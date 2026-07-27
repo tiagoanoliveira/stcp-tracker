@@ -1,0 +1,93 @@
+{
+  "lines": [
+    "2010",
+    "2044",
+    "2048"
+  ],
+  "passages_by_hour": {
+    "07": [
+      {
+        "minute": "38",
+        "trip_id": "SMF_E-U:2048:0:1:0700",
+        "arrival_time": "07:38:54",
+        "departure_time": "07:38:54",
+        "stop_sequence": 34
+      }
+    ],
+    "09": [
+      {
+        "minute": "08",
+        "trip_id": "SMF_FE-U:2010:0:1:0900",
+        "arrival_time": "09:08:20",
+        "departure_time": "09:08:20",
+        "stop_sequence": 10
+      }
+    ],
+    "10": [
+      {
+        "minute": "38",
+        "trip_id": "A-U:2010:0:1:1030",
+        "arrival_time": "10:38:20",
+        "departure_time": "10:38:20",
+        "stop_sequence": 10
+      }
+    ],
+    "13": [
+      {
+        "minute": "08",
+        "trip_id": "SMF_E-U:2048:0:1:1230",
+        "arrival_time": "13:08:54",
+        "departure_time": "13:08:54",
+        "stop_sequence": 34
+      },
+      {
+        "minute": "52",
+        "trip_id": "SMF_E-U:2044:v1:2:1330",
+        "arrival_time": "13:52:45",
+        "departure_time": "13:52:45",
+        "stop_sequence": 28
+      },
+      {
+        "minute": "58",
+        "trip_id": "SMF_FE-U:2010:0:1:1350",
+        "arrival_time": "13:58:20",
+        "departure_time": "13:58:20",
+        "stop_sequence": 10
+      }
+    ],
+    "14": [
+      {
+        "minute": "59",
+        "trip_id": "SMF_E-U:2048:0:1:1430",
+        "arrival_time": "14:59:00",
+        "departure_time": "14:59:00",
+        "stop_sequence": 34
+      }
+    ],
+    "17": [
+      {
+        "minute": "38",
+        "trip_id": "SMF_E-U:2010:0:1:1730",
+        "arrival_time": "17:38:20",
+        "departure_time": "17:38:20",
+        "stop_sequence": 10
+      },
+      {
+        "minute": "53",
+        "trip_id": "SMF_E-U:2044:0:2:1730",
+        "arrival_time": "17:53:25",
+        "departure_time": "17:53:25",
+        "stop_sequence": 25
+      }
+    ],
+    "18": [
+      {
+        "minute": "33",
+        "trip_id": "SMF_E-U:2010:0:1:1825",
+        "arrival_time": "18:33:20",
+        "departure_time": "18:33:20",
+        "stop_sequence": 10
+      }
+    ]
+  }
+}

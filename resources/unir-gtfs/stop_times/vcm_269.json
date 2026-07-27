@@ -1,0 +1,129 @@
+{
+  "lines": [
+    "1209",
+    "1215",
+    "1601",
+    "1603",
+    "1604",
+    "1606"
+  ],
+  "passages_by_hour": {
+    "07": [
+      {
+        "minute": "01",
+        "trip_id": "VLC_A-U:1601:0:2:0700",
+        "arrival_time": "07:01:50",
+        "departure_time": "07:01:50",
+        "stop_sequence": 2
+      },
+      {
+        "minute": "47",
+        "trip_id": "E-U:1215:v1:2:0715",
+        "arrival_time": "07:47:55",
+        "departure_time": "07:47:55",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "57",
+        "trip_id": "E-U:1606:0:1:0730",
+        "arrival_time": "07:57:45",
+        "departure_time": "07:57:45",
+        "stop_sequence": 29
+      }
+    ],
+    "08": [
+      {
+        "minute": "16",
+        "trip_id": "A-U:1604:0:1:0815",
+        "arrival_time": "08:16:30",
+        "departure_time": "08:16:30",
+        "stop_sequence": 2
+      },
+      {
+        "minute": "35",
+        "trip_id": "FE-U:1606:0:1:0810",
+        "arrival_time": "08:35:45",
+        "departure_time": "08:35:45",
+        "stop_sequence": 29
+      }
+    ],
+    "11": [
+      {
+        "minute": "01",
+        "trip_id": "VLC_E-U:1603:0:2:1100",
+        "arrival_time": "11:01:00",
+        "departure_time": "11:01:00",
+        "stop_sequence": 2
+      },
+      {
+        "minute": "01",
+        "trip_id": "VLC_A-U:1601:0:2:1100",
+        "arrival_time": "11:01:50",
+        "departure_time": "11:01:50",
+        "stop_sequence": 2
+      }
+    ],
+    "13": [
+      {
+        "minute": "46",
+        "trip_id": "A-U:1604:0:1:1345",
+        "arrival_time": "13:46:30",
+        "departure_time": "13:46:30",
+        "stop_sequence": 2
+      },
+      {
+        "minute": "46",
+        "trip_id": "VLC_E-U:1601:0:2:1345",
+        "arrival_time": "13:46:50",
+        "departure_time": "13:46:50",
+        "stop_sequence": 2
+      }
+    ],
+    "17": [
+      {
+        "minute": "02",
+        "trip_id": "A-U:1209:v1:1:1700",
+        "arrival_time": "17:02:00",
+        "departure_time": "17:02:00",
+        "stop_sequence": 2
+      },
+      {
+        "minute": "46",
+        "trip_id": "VLC_A-U:1603:0:2:1745",
+        "arrival_time": "17:46:00",
+        "departure_time": "17:46:00",
+        "stop_sequence": 2
+      },
+      {
+        "minute": "46",
+        "trip_id": "E-U:1604:0:1:1745",
+        "arrival_time": "17:46:30",
+        "departure_time": "17:46:30",
+        "stop_sequence": 2
+      },
+      {
+        "minute": "46",
+        "trip_id": "VLC_A-U:1601:0:2:1745",
+        "arrival_time": "17:46:50",
+        "departure_time": "17:46:50",
+        "stop_sequence": 2
+      },
+      {
+        "minute": "55",
+        "trip_id": "A-U:1606:0:2:1745",
+        "arrival_time": "17:55:47",
+        "departure_time": "17:55:47",
+        "stop_sequence": 14
+      }
+    ],
+    "18": [
+      {
+        "minute": "46",
+        "trip_id": "FE-U:1604:0:1:1845",
+        "arrival_time": "18:46:30",
+        "departure_time": "18:46:30",
+        "stop_sequence": 2
+      }
+    ]
+  }
+}

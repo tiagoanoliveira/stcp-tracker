@@ -1,0 +1,56 @@
+{
+  "lines": [
+    "1602",
+    "1603"
+  ],
+  "passages_by_hour": {
+    "11": [
+      {
+        "minute": "15",
+        "trip_id": "VLC_A-U:1602:0:2:1100",
+        "arrival_time": "11:15:08",
+        "departure_time": "11:15:08",
+        "stop_sequence": 15
+      },
+      {
+        "minute": "22",
+        "trip_id": "VLC_E-U:1603:0:2:1100",
+        "arrival_time": "11:22:46",
+        "departure_time": "11:22:46",
+        "stop_sequence": 23
+      }
+    ],
+    "14": [
+      {
+        "minute": "02",
+        "trip_id": "VLC_E-U:1602:0:2:1345",
+        "arrival_time": "14:02:08",
+        "departure_time": "14:02:08",
+        "stop_sequence": 15
+      },
+      {
+        "minute": "23",
+        "trip_id": "VLC_A-U:1603:v1:2:1345",
+        "arrival_time": "14:23:05",
+        "departure_time": "14:23:05",
+        "stop_sequence": 39
+      }
+    ],
+    "18": [
+      {
+        "minute": "02",
+        "trip_id": "VLC_A-U:1602:0:2:1745",
+        "arrival_time": "18:02:08",
+        "departure_time": "18:02:08",
+        "stop_sequence": 15
+      },
+      {
+        "minute": "10",
+        "trip_id": "VLC_A-U:1603:0:2:1745",
+        "arrival_time": "18:10:46",
+        "departure_time": "18:10:46",
+        "stop_sequence": 23
+      }
+    ]
+  }
+}

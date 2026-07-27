@@ -126,7 +126,7 @@ export class LineOverlayManager {
   _buildStopPopup(stop, lineColor) {
     const isUnir = stop.operator === 'unir' || stop.source === 'unir';
     const actionHtml = isUnir
-        ? `<p style="margin-top:8px;font-size:11px;color:#555;line-height:1.4;">
+        ? `<p style="margin-top:8px;font-size:11px;color:#555;line-height:1.4;max-width: 190px; text-align: center;">
            Horários da linha UNIR serão apresentados em breve aqui. Por agora podes visualizar a posição em tempo real dos veículos no mapa.
          </p>`
         : `<button class="stop-popup-arrivals-btn" style="

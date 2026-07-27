@@ -1,0 +1,102 @@
+{
+  "lines": [
+    "3534",
+    "6007",
+    "6009",
+    "6010"
+  ],
+  "passages_by_hour": {
+    "07": [
+      {
+        "minute": "54",
+        "trip_id": "AU:3534:0:1:0655",
+        "arrival_time": "07:54:00",
+        "departure_time": "07:54:00",
+        "stop_sequence": 62
+      }
+    ],
+    "08": [
+      {
+        "minute": "06",
+        "trip_id": "A-U:6009:v1:1:0715",
+        "arrival_time": "08:06:30",
+        "departure_time": "08:06:30",
+        "stop_sequence": 54
+      },
+      {
+        "minute": "08",
+        "trip_id": "A-U:6010:v1:1:0730",
+        "arrival_time": "08:08:30",
+        "departure_time": "08:08:30",
+        "stop_sequence": 44
+      },
+      {
+        "minute": "14",
+        "trip_id": "A-U:6007:v1:2:0735",
+        "arrival_time": "08:14:30",
+        "departure_time": "08:14:30",
+        "stop_sequence": 39
+      }
+    ],
+    "13": [
+      {
+        "minute": "11",
+        "trip_id": "A-U:6009:v1:1:1220",
+        "arrival_time": "13:11:30",
+        "departure_time": "13:11:30",
+        "stop_sequence": 54
+      },
+      {
+        "minute": "18",
+        "trip_id": "A-U:6010:v1:1:1240",
+        "arrival_time": "13:18:30",
+        "departure_time": "13:18:30",
+        "stop_sequence": 44
+      },
+      {
+        "minute": "44",
+        "trip_id": "A-U:6009:v1:2:1330",
+        "arrival_time": "13:44:30",
+        "departure_time": "13:44:30",
+        "stop_sequence": 13
+      },
+      {
+        "minute": "51",
+        "trip_id": "A-U:6010:v3:2:1335",
+        "arrival_time": "13:51:00",
+        "departure_time": "13:51:00",
+        "stop_sequence": 17
+      },
+      {
+        "minute": "56",
+        "trip_id": "AU:3534:0:2:1340",
+        "arrival_time": "13:56:00",
+        "departure_time": "13:56:00",
+        "stop_sequence": 15
+      }
+    ],
+    "17": [
+      {
+        "minute": "04",
+        "trip_id": "A-U:6009:v1:2:1650",
+        "arrival_time": "17:04:30",
+        "departure_time": "17:04:30",
+        "stop_sequence": 13
+      },
+      {
+        "minute": "06",
+        "trip_id": "A-U:6010:v3:2:1650",
+        "arrival_time": "17:06:00",
+        "departure_time": "17:06:00",
+        "stop_sequence": 17
+      },
+      {
+        "minute": "58",
+        "trip_id": "AU:3534:1:2:1745",
+        "arrival_time": "17:58:00",
+        "departure_time": "17:58:00",
+        "stop_sequence": 15
+      }
+    ]
+  }
+}

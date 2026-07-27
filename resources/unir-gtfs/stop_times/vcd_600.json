@@ -1,0 +1,76 @@
+{
+  "lines": [
+    "3512",
+    "3523"
+  ],
+  "passages_by_hour": {
+    "07": [
+      {
+        "minute": "45",
+        "trip_id": "AU:3512:0:2:0745",
+        "arrival_time": "07:45:00",
+        "departure_time": "07:45:00",
+        "stop_sequence": 1
+      }
+    ],
+    "12": [
+      {
+        "minute": "30",
+        "trip_id": "E1:3512:0:2:1230",
+        "arrival_time": "12:30:00",
+        "departure_time": "12:30:00",
+        "stop_sequence": 1
+      }
+    ],
+    "13": [
+      {
+        "minute": "39",
+        "trip_id": "E1:3523:0:1:1310",
+        "arrival_time": "13:39:00",
+        "departure_time": "13:39:00",
+        "stop_sequence": 32
+      }
+    ],
+    "16": [
+      {
+        "minute": "29",
+        "trip_id": "E1:3523:0:1:1600",
+        "arrival_time": "16:29:00",
+        "departure_time": "16:29:00",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "40",
+        "trip_id": "E1:3512:0:2:1640",
+        "arrival_time": "16:40:00",
+        "departure_time": "16:40:00",
+        "stop_sequence": 1
+      }
+    ],
+    "17": [
+      {
+        "minute": "30",
+        "trip_id": "E1:3512:0:2:1730",
+        "arrival_time": "17:30:00",
+        "departure_time": "17:30:00",
+        "stop_sequence": 1
+      }
+    ],
+    "18": [
+      {
+        "minute": "29",
+        "trip_id": "E1:3523:0:1:1800",
+        "arrival_time": "18:29:00",
+        "departure_time": "18:29:00",
+        "stop_sequence": 32
+      },
+      {
+        "minute": "30",
+        "trip_id": "AU:3512:0:2:1830",
+        "arrival_time": "18:30:00",
+        "departure_time": "18:30:00",
+        "stop_sequence": 1
+      }
+    ]
+  }
+}

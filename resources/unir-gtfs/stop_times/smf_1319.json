@@ -1,0 +1,33 @@
+{
+  "lines": [
+    "2001",
+    "2018"
+  ],
+  "passages_by_hour": {
+    "08": [
+      {
+        "minute": "19",
+        "trip_id": "SMF_E-U:2001:0:1:0710",
+        "arrival_time": "08:19:30",
+        "departure_time": "08:19:30",
+        "stop_sequence": 36
+      },
+      {
+        "minute": "19",
+        "trip_id": "SMF_E-U:2018:0:1:0730",
+        "arrival_time": "08:19:55",
+        "departure_time": "08:19:55",
+        "stop_sequence": 38
+      }
+    ],
+    "15": [
+      {
+        "minute": "25",
+        "trip_id": "SMF_E-U:2018:0:1:1440",
+        "arrival_time": "15:25:00",
+        "departure_time": "15:25:00",
+        "stop_sequence": 38
+      }
+    ]
+  }
+}

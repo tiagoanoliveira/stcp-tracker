@@ -1,0 +1,75 @@
+{
+  "lines": [
+    "15246",
+    "2013",
+    "4246"
+  ],
+  "passages_by_hour": {
+    "07": [
+      {
+        "minute": "05",
+        "trip_id": "A-U:2013:0:1:0630",
+        "arrival_time": "07:05:28",
+        "departure_time": "07:05:28",
+        "stop_sequence": 31
+      },
+      {
+        "minute": "35",
+        "trip_id": "4246:8002:0:2:0725",
+        "arrival_time": "07:35:11",
+        "departure_time": "07:35:11",
+        "stop_sequence": 5
+      },
+      {
+        "minute": "35",
+        "trip_id": "A-S:2013:0:1:0700",
+        "arrival_time": "07:35:28",
+        "departure_time": "07:35:28",
+        "stop_sequence": 31
+      }
+    ],
+    "08": [
+      {
+        "minute": "25",
+        "trip_id": "A-DFXPN:2013:0:1:0750",
+        "arrival_time": "08:25:28",
+        "departure_time": "08:25:28",
+        "stop_sequence": 31
+      }
+    ],
+    "13": [
+      {
+        "minute": "05",
+        "trip_id": "SMF_E-U:2013:0:1:1230",
+        "arrival_time": "13:05:28",
+        "departure_time": "13:05:28",
+        "stop_sequence": 31
+      },
+      {
+        "minute": "25",
+        "trip_id": "15246:8002:0:2:1315",
+        "arrival_time": "13:25:11",
+        "departure_time": "13:25:11",
+        "stop_sequence": 5
+      }
+    ],
+    "15": [
+      {
+        "minute": "15",
+        "trip_id": "SMF_E-U:2013:0:1:1440",
+        "arrival_time": "15:15:28",
+        "departure_time": "15:15:28",
+        "stop_sequence": 31
+      }
+    ],
+    "16": [
+      {
+        "minute": "35",
+        "trip_id": "SMF_FE-U:2013:0:1:1600",
+        "arrival_time": "16:35:28",
+        "departure_time": "16:35:28",
+        "stop_sequence": 31
+      }
+    ]
+  }
+}

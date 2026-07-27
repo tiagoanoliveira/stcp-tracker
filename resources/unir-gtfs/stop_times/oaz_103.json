@@ -1,0 +1,57 @@
+{
+  "lines": [
+    "1006",
+    "1015",
+    "1210"
+  ],
+  "passages_by_hour": {
+    "07": [
+      {
+        "minute": "07",
+        "trip_id": "A-U:1006:1:2:0640",
+        "arrival_time": "07:07:15",
+        "departure_time": "07:07:15",
+        "stop_sequence": 20
+      },
+      {
+        "minute": "23",
+        "trip_id": "E-U:1210:0:2:0710",
+        "arrival_time": "07:23:40",
+        "departure_time": "07:23:40",
+        "stop_sequence": 8
+      },
+      {
+        "minute": "28",
+        "trip_id": "A-U:1015:0:1:0700",
+        "arrival_time": "07:28:45",
+        "departure_time": "07:28:45",
+        "stop_sequence": 15
+      }
+    ],
+    "12": [
+      {
+        "minute": "28",
+        "trip_id": "A-U:1015:0:1:1200",
+        "arrival_time": "12:28:45",
+        "departure_time": "12:28:45",
+        "stop_sequence": 15
+      }
+    ],
+    "13": [
+      {
+        "minute": "07",
+        "trip_id": "E-U:1006:0:2:1240",
+        "arrival_time": "13:07:15",
+        "departure_time": "13:07:15",
+        "stop_sequence": 20
+      },
+      {
+        "minute": "43",
+        "trip_id": "E-U:1210:0:2:1330",
+        "arrival_time": "13:43:40",
+        "departure_time": "13:43:40",
+        "stop_sequence": 8
+      }
+    ]
+  }
+}

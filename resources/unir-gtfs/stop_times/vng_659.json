@@ -1,0 +1,50 @@
+{
+  "lines": [
+    "9048"
+  ],
+  "passages_by_hour": {
+    "06": [
+      {
+        "minute": "53",
+        "trip_id": "AU:9048:0:1:0600",
+        "arrival_time": "06:53:33",
+        "departure_time": "06:53:33",
+        "stop_sequence": 33
+      }
+    ],
+    "08": [
+      {
+        "minute": "00",
+        "trip_id": "AU:9048:2:1:0745",
+        "arrival_time": "08:00:21",
+        "departure_time": "08:00:21",
+        "stop_sequence": 6
+      }
+    ],
+    "13": [
+      {
+        "minute": "00",
+        "trip_id": "AU:9048:2:1:1245",
+        "arrival_time": "13:00:21",
+        "departure_time": "13:00:21",
+        "stop_sequence": 6
+      },
+      {
+        "minute": "40",
+        "trip_id": "AU:9048:2:1:1325",
+        "arrival_time": "13:40:21",
+        "departure_time": "13:40:21",
+        "stop_sequence": 6
+      }
+    ],
+    "18": [
+      {
+        "minute": "40",
+        "trip_id": "AU:9048:2:1:1825",
+        "arrival_time": "18:40:21",
+        "departure_time": "18:40:21",
+        "stop_sequence": 6
+      }
+    ]
+  }
+}

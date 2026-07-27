@@ -1,0 +1,111 @@
+{
+  "lines": [
+    "1002",
+    "1004",
+    "1005"
+  ],
+  "passages_by_hour": {
+    "07": [
+      {
+        "minute": "25",
+        "trip_id": "E-U:1005:0:1:0705",
+        "arrival_time": "07:25:46",
+        "departure_time": "07:25:46",
+        "stop_sequence": 13
+      }
+    ],
+    "09": [
+      {
+        "minute": "35",
+        "trip_id": "A-U:1002:0:2:0900",
+        "arrival_time": "09:35:52",
+        "departure_time": "09:35:52",
+        "stop_sequence": 38
+      }
+    ],
+    "10": [
+      {
+        "minute": "37",
+        "trip_id": "FE-U:1004:0:2:0930",
+        "arrival_time": "10:37:35",
+        "departure_time": "10:37:35",
+        "stop_sequence": 38
+      },
+      {
+        "minute": "40",
+        "trip_id": "E-U:1002:0:2:1005",
+        "arrival_time": "10:40:52",
+        "departure_time": "10:40:52",
+        "stop_sequence": 38
+      }
+    ],
+    "12": [
+      {
+        "minute": "50",
+        "trip_id": "E-U:1005:0:1:1230",
+        "arrival_time": "12:50:46",
+        "departure_time": "12:50:46",
+        "stop_sequence": 13
+      }
+    ],
+    "14": [
+      {
+        "minute": "50",
+        "trip_id": "A-U:1002:0:2:1415",
+        "arrival_time": "14:50:52",
+        "departure_time": "14:50:52",
+        "stop_sequence": 38
+      }
+    ],
+    "15": [
+      {
+        "minute": "35",
+        "trip_id": "A-S:1002:0:2:1500",
+        "arrival_time": "15:35:52",
+        "departure_time": "15:35:52",
+        "stop_sequence": 38
+      }
+    ],
+    "17": [
+      {
+        "minute": "15",
+        "trip_id": "E-U:1002:0:2:1640",
+        "arrival_time": "17:15:52",
+        "departure_time": "17:15:52",
+        "stop_sequence": 38
+      },
+      {
+        "minute": "37",
+        "trip_id": "A-U:1004:0:2:1630",
+        "arrival_time": "17:37:35",
+        "departure_time": "17:37:35",
+        "stop_sequence": 38
+      }
+    ],
+    "18": [
+      {
+        "minute": "15",
+        "trip_id": "A-U:1002:0:2:1740",
+        "arrival_time": "18:15:52",
+        "departure_time": "18:15:52",
+        "stop_sequence": 38
+      },
+      {
+        "minute": "50",
+        "trip_id": "A-DFXPN:1002:0:2:1815",
+        "arrival_time": "18:50:52",
+        "departure_time": "18:50:52",
+        "stop_sequence": 38
+      }
+    ],
+    "19": [
+      {
+        "minute": "07",
+        "trip_id": "E-U:1002:1:2:1900",
+        "arrival_time": "19:07:24",
+        "departure_time": "19:07:24",
+        "stop_sequence": 5
+      }
+    ]
+  }
+}

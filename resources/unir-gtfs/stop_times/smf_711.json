@@ -1,0 +1,246 @@
+{
+  "lines": [
+    "2003",
+    "2010",
+    "2021",
+    "2044",
+    "2045",
+    "2048"
+  ],
+  "passages_by_hour": {
+    "07": [
+      {
+        "minute": "11",
+        "trip_id": "A-U:2021:0:2:0700",
+        "arrival_time": "07:11:58",
+        "departure_time": "07:11:58",
+        "stop_sequence": 20
+      },
+      {
+        "minute": "27",
+        "trip_id": "A-U:2003:0:2:0700",
+        "arrival_time": "07:27:09",
+        "departure_time": "07:27:09",
+        "stop_sequence": 29
+      },
+      {
+        "minute": "35",
+        "trip_id": "SMF_E-U:2048:0:1:0700",
+        "arrival_time": "07:35:18",
+        "departure_time": "07:35:18",
+        "stop_sequence": 30
+      },
+      {
+        "minute": "48",
+        "trip_id": "SMF_E-U:2045:0:1:0740",
+        "arrival_time": "07:48:56",
+        "departure_time": "07:48:56",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "57",
+        "trip_id": "A-U:2021:0:1:0735",
+        "arrival_time": "07:57:10",
+        "departure_time": "07:57:10",
+        "stop_sequence": 27
+      }
+    ],
+    "08": [
+      {
+        "minute": "32",
+        "trip_id": "A-U:2021:0:2:0815",
+        "arrival_time": "08:32:57",
+        "departure_time": "08:32:57",
+        "stop_sequence": 20
+      },
+      {
+        "minute": "45",
+        "trip_id": "A-DFXPN:2003:1:2:0830",
+        "arrival_time": "08:45:30",
+        "departure_time": "08:45:30",
+        "stop_sequence": 19
+      },
+      {
+        "minute": "45",
+        "trip_id": "A-S:2003:1:2:0830",
+        "arrival_time": "08:45:30",
+        "departure_time": "08:45:30",
+        "stop_sequence": 19
+      }
+    ],
+    "09": [
+      {
+        "minute": "04",
+        "trip_id": "SMF_FE-U:2010:0:1:0900",
+        "arrival_time": "09:04:56",
+        "departure_time": "09:04:56",
+        "stop_sequence": 6
+      }
+    ],
+    "10": [
+      {
+        "minute": "34",
+        "trip_id": "A-U:2010:0:1:1030",
+        "arrival_time": "10:34:56",
+        "departure_time": "10:34:56",
+        "stop_sequence": 6
+      }
+    ],
+    "11": [
+      {
+        "minute": "11",
+        "trip_id": "SMF_E-U:2021:0:2:1100",
+        "arrival_time": "11:11:58",
+        "departure_time": "11:11:58",
+        "stop_sequence": 20
+      }
+    ],
+    "12": [
+      {
+        "minute": "22",
+        "trip_id": "A-U:2021:0:1:1200",
+        "arrival_time": "12:22:10",
+        "departure_time": "12:22:10",
+        "stop_sequence": 27
+      },
+      {
+        "minute": "23",
+        "trip_id": "A-U:2003:0:2:1200",
+        "arrival_time": "12:23:09",
+        "departure_time": "12:23:09",
+        "stop_sequence": 29
+      },
+      {
+        "minute": "53",
+        "trip_id": "SMF_E-U:2021:0:1:1230",
+        "arrival_time": "12:53:10",
+        "departure_time": "12:53:10",
+        "stop_sequence": 27
+      },
+      {
+        "minute": "58",
+        "trip_id": "SMF_E-U:2045:0:1:1250",
+        "arrival_time": "12:58:56",
+        "departure_time": "12:58:56",
+        "stop_sequence": 9
+      }
+    ],
+    "13": [
+      {
+        "minute": "05",
+        "trip_id": "SMF_E-U:2048:0:1:1230",
+        "arrival_time": "13:05:18",
+        "departure_time": "13:05:18",
+        "stop_sequence": 30
+      },
+      {
+        "minute": "50",
+        "trip_id": "SMF_E-U:2044:v1:2:1330",
+        "arrival_time": "13:50:00",
+        "departure_time": "13:50:00",
+        "stop_sequence": 24
+      },
+      {
+        "minute": "54",
+        "trip_id": "SMF_FE-U:2010:0:1:1350",
+        "arrival_time": "13:54:56",
+        "departure_time": "13:54:56",
+        "stop_sequence": 6
+      }
+    ],
+    "14": [
+      {
+        "minute": "15",
+        "trip_id": "A-DFXPN:2003:1:2:1400",
+        "arrival_time": "14:15:30",
+        "departure_time": "14:15:30",
+        "stop_sequence": 19
+      },
+      {
+        "minute": "15",
+        "trip_id": "A-S:2003:1:2:1400",
+        "arrival_time": "14:15:30",
+        "departure_time": "14:15:30",
+        "stop_sequence": 19
+      },
+      {
+        "minute": "41",
+        "trip_id": "A-U:2021:0:2:1430",
+        "arrival_time": "14:41:58",
+        "departure_time": "14:41:58",
+        "stop_sequence": 20
+      },
+      {
+        "minute": "56",
+        "trip_id": "SMF_E-U:2048:0:1:1430",
+        "arrival_time": "14:56:11",
+        "departure_time": "14:56:11",
+        "stop_sequence": 30
+      }
+    ],
+    "15": [
+      {
+        "minute": "02",
+        "trip_id": "A-U:2003:0:2:1440",
+        "arrival_time": "15:02:09",
+        "departure_time": "15:02:09",
+        "stop_sequence": 29
+      }
+    ],
+    "16": [
+      {
+        "minute": "22",
+        "trip_id": "A-U:2021:0:1:1600",
+        "arrival_time": "16:22:10",
+        "departure_time": "16:22:10",
+        "stop_sequence": 27
+      },
+      {
+        "minute": "56",
+        "trip_id": "A-U:2021:0:2:1645",
+        "arrival_time": "16:56:58",
+        "departure_time": "16:56:58",
+        "stop_sequence": 20
+      }
+    ],
+    "17": [
+      {
+        "minute": "34",
+        "trip_id": "SMF_E-U:2010:0:1:1730",
+        "arrival_time": "17:34:56",
+        "departure_time": "17:34:56",
+        "stop_sequence": 6
+      },
+      {
+        "minute": "43",
+        "trip_id": "SMF_E-U:2045:0:1:1735",
+        "arrival_time": "17:43:56",
+        "departure_time": "17:43:56",
+        "stop_sequence": 9
+      },
+      {
+        "minute": "50",
+        "trip_id": "SMF_E-U:2044:0:2:1730",
+        "arrival_time": "17:50:30",
+        "departure_time": "17:50:30",
+        "stop_sequence": 21
+      }
+    ],
+    "18": [
+      {
+        "minute": "29",
+        "trip_id": "SMF_E-U:2010:0:1:1825",
+        "arrival_time": "18:29:56",
+        "departure_time": "18:29:56",
+        "stop_sequence": 6
+      },
+      {
+        "minute": "52",
+        "trip_id": "A-U:2021:0:1:1830",
+        "arrival_time": "18:52:10",
+        "departure_time": "18:52:10",
+        "stop_sequence": 27
+      }
+    ]
+  }
+}

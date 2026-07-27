@@ -1,0 +1,91 @@
+{
+  "lines": [
+    "7311",
+    "7312",
+    "7313"
+  ],
+  "passages_by_hour": {
+    "06": [
+      {
+        "minute": "45",
+        "trip_id": "4:7313:0:1:0645",
+        "arrival_time": "06:45:00",
+        "departure_time": "06:45:00",
+        "stop_sequence": 1
+      }
+    ],
+    "07": [
+      {
+        "minute": "25",
+        "trip_id": "15:7312:0:1:0725",
+        "arrival_time": "07:25:00",
+        "departure_time": "07:25:00",
+        "stop_sequence": 1
+      },
+      {
+        "minute": "30",
+        "trip_id": "15:7311:0:1:0730",
+        "arrival_time": "07:30:00",
+        "departure_time": "07:30:00",
+        "stop_sequence": 1
+      }
+    ],
+    "08": [
+      {
+        "minute": "00",
+        "trip_id": "41:7311:0:1:0800",
+        "arrival_time": "08:00:00",
+        "departure_time": "08:00:00",
+        "stop_sequence": 1
+      }
+    ],
+    "12": [
+      {
+        "minute": "30",
+        "trip_id": "4:7313:0:1:1230",
+        "arrival_time": "12:30:00",
+        "departure_time": "12:30:00",
+        "stop_sequence": 1
+      },
+      {
+        "minute": "35",
+        "trip_id": "4:7312:0:1:1235",
+        "arrival_time": "12:35:00",
+        "departure_time": "12:35:00",
+        "stop_sequence": 1
+      },
+      {
+        "minute": "40",
+        "trip_id": "15:7311:0:1:1240",
+        "arrival_time": "12:40:00",
+        "departure_time": "12:40:00",
+        "stop_sequence": 1
+      }
+    ],
+    "14": [
+      {
+        "minute": "15",
+        "trip_id": "4:7313:0:1:1415",
+        "arrival_time": "14:15:00",
+        "departure_time": "14:15:00",
+        "stop_sequence": 1
+      }
+    ],
+    "17": [
+      {
+        "minute": "35",
+        "trip_id": "4:7312:0:1:1735",
+        "arrival_time": "17:35:00",
+        "departure_time": "17:35:00",
+        "stop_sequence": 1
+      },
+      {
+        "minute": "35",
+        "trip_id": "4:7313:0:1:1735",
+        "arrival_time": "17:35:00",
+        "departure_time": "17:35:00",
+        "stop_sequence": 1
+      }
+    ]
+  }
+}
