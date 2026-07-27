@@ -24,6 +24,10 @@ function getRouteTextColor(routeObj) {
  * - STCP: restantes
  */
 export function detectOperator(routeObj) {
+    const explicit = String(routeObj?.operator ?? routeObj?.source ?? '').toLowerCase();
+    if (explicit === 'unir') return 'UNIR';
+    if (explicit === 'stcp') return 'STCP';
+    if (explicit === 'metrobus') return 'METROBUS';
     const n = parseInt(getRouteNumber(routeObj), 10);
     if (Number.isFinite(n) && n >= 1000) return 'UNIR';
     return 'STCP';
@@ -53,11 +57,10 @@ function normalizeUnirShapesPayload(payload) {
         const points = payload
             .map(p => {
                 const lat = Number(p?.shape_pt_lat ?? p?.lat);
-                const lon = Number(p?.shape_pt_lon ?? p?.lon);
+                const lon = Number(p?.shape_pt_lon ?? p?.lon ?? p?.lng); // ← adicionar ?? p?.lng
                 return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
             })
             .filter(Boolean);
-
         return points.length ? [{ points }] : [];
     }
 

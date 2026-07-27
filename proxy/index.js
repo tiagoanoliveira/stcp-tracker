@@ -296,7 +296,18 @@ async function handleStcpLiveVehicles() {
 }
 
 async function handleUnirVehicles() {
-  return jsonResponse({ success: true, vehicles: [] }, 'vehicles_unir', 'public, max-age=5');
+  try {
+    const raw = await proxyRawRequest('https://unir.live/api/vehicles', 'vehicles_unir');
+    if (!raw.ok) return errorResponse('Erro ao obter veículos UNIR', raw.status);
+    const data = await raw.json();
+    const vehicles = Array.isArray(data) ? data
+        : Array.isArray(data?.vehicles) ? data.vehicles
+            : [];
+    return jsonResponse({ success: true, vehicles }, 'vehicles_unir', 'public, max-age=5');
+  } catch (err) {
+    console.error('[WORKER] handleUnirVehicles:', err);
+    return jsonResponse({ success: true, vehicles: [] }, 'vehicles_unir', 'no-store');
+  }
 }
 
 async function handleNearbyStops(lat, lng, radius) {
@@ -340,7 +351,15 @@ async function handleRouteShape(routeId, directionId) {
   }
 
   if (route.operator === 'unir') {
-    return errorResponse(`Shape UNIR da rota ${routeId} deve ser carregada localmente a partir dos recursos estáticos.`, 404);
+    return jsonResponse({
+      success: true,
+      route_id: String(route.id),
+      direction_id: Number(directionId),
+      coordinates: [],
+      operator: 'unir',
+      source: 'unir',
+      client_side_only: true,
+    }, 'route_shape', 'public, max-age=86400');
   }
 
   const raw = await proxyRawRequest(
@@ -652,12 +671,21 @@ async function handleRequest(request) {
     const stopId = firstSegment;
     const endpoint = pathParts[1] || 'realtime';
 
+    if (endpoint === 'services') {
+      const date = url.searchParams.get('date');
+      if (!date) return errorResponse('Parâmetro "date" é obrigatório. Uso: /{stopId}/services?date=YYYY-MM-DD', 400);
+      return await proxyRequest(
+          `https://stcp.pt/api/stops/${stopId}/services?date=${date}`,
+          'stop_services', 'public, max-age=3600'
+      );
+    }
+
     if (endpoint === 'info') return await handleStopInfo(stopId);
     if (endpoint === 'routes') return await handleStopRoutes(stopId);
     if (endpoint === 'realtime') return await handleStopRealtime(stopId, url);
     if (endpoint === 'schedule') return await handleStopSchedule(stopId, url);
 
-    return errorResponse(`Endpoint inválido: ${endpoint}. Use: realtime, routes, schedule ou info`, 400);
+    return errorResponse(`Endpoint inválido: ${endpoint}. Use: realtime, routes, schedule, info ou services`, 400);
   } catch (error) {
     console.error('[WORKER] Error:', error);
     return errorResponse(`Erro interno: ${error.message}`, 500);
