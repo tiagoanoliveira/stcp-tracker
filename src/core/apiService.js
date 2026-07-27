@@ -213,6 +213,17 @@ class ApiService {
     }
   }
 
+  async fetchStopScheduleUnir(stopId) {
+    try {
+      return await this.fetchWithRetry(
+          this.buildUrl(`/${encodeURIComponent(stopId)}/schedule`)
+      );
+    } catch (error) {
+      console.warn(`⚠️ fetchStopScheduleUnir(${stopId}) falhou`, error);
+      return null;
+    }
+  }
+
   async fetchStopInfo(stopId) {
     try {
       const data = await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/info`));

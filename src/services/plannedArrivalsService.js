@@ -236,6 +236,48 @@ class PlannedArrivalsService {
     const stopCode = await _resolveStopCode(stopId);
     _log(`getNextArrivals stopId:${stopId} stopCode:${stopCode} maxMinutes:${maxMinutes}`);
 
+    // ── UNIR: usar horários estáticos do proxy ────────────────────────────────
+    const stopInfo = stopService.getStopById(stopId);
+    const isUnir   = stopInfo?.operator === 'unir' || String(stopId).startsWith('prg:');
+
+    if (isUnir) {
+      const cacheKey = `${stopId}:${maxMinutes}`;
+      if (!forceRefresh) {
+        const cached = _cache.get(cacheKey);
+        if (cached && (Date.now() - cached.ts) < CACHE_TTL) return cached.data;
+      }
+      try {
+        const data = await apiService.fetchWithRetry(
+            apiService.buildUrl(`/${encodeURIComponent(stopId)}/schedule`)
+        );
+        const now = new Date();
+        const nowMs = now.getTime();
+        const result = (data?.passages || []).map(p => ({
+          route_short_name:  (data.lines?.[0] || p.trip_id?.split(':')?.[1] || ''),
+          trip_id:           p.trip_id,
+          headsign:          p.destination || '',
+          scheduled_arrival: (() => {
+            const [h, m, s] = p.arrival_time.split(':').map(Number);
+            const d = new Date(now);
+            d.setHours(h, m, s || 0, 0);
+            return d.toISOString();
+          })(),
+          realtime_arrival:  null,
+          delay:             null,
+          is_realtime:       false,
+          directionId:       null,
+          _source:           'unir-gtfs',
+        }));
+        if (result.length > 0) {
+          _cache.set(cacheKey, { data: result, ts: Date.now() });
+        }
+        return result;
+      } catch (err) {
+        console.warn('[ARRIVALS] UNIR schedule falhou:', err);
+        return [];
+      }
+    }
+
     const t0 = performance.now();
     const [otpResult, rtResult] = await Promise.allSettled([
       otpService.getArrivalsForStop(stopCode, maxMinutes),

@@ -157,16 +157,6 @@ function getStop(stopId) {
   return STOP_BY_ID.get(String(stopId)) ?? null;
 }
 
-function isMetrobusRoute(routeId) {
-  const route = getRoute(routeId);
-  return route?.operator === 'metrobus';
-}
-
-function isUnirRoute(routeId) {
-  const route = getRoute(routeId);
-  return route?.operator === 'unir';
-}
-
 function getMetrobusTrips(routeId) {
   return METROBUS_STOP_TIMES.find(r => String(r.route_id) === String(routeId))?.trips ?? [];
 }
@@ -573,6 +563,68 @@ async function handleStopRealtime(stopId, url) {
 
 async function handleStopSchedule(stopId, url) {
   const stop = getStop(stopId);
+
+  // ── UNIR ──────────────────────────────────────────────────────────────────
+  if (stop && stop.operator === 'unir') {
+    // O stopCode UNIR tem formato "prg:aro:5" → ficheiro "aro_5.json"
+    // A convenção do ficheiro é: retirar o prefixo "prg:", substituir ":" por "_"
+    const rawCode = stop.stop_code || stop.stop_id; // ex: "prg:aro:5"
+    const fileKey = rawCode.replace(/^prg:/, '').replace(/:/g, '_'); // → "aro_5"
+
+    try {
+      // Carregar ficheiro de stop_times dinamicamente
+      const mod = await import(
+          `../resources/unir-gtfs/stop_times/${fileKey}.json`,
+          { assert: { type: 'json' } }
+          );
+      const data = mod.default ?? mod;
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const windowEnd  = nowMinutes + 120; // próximos 120 minutos
+
+      const passages = [];
+      for (const [hour, trips] of Object.entries(data.passages_by_hour || {})) {
+        for (const trip of trips) {
+          const totalMin = parseInt(hour, 10) * 60 + parseInt(trip.minute, 10);
+          if (totalMin >= nowMinutes && totalMin <= windowEnd) {
+            passages.push({
+              hour,
+              minute:           trip.minute,
+              trip_id:          trip.trip_id,
+              destination:      trip.destination,
+              arrival_time:     trip.arrival_time,
+              departure_time:   trip.departure_time,
+              stop_sequence:    trip.stop_sequence,
+            });
+          }
+        }
+      }
+
+      return jsonResponse({
+        success:  true,
+        stop_id:  String(stopId),
+        stop_name: stop.stop_name,
+        stop_code: stop.stop_code,
+        operator: 'unir',
+        source:   'unir',
+        lines:    data.lines || [],
+        passages,
+      }, 'stop_schedule', 'public, max-age=60');
+    } catch (err) {
+      // Ficheiro não existe ou vazio → devolver estrutura vazia
+      return jsonResponse({
+        success:  true,
+        stop_id:  String(stopId),
+        stop_name: stop.stop_name,
+        stop_code: stop.stop_code,
+        operator: 'unir',
+        source:   'unir',
+        lines:    [],
+        passages: [],
+      }, 'stop_schedule', 'public, max-age=60');
+    }
+  }
+
   if (stop && stop.operator === 'metrobus') {
     const routeId = url.searchParams.get('route_id') ?? url.searchParams.get('routeId');
     if (!routeId) {
