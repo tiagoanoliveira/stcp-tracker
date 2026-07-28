@@ -659,7 +659,7 @@ async function handleRequest(request) {
 
   if (pathParts.length === 0) {
     return jsonResponse({
-      message: 'STCP / UNIR / MetroBus proxy',
+      message: 'Porto Live Transportes proxy. Direitos reservados. Contacte o proprietário para obter autorização de utilização: geral@tiagoanoliveira.pt',
       version: '5.0',
       endpoints: {
         vehicle_endpoints: ['vehicles', 'vehicles/unir'],

@@ -10,7 +10,7 @@ workers_dev = true
 
 # Custom Domain Routes
 [[routes]]
-pattern = "stcp-worker.tiagoanoliveira.pt/*"
+pattern = "porto-live.tiagoanoliveira.pt/*"
 zone_name = "tiagoanoliveira.pt"
 
 [[d1_databases]]
