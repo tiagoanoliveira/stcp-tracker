@@ -2,7 +2,7 @@ import { mqttVehicleService } from '../services/mqttVehicleService.js';
 
 class ApiService {
   constructor() {
-    this.proxyUrl = 'https://porto-live.tiagoanoliveira.pt';
+    this.proxyUrl = 'https://porto-live.tiagoanoliveira.workers.dev';
     this.retries = 3;
     this.delayMs = 500;
     this.timeoutMs = 10000;

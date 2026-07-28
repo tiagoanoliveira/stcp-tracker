@@ -553,16 +553,66 @@ export class StopsMapApp {
    */
   async loadStopArrivals(stopId, centerMap = false, forceRefresh = false) {
     try {
+      const isUnirStop = stopService.getStopById(stopId)?.operator === 'unir' || String(stopId).startsWith('prg:');
       // forceRefresh=true: botão de refresh e intervalo de 5 s
-      const arrivals = await plannedArrivalsService.getNextArrivals(stopId, 60, forceRefresh);
+      const windowMinutes = isUnirStop ? 120 : 60;
+      const arrivals = await plannedArrivalsService.getNextArrivals(stopId, windowMinutes, forceRefresh);
 
       if (!arrivals || arrivals.length === 0) {
         this.nextArrivals.setArrivals([], []);
         this.busMarkerManager.clearAllMarkers();
         this.nextArrivals.updateLastUpdate();
         this._allowedTripIds.clear();
-        this._restrictToAllowedTrips = false;
         return;
+      }
+
+      if (isUnirStop) {
+        // Construir filtros de linha UNIR a partir das chegadas
+        const lineSet = new Set(
+            arrivals
+                .map(a => String(a.route_short_name || '').trim())
+                .filter(Boolean)
+        );
+
+        if (lineSet.size > 0 && (!this.nextArrivals.availableRoutes || this.nextArrivals.availableRoutes.length === 0)) {
+          const routes = Array.from(lineSet).map(lineNum => {
+            const colorInfo = getUnirLineColor?.(lineNum) || {};
+            return {
+              id:         lineNum,
+              number:     lineNum,
+              name:       `Linha ${lineNum}`,
+              color:      colorInfo.busColor || '#187EC2',
+              text_color: colorInfo.textColor || '#FFFFFF',
+              operator:   'unir',
+              source:     'unir',
+            };
+          });
+          this.nextArrivals.setRoutes(routes);
+        }
+      }
+
+      if (!isUnirStop) {
+        // STCP/Metrobus – fallback para filtros de linha com base nas chegadas
+        if (!this.nextArrivals.availableRoutes || this.nextArrivals.availableRoutes.length === 0) {
+          const lineSet = new Set(
+              arrivals
+                  .map(a => String(a.route_short_name || a.route_number || a.route_id || '').trim())
+                  .filter(Boolean)
+          );
+
+          if (lineSet.size > 0) {
+            const routes = Array.from(lineSet).map(lineNum => ({
+              id:         lineNum,
+              number:     lineNum,
+              name:       `Linha ${lineNum}`,
+              color:      '#187EC2',   // cor STCP default; iconCache pode pintar o marcador
+              text_color: '#FFFFFF',
+              operator:   'stcp',
+              source:     'stcp',
+            }));
+            this.nextArrivals.setRoutes(routes);
+          }
+        }
       }
 
       let vehicles = [];

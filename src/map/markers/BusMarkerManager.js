@@ -63,7 +63,23 @@ export class BusMarkerManager {
     Object.entries(this.markers).forEach(([id, marker]) => {
       const bus         = this._busData[id];
       const displayLine = (bus?.displayLine) || this._markerRoutes[id] || '';
-      const markerDir   = this._markerDirs[id];
+
+      // Direcção preferencialmente vinda de _markerDirs (quando o caller a seta),
+      // caso contrário usar a direcção do próprio veículo.
+      let markerDir = this._markerDirs[id];
+      if (markerDir === undefined || markerDir === null) {
+        if (bus && bus.direction != null) {
+          markerDir = Number(bus.direction);
+        } else {
+          markerDir = null;
+        }
+      }
+
+      // UNIR: normalizar direcções 1/2 → 0/1 para bater certo com dirMap (0/1)
+      if (markerDir != null && (bus?.source || '').toLowerCase() === 'unir') {
+        if (markerDir === 1) markerDir = 0;
+        else if (markerDir === 2) markerDir = 1;
+      }
 
       let visible = showAll || selectedRoutes.has(displayLine);
 
@@ -79,6 +95,7 @@ export class BusMarkerManager {
         if (this.map.hasLayer(marker)) this.map.removeLayer(marker);
       }
     });
+
     return visiblePositions;
   }
 

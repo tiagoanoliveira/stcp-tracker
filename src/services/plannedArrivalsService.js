@@ -57,6 +57,12 @@ async function _resolveStopCode(stopId) {
   return stopId;
 }
 
+function _isUnirStop(stopId) {
+  const cached = stopService.getStopById(stopId);
+  if (cached?.operator === 'unir') return true;
+  return String(stopId).startsWith('prg:');
+}
+
 function _withTimeout(promise, ms) {
   return Promise.race([
     promise,
@@ -216,6 +222,84 @@ function _merge(otpArr, realtimeArr) {
   return merged;
 }
 
+async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 120) {
+  // Derivar chave do ficheiro a partir do stopId
+  let key = String(stopId);
+  if (key.startsWith('prg:')) key = key.slice(4);   // prg:aro:5 → aro:5
+
+  let fileKey;
+  if (key.includes('_')) {
+    fileKey = key; // já está no formato aro_5
+  } else {
+    const parts = key.split(':');                   // aro:5 → ['aro', '5']
+    if (parts.length >= 2) fileKey = `${parts[0]}_${parts[1]}`;
+    else fileKey = key.replace(':', '_');
+  }
+
+  const res = await fetch(`./resources/unir-gtfs/stop_times/${fileKey}.json`);
+  if (!res.ok) {
+    _info(`[ARRIVALS] UNIR stop_times não encontrado para ${stopId} (${fileKey})`);
+    return [];
+  }
+
+  const data = await res.json();
+  const passagesByHour = data.passages_by_hour || {};
+  const now = new Date();
+  const nowMs = now.getTime();
+  const windowMs = maxMinutes * 60_000;
+
+  const arrivals = [];
+
+  for (const [hourStr, list] of Object.entries(passagesByHour)) {
+    const hour = Number(hourStr);
+    if (!Array.isArray(list)) continue;
+
+    for (const p of list) {
+      const timeStr = p.arrival_time || `${hour}:${p.minute || '00'}:00`;
+      const [h, m, s] = timeStr.split(':').map(Number);
+
+      const d = new Date(now);
+      d.setHours(h, m, s || 0, 0);
+
+      const t = d.getTime();
+      const diffMs = t - nowMs;
+      if (diffMs < 0 || diffMs > windowMs) continue; // filtrar para próxima janela
+
+      const diffSec = Math.round(diffMs / 1000);
+      const segments = String(p.trip_id || '').split(':');
+      const routeShort = segments[1] || (data.lines?.[0] || '');
+
+      let directionId = null;
+      if (segments.length >= 3) {
+        const dir = Number(segments[2]);
+        if (Number.isFinite(dir)) directionId = dir;
+      }
+
+      arrivals.push(_normalizeOne({
+        route_short_name:  routeShort,
+        trip_id:           p.trip_id,
+        headsign:          p.destination || '',
+        scheduled_arrival: d.toISOString(),
+        realtime_arrival:  null,
+        delay:             null,
+        is_realtime:       false,
+        directionId,
+        arrival_seconds:   diffSec,
+        arrival_minutes:   diffSec / 60,
+        _source:           'unir-gtfs',
+      }));
+    }
+  }
+
+  arrivals.sort((a, b) => {
+    const tA = _toEpoch(a.scheduled_arrival);
+    const tB = _toEpoch(b.scheduled_arrival);
+    return (tA ?? Infinity) - (tB ?? Infinity);
+  });
+
+  return arrivals;
+}
+
 // ── Serviço ──────────────────────────────────────────────────────────────────
 
 class PlannedArrivalsService {
@@ -223,9 +307,7 @@ class PlannedArrivalsService {
   async getNextArrivals(stopId, maxMinutes = 60, forceRefresh = false) {
     const cacheKey = `${stopId}:${maxMinutes}`;
 
-    // Detectar logo se é UNIR
-    const stopInfo = stopService.getStopById(stopId);
-    const isUnir   = stopInfo?.operator === 'unir' || String(stopId).startsWith('prg:');
+    const isUnir = _isUnirStop(stopId);
 
     if (isUnir) {
       if (!forceRefresh) {
@@ -239,33 +321,13 @@ class PlannedArrivalsService {
       }
 
       try {
-        const data = await apiService.fetchWithRetry(
-            apiService.buildUrl(`/${encodeURIComponent(stopId)}/schedule`)
-        );
-        const now = new Date();
-        const result = (data?.passages || []).map(p => ({
-          route_short_name:  (data.lines?.[0] || p.trip_id?.split(':')?.[1] || ''),
-          trip_id:           p.trip_id,
-          headsign:          p.destination || '',
-          scheduled_arrival: (() => {
-            const [h, m, s] = p.arrival_time.split(':').map(Number);
-            const d = new Date(now);
-            d.setHours(h, m, s || 0, 0);
-            return d.toISOString();
-          })(),
-          realtime_arrival:  null,
-          delay:             null,
-          is_realtime:       false,
-          directionId:       null,
-          _source:           'unir-gtfs',
-        }));
-
+        const result = await _getUnirArrivalsFromStopTimes(stopId, maxMinutes || 120);
         if (result.length > 0) {
           _cache.set(cacheKey, { data: result, ts: Date.now() });
         }
         return result;
       } catch (err) {
-        console.warn('[ARRIVALS] UNIR schedule falhou:', err);
+        console.warn('[ARRIVALS] UNIR stop_times falhou:', err);
         return [];
       }
     }
