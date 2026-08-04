@@ -137,8 +137,8 @@ export class StopsMapApp {
       
       // Aviso temporário — 200
       AnnouncementBanner.show(
-        'Por motivos desconhecidos a linha 200 não está a apresentar dados em tempo real - verifique o horário planeado nas próximas chegadas.',
-        { type: 'warning', id: '200-warning', dismissible: false }
+        'Foram detetados problemas nos dados recebidos relativamente às próximas chegadas em tempo real. Estamos a trabalhar para resolver o problema o mais rápido possível.',
+        { type: 'info', id: 'stops-warning', dismissible: false }
       );
      
       await scheduleService.loadScheduleData();
