@@ -136,7 +136,23 @@ class StopService {
    * Obtém paragem por ID (do cache; inclui custom).
    */
   getStopById(id) {
-    return this.allStopsCache.get(id) || null;
+    if (!id) return null;
+
+    const direct = this.allStopsCache.get(id);
+    if (direct) return direct;
+
+    const needle = String(id).toLowerCase();
+
+    for (const stop of this.allStopsCache.values()) {
+      if (
+          String(stop.stop_id || '').toLowerCase()   === needle ||
+          String(stop.stop_code || '').toLowerCase() === needle
+      ) {
+        return stop;
+      }
+    }
+
+    return null;
   }
 
   /**

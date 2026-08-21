@@ -311,22 +311,39 @@ class VehicleService {
   }
 
   async resolveUnirHeadsign(tripId) {
-    // trips.txt está em resources/unir-gtfs/trips.txt
-    // Formato: ln:5011:0,ut1:A-U,A-U:5011:0:1:1442,"Matosinhos (Mercado)",5011,0,...
-    // Campo 3 (index 3) é o headsign, entre aspas
     try {
       const response = await fetch('./resources/unir-gtfs/trips.txt');
       if (!response.ok) return null;
-      const text = await response.text();
+
+      const text  = await response.text();
       const lines = text.split('\n');
+
+      // Prefixo até ao penúltimo ':' – ex: "AU:9018:0:1:1850" → "AU:9018:0:1:"
+      let prefix = tripId;
+      const lastColon = tripId.lastIndexOf(':');
+      if (lastColon > 0) {
+        prefix = tripId.slice(0, lastColon + 1); // inclui o ':'
+      }
+
+      let fallbackHeadsign = null;
+
       for (const line of lines) {
+        if (!line) continue;
+
+        // 1) tentativa exacta
         if (line.includes(tripId)) {
-          // Extrair headsign — campo entre primeiras aspas
           const match = line.match(/"([^"]+)"/);
           if (match) return match[1];
         }
+
+        // 2) fallback por prefixo (ignora hora nos últimos dígitos)
+        if (!fallbackHeadsign && prefix && line.includes(prefix)) {
+          const match = line.match(/"([^"]+)"/);
+          if (match) fallbackHeadsign = match[1];
+        }
       }
-      return null;
+
+      return fallbackHeadsign;
     } catch {
       return null;
     }

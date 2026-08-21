@@ -10,6 +10,7 @@
 import { vehicleService, normalizeDestinationText } from '../../services/vehicleService.js';
 import { LoadingSpinner }    from './LoadingSpinner.js';
 import { routeFilterState }  from '../../services/routeFilterState.js';
+import { getUnirLineColor } from '../../../resources/busDesign/busColors.js';
 
 function isNightLine(number) { return /M$/i.test(String(number)); }
 
@@ -172,7 +173,9 @@ export class NextArrivals {
   // ─── Filtros ────────────────────────────────────────────────────────────────
 
   setRoutes(routes = []) {
-    this.availableRoutes = routes;
+    this.availableRoutes = [...routes].sort(
+        (a, b) => String(a.number).localeCompare(String(b.number), 'pt', { numeric: true })
+    );
 
     // Sincronizar com filtro global: se houver filtros globais ativos
     // que correspondem a rotas desta paragem, pré-selecioná-los
@@ -387,8 +390,19 @@ export class NextArrivals {
   }
 
   _createArrivalElement(arrival, vehicle) {
-    const busColor    = arrival.route_color      || '#0072C6';
-    const textColor   = arrival.route_text_color || '#FFFFFF';
+    let busColor    = arrival.route_color      || '#0072C6';
+    let textColor   = arrival.route_text_color || '#FFFFFF';
+
+    const lineNumber = String(arrival.route_short_name || arrival.route_id || '');
+    const isUnir = /^\d{4,}$/.test(lineNumber); // 4+ dígitos → UNIR
+
+    if (isUnir) {
+      const unirColor = getUnirLineColor(lineNumber);
+      if (unirColor) {
+        busColor  = unirColor.busColor;
+        textColor = unirColor.textColor;
+      }
+    }
     const isRealtime  = arrival.is_realtime === true;
     const status      = arrival.status || 'SCHEDULED';
     const delayS      = arrival.delay || 0;
@@ -431,8 +445,12 @@ export class NextArrivals {
         if (this.onArrivalClickCallback) this.onArrivalClickCallback({ vehicleId: vehicle.id, location, arrival });
       });
     }
-    const normalizedDestination = normalizeDestinationText(arrival.trip_headsign);
+    let rawDestination = arrival.trip_headsign;
+    if (!rawDestination || rawDestination === 'undefined') {
+      rawDestination = 'Destino desconhecido';
+    }
 
+    const normalizedDestination = normalizeDestinationText(rawDestination);
     div.innerHTML = `
       <div class="arrival-line" style="background-color:${busColor};color:${textColor};">
         ${arrival.route_short_name}
