@@ -11,6 +11,7 @@ import { vehicleService, normalizeDestinationText } from '../../services/vehicle
 import { LoadingSpinner }    from './LoadingSpinner.js';
 import { routeFilterState }  from '../../services/routeFilterState.js';
 import { getUnirLineColor } from '../../../resources/busDesign/busColors.js';
+import { iconCache } from '../design/iconCache.js';
 
 function isNightLine(number) { return /M$/i.test(String(number)); }
 
@@ -249,8 +250,23 @@ export class NextArrivals {
       chip.className  = `filter-chip${isActive ? ' active' : ''}`;
       chip.dataset.line      = String(route.number);
       chip.dataset.nightLine = isNightLine(route.number) ? 'true' : 'false';
-      chip.style.backgroundColor = route.color      || '#0072C6';
-      chip.style.color           = route.text_color || '#FFFFFF';
+      const routeKey = String(route.number ?? route.id ?? '');
+      const colors = iconCache.getRouteColor(routeKey);
+
+      const bgColor =
+          colors?.busColor ||
+          route.color      ||
+          route.route_color ||
+          '#0072C6';
+
+      const textColor =
+          colors?.textColor ||
+          route.text_color   ||
+          route.route_text_color ||
+          '#FFFFFF';
+
+      chip.style.backgroundColor = bgColor;
+      chip.style.color           = textColor;
       chip.title       = route.name || route.number;
       chip.textContent = route.number;
       chip.addEventListener('click', () => this._toggleRoute(route.number));

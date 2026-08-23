@@ -600,16 +600,31 @@ export class StopsMapApp {
                   .filter(Boolean)
           );
 
+          const globalRoutes = this.routeFilterBar?.routes || [];
+
           if (lineSet.size > 0) {
-            const routes = Array.from(lineSet).map(lineNum => ({
-              id:         lineNum,
-              number:     lineNum,
-              name:       `Linha ${lineNum}`,
-              color:      '#187EC2',   // cor STCP default; iconCache pode pintar o marcador
-              text_color: '#FFFFFF',
-              operator:   'stcp',
-              source:     'stcp',
-            }));
+            const routes = Array.from(lineSet).map(lineNum => {
+              const ref = globalRoutes.find(r => String(r.number) === String(lineNum));
+
+              const bgColor =
+                  ref?.color ??
+                  '#187EC2'; // fallback STCP
+
+              const textColor =
+                  ref?.text_color ??
+                  '#FFFFFF';
+
+              return {
+                id:         ref?.id        ?? lineNum,
+                number:     ref?.number    ?? lineNum,
+                name:       ref?.name      ?? `Linha ${lineNum}`,
+                color:      bgColor,
+                text_color: textColor,
+                operator:   ref?.operator  ?? 'stcp',
+                source:     ref?.source    ?? 'stcp',
+              };
+            });
+
             this.nextArrivals.setRoutes(routes);
           }
         }

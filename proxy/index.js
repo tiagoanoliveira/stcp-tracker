@@ -110,11 +110,8 @@ function normalizeStopRecord(stop, operator) {
 
   return {
     stop_id: stopId,
-    stopid: stopId,
     stop_code: stopCode,
-    stopcode: stopCode,
     stop_name: stopName,
-    stopname: stopName,
     latitude: Number(stop.latitude ?? stop.stop_lat ?? stop.lat),
     longitude: Number(stop.longitude ?? stop.stop_lon ?? stop.lon ?? stop.lng),
     zone_id: stop.zone_id ?? null,
@@ -173,11 +170,8 @@ function buildMetrobusStops(routeId) {
       if (!unique.has(String(stop.stop_id))) {
         unique.set(String(stop.stop_id), {
           stop_id: stop.stop_id,
-          stopid: stop.stop_id,
           stop_code: stop.stop_code,
-          stopcode: stop.stop_code,
           stop_name: stop.stop_name,
-          stopname: stop.stop_name,
           latitude: stop.latitude,
           longitude: stop.longitude,
           zone_id: stop.zone_id ?? null,
@@ -400,11 +394,8 @@ async function handleRouteStops(routeId, directionId) {
       .sort((a, b) => (a.stop_sequence || 0) - (b.stop_sequence || 0))
       .map(s => ({
         stop_id: s.stop_id,
-        stopid: s.stop_id,
         stop_code: s.stop_code,
-        stopcode: s.stop_code,
         stop_name: s.stop_name,
-        stopname: s.stop_name,
         latitude: s.stop_lat,
         longitude: s.stop_lon,
         stop_sequence: s.stop_sequence,
@@ -484,11 +475,8 @@ async function handleStopInfo(stopId) {
   if (localStop) {
     return jsonResponse({
       stop_id: localStop.stop_id,
-      stopid: localStop.stopid,
       stop_name: localStop.stop_name,
-      stopname: localStop.stopname,
       stop_code: localStop.stop_code,
-      stopcode: localStop.stopcode,
       latitude: localStop.latitude,
       longitude: localStop.longitude,
       zone_id: localStop.zone_id || null,
@@ -504,11 +492,8 @@ async function handleStopInfo(stopId) {
   const d = await raw.json();
   return jsonResponse({
     stop_id: d.stop_id,
-    stopid: d.stop_id,
     stop_name: d.stop_name,
-    stopname: d.stop_name,
     stop_code: d.stop_code,
-    stopcode: d.stop_code,
     latitude: d.stop_lat,
     longitude: d.stop_lon,
     zone_id: d.zone_id || null,
