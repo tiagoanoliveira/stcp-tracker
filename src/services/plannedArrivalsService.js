@@ -278,7 +278,7 @@ async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 120) {
       arrivals.push(_normalizeOne({
         route_short_name:  routeShort,
         trip_id:           p.trip_id,
-        headsign:          p.destination || '',
+        trip_headsign:          p.destination || '',
         scheduled_arrival: d.toISOString(),
         realtime_arrival:  null,
         delay:             null,
