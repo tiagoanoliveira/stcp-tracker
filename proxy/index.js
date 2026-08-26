@@ -472,7 +472,7 @@ async function handleSearch(url) {
 
 async function handleStopInfo(stopId) {
   const localStop = getStop(stopId);
-  if (localStop) {
+  if (localStop && localStop.operator !== 'stcp') {
     return jsonResponse({
       stop_id: localStop.stop_id,
       stop_name: localStop.stop_name,
@@ -513,7 +513,7 @@ async function handleStopInfo(stopId) {
 
 async function handleStopRoutes(stopId) {
   const localStop = getStop(stopId);
-  if (localStop) {
+  if (localStop && localStop.operator !== 'stcp') {
     return jsonResponse({
       success: true,
       stop_id: String(localStop.stop_id),
