@@ -409,16 +409,6 @@ export class NextArrivals {
     let busColor    = arrival.route_color      || '#0072C6';
     let textColor   = arrival.route_text_color || '#FFFFFF';
 
-    const lineNumber = String(arrival.route_short_name || arrival.route_id || '');
-    const isUnir = /^\d{4,}$/.test(lineNumber); // 4+ dígitos → UNIR
-
-    if (isUnir) {
-      const unirColor = getUnirLineColor(lineNumber);
-      if (unirColor) {
-        busColor  = unirColor.busColor;
-        textColor = unirColor.textColor;
-      }
-    }
     const isRealtime  = arrival.is_realtime === true;
     const status      = arrival.status || 'SCHEDULED';
     const delayS      = arrival.delay || 0;
