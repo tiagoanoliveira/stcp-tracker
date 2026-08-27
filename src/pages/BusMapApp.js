@@ -602,49 +602,60 @@ export class BusMapApp {
     this._currentStopId       = stop.stop_id;
     this._currentStopPosition = [stop.latitude, stop.longitude];
     this._busMapCentered      = false;
-    // Limpar qualquer seguimento de veículo anterior ao mudar de paragem
     this._trackedVehicleId    = null;
 
-    // Limpar cache da paragem anterior para garantir fetch fresco
     plannedArrivalsService.clearCache(stop.stop_id);
 
     this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
     this.nextArrivals.show(stop.stop_name, stop.stop_id);
     this.mapManager.map.closePopup();
 
-    const [stopInfo, unirSchedule] = await Promise.allSettled([
-      apiService.fetchStopInfo(stop.stop_id),
-      apiService.fetchStopScheduleUnir(stop.stop_id), // pode falhar tranquilamente para STCP
-    ]);
+    const isUnirStop =
+        stop.operator === 'unir' ||
+        String(stop.stop_id).startsWith('prg:') ||
+        String(stop.stop_id).includes(':prg:');
 
     let routes = stop.routes || [];
 
-    if (stopInfo.status === 'fulfilled' && stopInfo.value) {
-      routes = stopInfo.value.routes || routes;
-    }
+    if (isUnirStop) {
+      // UNIR via GTFS API
+      const unirStopId = String(stop.stop_id).startsWith('unir:')
+          ? String(stop.stop_id)
+          : `unir:${stop.stop_id}`;
 
-    const isUnirStop =
-        (stopInfo.status === 'fulfilled' && stopInfo.value?.operator === 'unir') ||
-        String(stop.stop_id).startsWith('prg:');
+      try {
+        const [info, routesResp] = await Promise.all([
+          apiService.fetchGtfsStopInfo(unirStopId),
+          apiService.fetchGtfsStopRoutes(unirStopId, 'unir'),
+        ]);
 
-    if (isUnirStop && unirSchedule.status === 'fulfilled' && unirSchedule.value?.lines) {
-      const lines = unirSchedule.value.lines || [];
-      routes = lines.map(lineNum => ({
-        id:         String(lineNum),
-        number:     String(lineNum),
-        name:       `Linha ${lineNum}`,
-        color:      getUnirLineColor?.(lineNum) || '#187EC2',
-        text_color: '#FFFFFF',
-        operator:   'unir',
-        source:     'unir',
-      }));
+        if (info) {
+          // Opcional: actualizar nome/coords com os dados GTFS
+          stop.stop_name = info.stop_name || stop.stop_name;
+          stop.latitude  = info.latitude  ?? stop.latitude;
+          stop.longitude = info.longitude ?? stop.longitude;
+        }
+
+        routes = routesResp.routes || [];
+      } catch (e) {
+        console.warn('[BusMapApp] Erro ao carregar info/rotas UNIR via GTFS:', e);
+      }
+    } else {
+      // STCP/metrobus via proxy atual
+      try {
+        const stopInfo = await apiService.fetchStopInfo(stop.stop_id);
+        if (stopInfo) {
+          routes = stopInfo.routes || routes;
+        }
+      } catch (e) {
+        console.warn('[BusMapApp] Erro ao carregar info de paragem STCP:', e);
+      }
     }
 
     this.nextArrivals.setRoutes(routes);
 
-    // Sincronizar filtros da barra global com a paragem
+    // Sincronização de filtros com painel mantém-se igual
     if (routeFilterState.hasActive()) {
-      // Pré-selecionar no painel as linhas que estão no filtro global
       const relevantRoutes = routes.filter(r =>
           routeFilterState.selectedRoutes.has(String(r.number))
       );

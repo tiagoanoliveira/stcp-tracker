@@ -60,7 +60,12 @@ async function _resolveStopCode(stopId) {
 function _isUnirStop(stopId) {
   const cached = stopService.getStopById(stopId);
   if (cached?.operator === 'unir') return true;
-  return String(stopId).startsWith('prg:');
+
+  const id = String(stopId);
+  // ids locais antigos (prg:...) ou ids GTFS tipo ut4:prg:...
+  if (id.startsWith('prg:') || id.includes(':prg:')) return true;
+
+  return false;
 }
 
 function _withTimeout(promise, ms) {
@@ -223,72 +228,63 @@ function _merge(otpArr, realtimeArr) {
 }
 
 async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 120) {
-  // Derivar chave do ficheiro a partir do stopId
-  let key = String(stopId);
-  if (key.startsWith('prg:')) key = key.slice(4);   // prg:aro:5 → aro:5
+  const now       = new Date();
+  const nowMs     = now.getTime();
+  const windowMs  = maxMinutes * 60_000;
+  const arrivals  = [];
 
-  let fileKey;
-  if (key.includes('_')) {
-    fileKey = key; // já está no formato aro_5
-  } else {
-    const parts = key.split(':');                   // aro:5 → ['aro', '5']
-    if (parts.length >= 2) fileKey = `${parts[0]}_${parts[1]}`;
-    else fileKey = key.replace(':', '_');
-  }
+  // Converter stopId local (ex. 'prg:prt:61') para alias GTFS (ex. 'unir:prg:prt:61')
+  const gtfsStopId = String(stopId).startsWith('unir:')
+      ? String(stopId)
+      : `unir:${stopId}`;
 
-  const res = await fetch(`./resources/unir-gtfs/stop_times/${fileKey}.json`);
-  if (!res.ok) {
-    _info(`[ARRIVALS] UNIR stop_times não encontrado para ${stopId} (${fileKey})`);
+  const schedule = await apiService.fetchGtfsStopSchedule(gtfsStopId, {
+    date: now.toISOString().slice(0, 10), // YYYY-MM-DD
+    limit: 5000,
+  });
+
+  if (!schedule?.departures || !Array.isArray(schedule.departures)) {
+    _info(`[ARRIVALS] UNIR GTFS schedule vazio para ${gtfsStopId}`);
     return [];
   }
 
-  const data = await res.json();
-  const passagesByHour = data.passages_by_hour || {};
-  const now = new Date();
-  const nowMs = now.getTime();
-  const windowMs = maxMinutes * 60_000;
+  const dateStr = schedule.date || now.toISOString().slice(0, 10); // YYYYMMDD ou YYYY-MM-DD
+  // Converter para componentes de data
+  let year = now.getFullYear(), month = now.getMonth(), day = now.getDate();
+  if (/^\\d{8}$/.test(dateStr)) {
+    year  = Number(dateStr.slice(0, 4));
+    month = Number(dateStr.slice(4, 6)) - 1;
+    day   = Number(dateStr.slice(6, 8));
+  } else if (/^\\d{4}-\\d{2}-\\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    year = y; month = m - 1; day = d;
+  }
 
-  const arrivals = [];
+  for (const dep of schedule.departures) {
+    const timeStr = dep.arrival_time || dep.departure_time;
+    if (!timeStr) continue;
 
-  for (const [hourStr, list] of Object.entries(passagesByHour)) {
-    const hour = Number(hourStr);
-    if (!Array.isArray(list)) continue;
+    const [h, m, s] = timeStr.split(':').map(Number);
+    const d = new Date(Date.UTC(year, month, day, h, m, s || 0));
+    const t = d.getTime();
+    const diffMs = t - nowMs;
+    if (diffMs < 0 || diffMs > windowMs) continue;
 
-    for (const p of list) {
-      const timeStr = p.arrival_time || `${hour}:${p.minute || '00'}:00`;
-      const [h, m, s] = timeStr.split(':').map(Number);
+    const diffSec = Math.round(diffMs / 1000);
 
-      const d = new Date(now);
-      d.setHours(h, m, s || 0, 0);
-
-      const t = d.getTime();
-      const diffMs = t - nowMs;
-      if (diffMs < 0 || diffMs > windowMs) continue; // filtrar para próxima janela
-
-      const diffSec = Math.round(diffMs / 1000);
-      const segments = String(p.trip_id || '').split(':');
-      const routeShort = segments[1] || (data.lines?.[0] || '');
-
-      let directionId = null;
-      if (segments.length >= 3) {
-        const dir = Number(segments[2]);
-        if (Number.isFinite(dir)) directionId = dir;
-      }
-
-      arrivals.push(_normalizeOne({
-        route_short_name:  routeShort,
-        trip_id:           p.trip_id,
-        trip_headsign:          p.destination || '',
-        scheduled_arrival: d.toISOString(),
-        realtime_arrival:  null,
-        delay:             null,
-        is_realtime:       false,
-        directionId,
-        arrival_seconds:   diffSec,
-        arrival_minutes:   diffSec / 60,
-        _source:           'unir-gtfs',
-      }));
-    }
+    arrivals.push(_normalizeOne({
+      route_short_name:  dep.route_short_name,
+      trip_id:           dep.trip_id,
+      trip_headsign:     dep.trip_headsign || '',
+      scheduled_arrival: d.toISOString(),
+      realtime_arrival:  null,
+      delay:             null,
+      is_realtime:       false,
+      directionId:       dep.direction_id,
+      arrival_seconds:   diffSec,
+      arrival_minutes:   diffSec / 60,
+      _source:           'unir-gtfs-api',
+    }));
   }
 
   arrivals.sort((a, b) => {

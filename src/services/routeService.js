@@ -197,10 +197,20 @@ class RouteService {
     }
 
     try {
-      const routes = await apiService.fetchRoutesList();
-      const normalized = (Array.isArray(routes) ? routes : [])
+      // STCP/metrobus via proxy atual
+      const stcpRoutes = await apiService.fetchRoutesList();
+      const stcpNormalized = (Array.isArray(stcpRoutes) ? stcpRoutes : [])
           .map(route => this._normalizeRoute(route))
           .filter(Boolean);
+
+      // UNIR via GTFS API
+      const unirRoutes = await apiService.fetchGtfsUnirRoutesList();
+      const unirNormalized = (Array.isArray(unirRoutes) ? unirRoutes : [])
+          .map(route => this._normalizeRoute(route))
+          .filter(Boolean);
+
+      // Combinar (se quiseres, podes deduplicar por number+operator)
+      const normalized = [...stcpNormalized, ...unirNormalized];
 
       return this._setCache(key, normalized);
     } catch (error) {
@@ -209,7 +219,7 @@ class RouteService {
     }
   }
 
-  async fetchRouteShape(routeId, directionId = 0, forceRefresh = false) {
+  async fetchRouteShape(routeId, directionId = 0, forceRefresh = false, operatorHint = null) {
     const key = this._cacheKey('shape', routeId, directionId);
 
     if (!forceRefresh) {
@@ -218,7 +228,20 @@ class RouteService {
     }
 
     try {
-      const payload = await apiService.fetchRouteShape(routeId, directionId);
+      let payload;
+      if (String(operatorHint).toLowerCase() === 'unir') {
+        // UNIR via GTFS API
+        payload = await apiService.fetchGtfsRouteShape(routeId, directionId);
+        // payload.shapes: flatten para lista simples de pontos
+        if (payload?.shapes?.length) {
+          const points = payload.shapes.flatMap(shape => shape.points || []);
+          payload = points;
+        }
+      } else {
+        // STCP/metrobus via proxy atual
+        payload = await apiService.fetchRouteShape(routeId, directionId);
+      }
+
       const normalized = this._normalizeShapePayload(payload);
       return this._setCache(key, normalized);
     } catch (error) {
@@ -227,7 +250,7 @@ class RouteService {
     }
   }
 
-  async fetchRouteStops(routeId, directionId = 0, forceRefresh = false) {
+  async fetchRouteStops(routeId, directionId = 0, forceRefresh = false, operatorHint = null) {
     const key = this._cacheKey('stops', routeId, directionId);
 
     if (!forceRefresh) {
@@ -236,7 +259,12 @@ class RouteService {
     }
 
     try {
-      const payload = await apiService.fetchRouteStops(routeId, directionId);
+      let payload;
+      if (String(operatorHint).toLowerCase() === 'unir') {
+        payload = await apiService.fetchGtfsRouteStops(routeId, directionId);
+      } else {
+        payload = await apiService.fetchRouteStops(routeId, directionId);
+      }
       const normalized = this._normalizeStopsPayload(payload);
       return this._setCache(key, normalized);
     } catch (error) {
@@ -252,8 +280,8 @@ class RouteService {
     const direction = Number(route.direction ?? 0);
 
     const [shape, stops] = await Promise.all([
-      this.fetchRouteShape(route.routeId, direction, forceRefresh),
-      this.fetchRouteStops(route.routeId, direction, forceRefresh),
+      this.fetchRouteShape(route.routeId, direction, forceRefresh, route.operator),
+      this.fetchRouteStops(route.routeId, direction, forceRefresh, route.operator),
     ]);
 
     return {

@@ -3,6 +3,7 @@ import { mqttVehicleService } from '../services/mqttVehicleService.js';
 class ApiService {
   constructor() {
     this.proxyUrl = 'https://porto-live.tiagoanoliveira.workers.dev';
+    this.gtfsApiUrl = 'https://gtfs-api.tiagoanoliveira.workers.dev';
     this.retries = 3;
     this.delayMs = 500;
     this.timeoutMs = 10000;
@@ -21,6 +22,18 @@ class ApiService {
 
   buildUrl(path, params = null) {
     const url = new URL(`${this.proxyUrl}${path}`);
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          url.searchParams.set(key, value);
+        }
+      });
+    }
+    return url.toString();
+  }
+
+  buildGtfsUrl(path, params = null) {
+    const url = new URL(`${this.gtfsApiUrl}${path}`);
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
@@ -154,6 +167,104 @@ class ApiService {
   normalizeRoutesResponse(data) {
     const routes = Array.isArray(data) ? data : Array.isArray(data?.routes) ? data.routes : [];
     return routes.map(route => this.normalizeRoute(route)).filter(Boolean);
+  }
+
+  // ─── GTFS API (UNIR e grupo) ────────────────────────────────────────────────
+
+  async fetchGtfsUnirRoutesList(limit = 1000) {
+    try {
+      const data = await this.fetchWithRetry(
+          this.buildGtfsUrl('/routes/list', {
+            operator: 'unir',
+            limit,
+          })
+      );
+      // data.routes: [{ route_id, route_short_name, route_long_name, route_color, ... }]
+      return this.normalizeRoutesResponse(data.routes || data);
+    } catch (error) {
+      console.error('❌ Erro ao obter lista de rotas UNIR via GTFS API:', error);
+      return [];
+    }
+  }
+
+  async fetchGtfsRouteStops(routeId, directionId = 0) {
+    try {
+      const data = await this.fetchWithRetry(
+          this.buildGtfsUrl(`/route/${encodeURIComponent(routeId)}/stops`, {
+            direction: directionId,
+          })
+      );
+      // data.stops: [{ stop_id, stop_name, stop_lat, stop_lon, stop_sequence }]
+      return data;
+    } catch (error) {
+      console.error(`❌ Erro ao obter paragens da rota UNIR ${routeId} via GTFS API:`, error);
+      return null;
+    }
+  }
+
+  async fetchGtfsRouteShape(routeId, directionId = 0) {
+    try {
+      const data = await this.fetchWithRetry(
+          this.buildGtfsUrl(`/route/${encodeURIComponent(routeId)}/shape`, {
+            direction: directionId,
+          })
+      );
+      // data.shapes: [{ shape_id, points: [{ shape_pt_lat, shape_pt_lon, shape_pt_sequence }] }]
+      return data;
+    } catch (error) {
+      console.error(`❌ Erro ao obter shape da rota UNIR ${routeId} via GTFS API:`, error);
+      return null;
+    }
+  }
+
+  async fetchGtfsStopInfo(stopId) {
+    try {
+      const data = await this.fetchWithRetry(
+          this.buildGtfsUrl(`/stop/${encodeURIComponent(stopId)}/info`)
+      );
+      // Pode devolver Stop único ou { count, stops: [...] }
+      const stopObj = Array.isArray(data?.stops) ? data.stops[0] : data;
+      return this.normalizeStop(stopObj);
+    } catch (error) {
+      console.error(`❌ Erro ao obter info da paragem UNIR ${stopId} via GTFS API:`, error);
+      return null;
+    }
+  }
+
+  async fetchGtfsStopRoutes(stopId, operator = 'unir') {
+    try {
+      const data = await this.fetchWithRetry(
+          this.buildGtfsUrl(`/stop/${encodeURIComponent(stopId)}/routes`, {
+            operator,
+          })
+      );
+      // data.routes: [{ route_id, route_short_name, route_long_name, route_type, ... }]
+      return {
+        stopId: data.stopId || stopId,
+        routes: this.normalizeRoutesResponse(data.routes || []),
+      };
+    } catch (error) {
+      console.error(`❌ Erro ao obter rotas da paragem UNIR ${stopId} via GTFS API:`, error);
+      return { routes: [] };
+    }
+  }
+
+  async fetchGtfsStopSchedule(stopId, { date, routeId, limit = 300 } = {}) {
+    try {
+      const params = {
+        date:  date || undefined,
+        route: routeId || undefined,
+        limit,
+      };
+      const data = await this.fetchWithRetry(
+          this.buildGtfsUrl(`/stop/${stopId}/schedule`, params)
+      );
+      // data.departures: [{ trip_id, trip_headsign, route_short_name, arrival_time, departure_time, direction_id, stop_sequence, route_id }]
+      return data;
+    } catch (error) {
+      console.error(`❌ Erro ao obter schedule UNIR para paragem ${stopId} via GTFS API:`, error);
+      return null;
+    }
   }
 
   async fetchBusData() {
