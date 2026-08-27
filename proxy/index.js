@@ -1,9 +1,7 @@
 import STCP_ROUTES_DATA from '../resources/routes/stcp-routes.json' with { type: 'json' };
-import UNIR_ROUTES_DATA from '../resources/routes/unir-routes.json' with { type: 'json' };
 import METROBUS_ROUTES_DATA from '../resources/routes/metrobus-routes.json' with { type: 'json' };
 
 import STCP_STOPS_DATA from '../resources/stops/stcp-stops.json' with { type: 'json' };
-import UNIR_STOPS_DATA from '../resources/stops/unir-stops.json' with { type: 'json' };
 import METROBUS_STOPS_DATA from '../resources/stops/metrobus-stops.json' with { type: 'json' };
 
 import METROBUS_STOP_TIMES from '../resources/metrobus/stop-times.json' with { type: 'json' };
@@ -18,23 +16,19 @@ const corsHeaders = {
 const STCP_API_BASE = 'https://stcp.pt/api';
 
 const STCP_ROUTES = Array.isArray(STCP_ROUTES_DATA) ? STCP_ROUTES_DATA : (STCP_ROUTES_DATA.routes ?? []);
-const UNIR_ROUTES = Array.isArray(UNIR_ROUTES_DATA) ? UNIR_ROUTES_DATA : (UNIR_ROUTES_DATA.routes ?? []);
 const METROBUS_ROUTES = Array.isArray(METROBUS_ROUTES_DATA) ? METROBUS_ROUTES_DATA : (METROBUS_ROUTES_DATA.routes ?? []);
 
 const STCP_STOPS = Array.isArray(STCP_STOPS_DATA) ? STCP_STOPS_DATA : (STCP_STOPS_DATA.stops ?? []);
-const UNIR_STOPS = Array.isArray(UNIR_STOPS_DATA) ? UNIR_STOPS_DATA : (UNIR_STOPS_DATA.stops ?? []);
 const METROBUS_STOPS = Array.isArray(METROBUS_STOPS_DATA) ? METROBUS_STOPS_DATA : (METROBUS_STOPS_DATA.stops ?? []);
 
 const ALL_ROUTES = [
   ...STCP_ROUTES.map(r => normalizeRoute(r, 'stcp')),
   ...METROBUS_ROUTES.map(r => normalizeRoute(r, 'metrobus')),
-  ...UNIR_ROUTES.map(r => normalizeRoute(r, 'unir')),
 ];
 
 const ALL_STOPS = [
   ...STCP_STOPS.map(s => normalizeStopRecord(s, 'stcp')),
   ...METROBUS_STOPS.map(s => normalizeStopRecord(s, 'metrobus')),
-  ...UNIR_STOPS.map(s => normalizeStopRecord(s, 'unir')),
 ];
 
 const ROUTE_BY_ID = new Map();
