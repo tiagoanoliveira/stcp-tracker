@@ -197,19 +197,16 @@ class RouteService {
     }
 
     try {
-      // STCP/metrobus via proxy atual
-      const stcpRoutes = await apiService.fetchRoutesList();
+      const stcpRoutes = await apiService.fetchRoutesList();          // proxy
       const stcpNormalized = (Array.isArray(stcpRoutes) ? stcpRoutes : [])
           .map(route => this._normalizeRoute(route))
           .filter(Boolean);
 
-      // UNIR via GTFS API
-      const unirRoutes = await apiService.fetchGtfsUnirRoutesList();
+      const unirRoutes = await apiService.fetchGtfsUnirRoutesList();  // GTFS API
       const unirNormalized = (Array.isArray(unirRoutes) ? unirRoutes : [])
           .map(route => this._normalizeRoute(route))
           .filter(Boolean);
 
-      // Combinar (se quiseres, podes deduplicar por number+operator)
       const normalized = [...stcpNormalized, ...unirNormalized];
 
       return this._setCache(key, normalized);

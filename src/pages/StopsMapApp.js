@@ -502,39 +502,47 @@ export class StopsMapApp {
     // Limpar cache da paragem para garantir fetch fresco na primeira abertura
     plannedArrivalsService.clearCache(stop.stop_id);
 
-    const [stopInfo, unirSchedule] = await Promise.allSettled([
-      apiService.fetchStopInfo(stop.stop_id),
-      apiService.fetchStopScheduleUnir(stop.stop_id),
-    ]);
+    const isUnirStop = stop.operator === 'unir' || stop.operator.includes('ut');
 
     let routes = stop.routes || [];
 
-    if (stopInfo.status === 'fulfilled' && stopInfo.value) {
-      routes = stopInfo.value.routes || routes;
-    }
+    if (isUnirStop) {
+      try {
+        const [info, routesResp] = await Promise.all([
+          apiService.fetchGtfsStopInfo(stop.stop_id),
+          apiService.fetchGtfsStopRoutes(stop.stop_id, 'unir'),
+        ]);
 
-    const isUnirStop =
-        (stopInfo.status === 'fulfilled' && stopInfo.value?.operator === 'unir') ||
-        String(stop.stop_id).startsWith('prg:');
+        if (info) {
+          stop.stop_name = info.stop_name || stop.stop_name;
+          stop.latitude  = info.latitude  ?? stop.latitude;
+          stop.longitude = info.longitude ?? stop.longitude;
+        }
 
-    if (isUnirStop && unirSchedule.status === 'fulfilled' && unirSchedule.value?.lines) {
-      const lines = unirSchedule.value.lines || [];
-      routes = lines.map(lineNum => ({
-        id:         String(lineNum),
-        number:     String(lineNum),
-        name:       `Linha ${lineNum}`,
-        color:      getUnirLineColor?.(lineNum) || '#187EC2',
-        text_color: '#FFFFFF',
-        operator:   'unir',
-        source:     'unir',
-      }));
+        routes = routesResp.routes || routes;
+      } catch (e) {
+        console.warn('[StopsMapApp] Erro ao carregar info/rotas UNIR via GTFS:', e);
+      }
+    } else {
+      try {
+        const stopInfo = await apiService.fetchStopInfo(stop.stop_id);
+        if (stopInfo) {
+          routes = stopInfo.routes || routes;
+        }
+      } catch (e) {
+        console.warn('[StopsMapApp] Erro ao carregar info STCP:', e);
+      }
     }
 
     this.nextArrivals.setRoutes(routes);
 
-    // Primeiro load: forceRefresh=true para garantir dados frescos
+    // primeira carga de chegadas
     await this.loadStopArrivals(stop.stop_id, true, true);
-    this.startAutoRefresh();
+
+    // apenas STCP/Metrobus precisam de refresh automático
+    if (!isUnirStop) {
+      this.startAutoRefresh();
+    }
     this._pushStopToURL(stop.stop_id);
   }
 

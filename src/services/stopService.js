@@ -33,21 +33,26 @@ class StopService {
     }
 
     try {
-      const response = await apiService.fetchNearbyStops(lat, lng, radius);
-      const stops = response.stops || [];
+      const [proxyResp, gtfsResp] = await Promise.all([
+        apiService.fetchNearbyStops(lat, lng, radius),               // STCP + Metrobus (proxy)
+        apiService.fetchGtfsNearbyStops(lat, lng, radius, 'unir'),   // UNIR (GTFS API)
+      ]);
 
-      const normalized = stops.map(s => {
+      const proxyStops = proxyResp.stops || [];
+      const unirStops  = gtfsResp?.stops || [];
+
+      const normalized = [...proxyStops, ...unirStops].map(s => {
         const stop = {
           stop_id:   s.stop_id || s.stop_code || s.id,
           stop_code: s.stop_code || s.stop_id || s.id,
           stop_name: s.stop_name || s.name,
-          latitude:  s.latitude,
-          longitude: s.longitude,
-          distance:  s.distance,
+          latitude:  s.latitude ?? s.stop_lat,
+          longitude: s.longitude ?? s.stop_lon,
+          distance:  s.distance_m ?? s.distance,
           zone_id:   s.zone_id,
           routes:    s.routes || [],
-          operator:  s.operator,
-          source:    s.source,
+          operator:  s.operator_id || s.operator,
+          source:    s.operator_id || s.operator,
         };
         this.allStopsCache.set(stop.stop_id, stop);
         return stop;
@@ -106,8 +111,10 @@ class StopService {
       const stops = response.stops || [];
 
       if (stops.length === 0) {
-        console.warn(`⚠️ API não encontrou paragens para "${query}"`);
-        return [];
+        // tentar UNIR via GTFS
+        const gtfs = await apiService.fetchGtfsSearchStops(query, 'unir');
+        const unirStops = gtfs?.stops || [];
+        // normalizar e encher allStopsCache tal como no caso STCP
       }
 
       const normalized = stops.map(s => {

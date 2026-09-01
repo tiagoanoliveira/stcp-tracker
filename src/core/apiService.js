@@ -1,4 +1,4 @@
-import { mqttVehicleService } from '../services/mqttVehicleService.js';
+import {mqttVehicleService} from '../services/mqttVehicleService.js';
 
 class ApiService {
   constructor() {
@@ -44,6 +44,18 @@ class ApiService {
     return url.toString();
   }
 
+  async fetchGtfsNearbyStops(lat, lng, radius, operator = 'unir') {
+    return await this.fetchWithRetry(
+        this.buildGtfsUrl(`/nearby/${lat}/${lng}/${radius}`, {operator})
+    ); // { count, stops: [...] }
+  }
+
+  async fetchGtfsSearchStops(query, operator = 'unir') {
+    return await this.fetchWithRetry(
+        this.buildGtfsUrl('/search', {q: query.trim(), operator, type: 'stop', limit: 50})
+    ); // { query, stops: [...] }
+  }
+  
   async fetchWithRetry(
       url,
       options = {},
@@ -189,13 +201,12 @@ class ApiService {
 
   async fetchGtfsRouteStops(routeId, directionId = 0) {
     try {
-      const data = await this.fetchWithRetry(
+      // data.stops: [{ stop_id, stop_name, stop_lat, stop_lon, stop_sequence }]
+      return await this.fetchWithRetry(
           this.buildGtfsUrl(`/route/${encodeURIComponent(routeId)}/stops`, {
             direction: directionId,
           })
       );
-      // data.stops: [{ stop_id, stop_name, stop_lat, stop_lon, stop_sequence }]
-      return data;
     } catch (error) {
       console.error(`❌ Erro ao obter paragens da rota UNIR ${routeId} via GTFS API:`, error);
       return null;
@@ -204,13 +215,12 @@ class ApiService {
 
   async fetchGtfsRouteShape(routeId, directionId = 0) {
     try {
-      const data = await this.fetchWithRetry(
-          this.buildGtfsUrl(`/route/${encodeURIComponent(routeId)}/shape`, {
+      // data.shapes: [{ shape_id, points: [{ shape_pt_lat, shape_pt_lon, shape_pt_sequence }] }]
+      return await this.fetchWithRetry(
+          this.buildGtfsUrl(`/route/${routeId}/shape`, {
             direction: directionId,
           })
       );
-      // data.shapes: [{ shape_id, points: [{ shape_pt_lat, shape_pt_lon, shape_pt_sequence }] }]
-      return data;
     } catch (error) {
       console.error(`❌ Erro ao obter shape da rota UNIR ${routeId} via GTFS API:`, error);
       return null;
@@ -220,7 +230,7 @@ class ApiService {
   async fetchGtfsStopInfo(stopId) {
     try {
       const data = await this.fetchWithRetry(
-          this.buildGtfsUrl(`/stop/${encodeURIComponent(stopId)}/info`)
+          this.buildGtfsUrl(`/stop/${stopId}/info`)
       );
       // Pode devolver Stop único ou { count, stops: [...] }
       const stopObj = Array.isArray(data?.stops) ? data.stops[0] : data;
@@ -234,7 +244,7 @@ class ApiService {
   async fetchGtfsStopRoutes(stopId, operator = 'unir') {
     try {
       const data = await this.fetchWithRetry(
-          this.buildGtfsUrl(`/stop/${encodeURIComponent(stopId)}/routes`, {
+          this.buildGtfsUrl(`/stop/${stopId}/routes`, {
             operator,
           })
       );
@@ -256,11 +266,10 @@ class ApiService {
         route: routeId || undefined,
         limit,
       };
-      const data = await this.fetchWithRetry(
+      // data.departures: [{ trip_id, trip_headsign, route_short_name, arrival_time, departure_time, direction_id, stop_sequence, route_id }]
+      return await this.fetchWithRetry(
           this.buildGtfsUrl(`/stop/${stopId}/schedule`, params)
       );
-      // data.departures: [{ trip_id, trip_headsign, route_short_name, arrival_time, departure_time, direction_id, stop_sequence, route_id }]
-      return data;
     } catch (error) {
       console.error(`❌ Erro ao obter schedule UNIR para paragem ${stopId} via GTFS API:`, error);
       return null;

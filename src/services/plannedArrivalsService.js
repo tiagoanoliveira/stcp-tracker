@@ -59,12 +59,7 @@ async function _resolveStopCode(stopId) {
 
 function _isUnirStop(stopId) {
   const cached = stopService.getStopById(stopId);
-  if (cached?.operator === 'unir') return true;
-
-  const id = String(stopId);
-  // ids locais antigos (prg:...) ou ids GTFS tipo ut4:prg:...
-  if (id.startsWith('prg:') || id.includes(':prg:')) return true;
-
+  if (cached?.operator === 'unir' || cached?.operator.includes('ut')) return true;
   return false;
 }
 
@@ -233,18 +228,13 @@ async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 120) {
   const windowMs  = maxMinutes * 60_000;
   const arrivals  = [];
 
-  // Converter stopId local (ex. 'prg:prt:61') para alias GTFS (ex. 'unir:prg:prt:61')
-  const gtfsStopId = String(stopId).startsWith('unir:')
-      ? String(stopId)
-      : `unir:${stopId}`;
-
-  const schedule = await apiService.fetchGtfsStopSchedule(gtfsStopId, {
+  const schedule = await apiService.fetchGtfsStopSchedule(stopId, {
     date: now.toISOString().slice(0, 10), // YYYY-MM-DD
     limit: 5000,
   });
 
   if (!schedule?.departures || !Array.isArray(schedule.departures)) {
-    _info(`[ARRIVALS] UNIR GTFS schedule vazio para ${gtfsStopId}`);
+    _info(`[ARRIVALS] UNIR GTFS schedule vazio para ${stopId}`);
     return [];
   }
 
