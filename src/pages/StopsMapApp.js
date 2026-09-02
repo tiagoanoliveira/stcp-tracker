@@ -414,7 +414,10 @@ export class StopsMapApp {
     this._lineFilterMode = true;
     const enrichedRouteObjs = routeObjs.map(r => ({
       ...r,
-      routeId: String(r.id || r.number),
+      routeId: String(r.routeId || r.id),
+      id: String(r.id || r.routeId),
+      number: String(r.number),
+      operator: r.operator || r.source || 'stcp',
     }));
     const overlayData = await routeOverlayService.buildOverlays(enrichedRouteObjs);
     this.lineOverlayManager.setRoutes(overlayData);
@@ -563,7 +566,7 @@ export class StopsMapApp {
     try {
       const isUnirStop = stopService.getStopById(stopId)?.operator === 'unir' || String(stopId).startsWith('prg:');
       // forceRefresh=true: botão de refresh e intervalo de 5 s
-      const windowMinutes = isUnirStop ? 3600 : 60;
+      const windowMinutes = isUnirStop ? 1440 : 60;
       const arrivals = await plannedArrivalsService.getNextArrivals(stopId, windowMinutes, forceRefresh);
 
       if (!arrivals || arrivals.length === 0) {
@@ -781,51 +784,59 @@ export class StopsMapApp {
         ? selectedRoutes
         : routeFilterState.selectedRoutes;
 
-    const availableRoutes = this.nextArrivals?.availableRoutes || [];
-    const resolvedDirMap  = new Map();
+    const availableVariants =
+        this.nextArrivals?.availableRouteVariants?.length
+            ? this.nextArrivals.availableRouteVariants
+            : (this.nextArrivals?.availableRoutes || []);
+
+    const routeDirMap = new Map();
+    const routeObjsForOverlay = [];
 
     if (this.currentStopId && effectiveFilter.size > 0) {
       await Promise.all(Array.from(effectiveFilter).map(async routeNum => {
-        const r       = availableRoutes.find(rt => String(rt.number) === String(routeNum));
-        const routeId = String(r?.id || routeNum);
-        let direction = 0;
-        try {
-          const stopsDir0 = await routeService.fetchRouteStops(routeId, 0);
-          const stopIds0  = (stopsDir0?.stops || []).map(s => String(s.stop_id));
-          if (!stopIds0.includes(String(this.currentStopId))) direction = 1;
-          _log(`handleArrivalFilterChange linha:${routeId} paragem:${this.currentStopId} dir0 tem ${stopIds0.length} paragens → usar dir:${direction}`);
-        } catch (e) {
-          _warn(`handleArrivalFilterChange: erro ao obter paragens dir0 para linha ${routeId}`, e);
-        }
-        resolvedDirMap.set(String(routeNum), direction);
+        const variants = availableVariants.filter(rt => String(rt.number) === String(routeNum));
+
+        await Promise.all(variants.map(async r => {
+          const routeId = String(r.routeId || r.id || r.number);
+          let direction = 0;
+
+          try {
+            const stopsDir0 = await routeService.fetchRouteStops(routeId, 0, false, r.operator);
+            const stopIds0 = (stopsDir0?.stops || []).map(s => String(s.stop_id));
+            if (!stopIds0.includes(String(this.currentStopId))) direction = 1;
+          } catch (e) {
+            console.warn(`Erro a resolver direção da rota ${routeId}`, e);
+          }
+
+          routeDirMap.set(routeId, direction);
+          routeObjsForOverlay.push({
+            ...r,
+            routeId,
+            direction,
+          });
+        }));
       }));
     }
 
-    // Actualizar o estado global com as direcções correctas.
-    routeFilterState.updateDirections(resolvedDirMap);
+    routeFilterState.updateDirections(routeDirMap);
 
-    const visiblePositions = this.busMarkerManager.filterByRoutes(effectiveFilter, resolvedDirMap);
+    const visiblePositions = this.busMarkerManager.filterByRoutes(
+        effectiveFilter,
+        routeFilterState.allowedDirectionsByNumber
+    );
 
-    if (selectedRoutes.size === 0 && !routeFilterState.hasActive()) {
+    if (routeObjsForOverlay.length > 0) {
+      const overlayData = await routeOverlayService.buildOverlays(routeObjsForOverlay);
+      this.lineOverlayManager.setRoutes(overlayData);
+    } else if (selectedRoutes.size === 0 && !routeFilterState.hasActive()) {
       this.lineOverlayManager.clearAll();
-    } else {
-      const sourceRoutes = selectedRoutes.size > 0 ? selectedRoutes : routeFilterState.selectedRoutes;
-      const routeObjs = availableRoutes
-          .filter(r => sourceRoutes.has(String(r.number)))
-          .map(r => ({
-            routeId:    String(r.id || r.number),
-            direction:  resolvedDirMap.get(String(r.number)) ?? 0,
-            color:      r.color      || '#187EC2',
-            text_color: r.text_color || '#FFFFFF'
-          }));
-
-      if (routeObjs.length > 0) {
-        const overlayData = await routeOverlayService.buildOverlays(routeObjs);
-        this.lineOverlayManager.setRoutes(overlayData);
-      }
     }
-    if (visiblePositions.length > 0) { this._recenterOnPositions(visiblePositions); }
-    else if (this.lineOverlayManager.hasActiveLayers()) { this.lineOverlayManager.fitBounds({ panelHeightRatio: 0.5 }); }
+
+    if (visiblePositions.length > 0) {
+      this._recenterOnPositions(visiblePositions);
+    } else if (this.lineOverlayManager.hasActiveLayers()) {
+      this.lineOverlayManager.fitBounds({ panelHeightRatio: 0.5 });
+    }
   }
 
   recenterOnBuses() { this._recenterOnPositions(this.currentBusPositions); }

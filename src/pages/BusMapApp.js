@@ -700,7 +700,7 @@ export class BusMapApp {
     try {
       const arrivals = await plannedArrivalsService.getNextArrivals(
         stopId,
-        3600,
+        1440,
         forceRefresh
       );
 

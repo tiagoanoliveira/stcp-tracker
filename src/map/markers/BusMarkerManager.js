@@ -84,7 +84,10 @@ export class BusMarkerManager {
       let visible = showAll || selectedRoutes.has(displayLine);
 
       if (visible && routeDirMap && routeDirMap.has(displayLine) && markerDir !== null) {
-        visible = markerDir === routeDirMap.get(displayLine);
+        const allowedDirs = routeDirMap.get(displayLine);
+        visible = allowedDirs instanceof Set
+            ? allowedDirs.has(markerDir)
+            : markerDir === allowedDirs;
       }
 
       if (visible) {

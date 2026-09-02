@@ -89,6 +89,7 @@ export class NextArrivals {
     this.allArrivals     = [];
     this.allVehicles     = [];
     this._timeCheckInterval = null;
+    this.availableRouteVariants = [];
   }
 
   create() {
@@ -174,14 +175,20 @@ export class NextArrivals {
   // ─── Filtros ────────────────────────────────────────────────────────────────
 
   setRoutes(routes = []) {
-    this.availableRoutes = [...routes].sort(
-        (a, b) => String(a.number).localeCompare(String(b.number), 'pt', { numeric: true })
+    this.availableRouteVariants = [...routes];
+
+    const deduped = Array.from(
+        new Map(
+            routes.map(r => [String(r.number), r])
+        ).values()
+    ).sort((a, b) =>
+        String(a.number).localeCompare(String(b.number), 'pt', { numeric: true })
     );
 
-    // Sincronizar com filtro global: se houver filtros globais ativos
-    // que correspondem a rotas desta paragem, pré-selecioná-los
+    this.availableRoutes = deduped;
+
     this.selectedRoutes = new Set(
-        routes
+        deduped
             .map(r => String(r.number))
             .filter(num => routeFilterState.selectedRoutes.has(num))
     );
@@ -491,22 +498,28 @@ export class NextArrivals {
    *   ≥ 60 m       → "Xh YY"
    */
   _formatArrivalTime(arrival) {
+    const ts = arrival.realtime_arrival || arrival.scheduled_arrival;
+    const clock = (() => {
+      if (!ts) return null;
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return null;
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    })();
+
     const seconds = arrival.arrival_seconds;
     const minutes = arrival.arrival_minutes;
-    // Preferir seconds se disponível (mais preciso)
+
     if (Number.isFinite(seconds)) {
       if (seconds < 60) return 'A chegar';
       const m = Math.floor(seconds / 60);
       if (m < 60) return `${m} min`;
-      const h = Math.floor(m / 60);
-      return `${h}h${String(m % 60).padStart(2, '0')}`;
+      return clock ? `Às ${clock}` : `${m} min`;
     }
-    // Fallback para minutos
-    if (minutes === undefined || minutes === null) return 'N/A';
+
+    if (minutes === undefined || minutes === null) return clock ? `Às ${clock}` : 'N/A';
     if (minutes < 1) return 'A chegar';
     if (minutes < 60) return `${Math.round(minutes)} min`;
-    const h = Math.floor(minutes / 60);
-    return `${h}h${String(Math.round(minutes % 60)).padStart(2, '0')}`;
+    return clock ? `Às ${clock}` : `${Math.round(minutes)} min`;
   }
 
   // ─── Favoritos ───────────────────────────────────────────────────────────────

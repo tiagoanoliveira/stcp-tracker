@@ -222,7 +222,14 @@ function _merge(otpArr, realtimeArr) {
   return merged;
 }
 
-async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 3600) {
+function _buildLocalServiceDate(year, month, day, timeStr) {
+  const [rawH, rawM, rawS] = String(timeStr).split(':').map(Number);
+  const d = new Date(year, month, day, 0, 0, 0, 0);
+  d.setHours(rawH || 0, rawM || 0, rawS || 0, 0);
+  return d;
+}
+
+async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 1440) {
   const now       = new Date();
   const nowMs     = now.getTime();
   const windowMs  = maxMinutes * 60_000;
@@ -254,8 +261,7 @@ async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 3600) {
     const timeStr = dep.arrival_time || dep.departure_time;
     if (!timeStr) continue;
 
-    const [h, m, s] = timeStr.split(':').map(Number);
-    const d = new Date(Date.UTC(year, month, day, h, m, s || 0));
+    const d = _buildLocalServiceDate(year, month, day, timeStr);
     const t = d.getTime();
     const diffMs = t - nowMs;
     if (diffMs < 0 || diffMs > windowMs) continue;
@@ -289,7 +295,7 @@ async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 3600) {
 
 class PlannedArrivalsService {
 
-  async getNextArrivals(stopId, maxMinutes = 3600, forceRefresh = false) {
+  async getNextArrivals(stopId, maxMinutes = 1440, forceRefresh = false) {
     const cacheKey = `${stopId}:${maxMinutes}`;
 
     const isUnir = _isUnirStop(stopId);
@@ -306,7 +312,7 @@ class PlannedArrivalsService {
       }
 
       try {
-        const result = await _getUnirArrivalsFromStopTimes(stopId, maxMinutes || 3600);
+        const result = await _getUnirArrivalsFromStopTimes(stopId, maxMinutes || 1440);
         if (result.length > 0) {
           _cache.set(cacheKey, { data: result, ts: Date.now() });
         }

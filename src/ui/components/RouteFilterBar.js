@@ -3,10 +3,28 @@
  *
  * Interface pública:
  *  mount()                  injeta HTML no container
- *  setRoutes(routes[])      define lista de linhas
+ *  setRoutes(routes[])      define lista de percursos (podem existir vários
+ *                            percursos/variantes com o mesmo `number`)
  *  setLoading(bool)         spinner enquanto carrega
- *  getSelected()            Set<string> de números seleccionados
- *  onFilterChange(cb)       cb(Set<string>, routeObjects[]) — routeObjects inclui direction (0|1)
+ *  getSelected()            Set<string> de NÚMEROS de linha activos
+ *  onFilterChange(cb)       cb(Set<string> numeros, routeObjects[]) —
+ *                            routeObjects são as VARIANTES (routeId + direction)
+ *                            realmente seleccionadas, não apenas os números
+ *
+ * Modelo de dados:
+ *  this.routes    -> lista PLANA de percursos/variantes (cada um com id/routeId
+ *                     próprio; o mesmo `number` pode aparecer várias vezes)
+ *  this.selected  -> Map<routeId, { route, direction }>  (chave = variante,
+ *                     nunca o número de linha, para não colapsar percursos
+ *                     diferentes da mesma linha)
+ *
+ * Percursos múltiplos por linha:
+ *  Quando uma linha (número) tem mais do que uma variante/percurso, é
+ *  mostrado um único chip principal (activa a 1.ª variante ao clicar) e,
+ *  quando existe uma variante activa, um botão "Ver outros percursos" que
+ *  expande a lista de variantes dessa linha. Cada variante pode ser activada
+ *  independentemente (múltiplas variantes da mesma linha podem estar activas
+ *  em simultâneo) e cada uma tem a sua própria direcção (ida/volta).
  *
  * Visibilidade temporal:
  *  Linhas diurnas  (sem 'M' no sufixo): visíveis 05:30–01:30
@@ -51,13 +69,21 @@ export class RouteFilterBar {
   constructor(containerId) {
     this.containerId = containerId;
     this.container   = null;
+
+    /** @type {Array<Object>} lista PLANA de percursos/variantes */
     this.routes      = [];
+
+    /** @type {Map<string, {route: Object, direction: number}>} routeId -> selecção */
     this.selected    = new Map();
+
     this._onFilterChange = null;
     this._timeCheckInterval = null;
-    this._stcpExpanded = new Set();   // grupos STCP expandidos ex: '2', '3', ...
-    this._unirExpanded = new Set();   // lotes UNIR expandidos ex: '1', '2', ...
-    this._unirSubExpanded = new Set(); // não necessário por ora
+    this._stcpExpanded = new Set();      // grupos STCP expandidos ex: '2', '3', ...
+    this._unirExpanded = new Set();      // lotes UNIR expandidos ex: '1', '2', ...
+    this._unirSubExpanded = new Set();   // não necessário por ora
+
+    /** @type {Set<string>} números de linha com "Ver outros percursos" aberto */
+    this._expandedLineFamilies = new Set();
   }
 
   mount() {
@@ -92,6 +118,7 @@ export class RouteFilterBar {
   setRoutes(routes = []) {
     this.routes   = routes;
     this.selected = new Map();
+    this._expandedLineFamilies = new Set();
     this._render();
   }
 
@@ -105,12 +132,37 @@ export class RouteFilterBar {
     }
   }
 
+  /** @returns {Set<string>} números de linha com pelo menos uma variante activa */
   getSelected() {
-    return new Set(this.selected.keys());
+    const numbers = new Set();
+    for (const { route } of this.selected.values()) {
+      numbers.add(String(route.number ?? route.id));
+    }
+    return numbers;
   }
 
   onFilterChange(callback) {
     this._onFilterChange = callback;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers de identidade
+  // ---------------------------------------------------------------------------
+
+  /** Identificador único de uma variante/percurso (nunca o número de linha). */
+  _routeId(route) {
+    return String(route.routeId ?? route.id ?? route.number ?? '');
+  }
+
+  /** Agrupa uma lista plana de percursos pelo número de linha visível. */
+  _groupRoutesByNumber(routes = []) {
+    const map = new Map(); // number -> variants[]
+    for (const route of routes) {
+      const number = String(route.number ?? route.id ?? '');
+      if (!map.has(number)) map.set(number, []);
+      map.get(number).push(route);
+    }
+    return map;
   }
 
   // ---------------------------------------------------------------------------
@@ -167,37 +219,39 @@ export class RouteFilterBar {
     return id === 'MB1' || number === 'MB1' || number.startsWith('MB');
   }
 
-  /** Render STCP em grupos (2XX, 3XX, etc.) */
+  /** Render STCP em grupos (2XX, 3XX, etc.), já agrupado por linha (família). */
   _renderStcpGroups(chipsEl, stcpRoutes) {
-    const defaultExpanded = getSetting(SETTINGS_KEYS.STCP_GROUPS_EXPANDED, true);
+    // families: number -> variants[]
+    const families = this._groupRoutesByNumber(stcpRoutes);
 
-    // Agrupa por prefixo numérico (primeiro dígito) + 'M' (nocturnas)
-    const groups = {};
-    stcpRoutes.forEach(route => {
-      const num = String(route.number ?? route.id);
+    // Agrupa as FAMÍLIAS (não as variantes individuais) por prefixo numérico
+    const groups = {}; // prefix -> [number, number, ...]
+    families.forEach((variants, number) => {
       let prefix;
-      if (/M$/i.test(num)) {
+      if (/M$/i.test(number)) {
         prefix = 'XM';
       } else {
-        prefix = num.charAt(0);
+        prefix = number.charAt(0);
       }
       if (!groups[prefix]) groups[prefix] = [];
-      groups[prefix].push(route);
+      groups[prefix].push(number);
     });
 
     const orderedPrefixes = [...STCP_GROUP_PREFIXES, 'XM']
         .filter(p => groups[p]);
 
     orderedPrefixes.forEach(prefix => {
-      const groupRoutes = groups[prefix];
+      const groupNumbers = groups[prefix];
       const label = prefix === 'XM' ? 'XM' : `${prefix}XX`;
 
-      const groupColor = groupRoutes[0]?.color || '#0072c6';
-      const groupTextColor = groupRoutes[0]?.text_color || '#FFFFFF';
+      const firstFamilyVariants = families.get(groupNumbers[0]) || [];
+      const groupColor = firstFamilyVariants[0]?.color || '#0072c6';
+      const groupTextColor = firstFamilyVariants[0]?.text_color || '#FFFFFF';
 
-      // Se o grupo só tem 1 linha, mostrar directamente sem agrupamento
-      if (groupRoutes.length === 1) {
-        this._appendChip(chipsEl, groupRoutes[0]);
+      // Se o grupo só tem 1 linha (família), mostrar directamente sem agrupamento
+      if (groupNumbers.length === 1) {
+        const number = groupNumbers[0];
+        this._appendLineFamilyChip(chipsEl, number, families.get(number));
         return;
       }
 
@@ -222,7 +276,7 @@ export class RouteFilterBar {
         });
         chipsEl.appendChild(groupChip);
       } else {
-        // Mostrar botão de colapso + chips individuais
+        // Mostrar botão de colapso + chips individuais (uma família por chip)
         const collapseBtn = document.createElement('button');
         collapseBtn.className = 'rfb-group-btn rfb-group-btn--expanded';
         collapseBtn.textContent = label;
@@ -237,14 +291,19 @@ export class RouteFilterBar {
         });
         chipsEl.appendChild(collapseBtn);
 
-        groupRoutes.forEach(route => this._appendChip(chipsEl, route));
+        groupNumbers.forEach(number => {
+          this._appendLineFamilyChip(chipsEl, number, families.get(number));
+        });
       }
     });
   }
 
-  /** Render UNIR em lotes (1XXX, 2XXX, ...) com sub-expansão */
+  /** Render UNIR em lotes (1XXX, 2XXX, ...) com sub-expansão, agrupado por linha. */
   _renderUnirGroups(chipsEl, unirRoutes) {
     const defaultExpanded = getSetting(SETTINGS_KEYS.UNIR_GROUPS_EXPANDED, false);
+
+    // families: number -> variants[]
+    const families = this._groupRoutesByNumber(unirRoutes);
 
     // Chip "UNIR" raiz
     const unirExpanded = this._unirExpanded.has('__root__');
@@ -262,16 +321,16 @@ export class RouteFilterBar {
 
     if (!unirExpanded) return;
 
-    // Agrupar por milhar (1XXX, 2XXX, ...)
-    const lots = {};
-    unirRoutes.forEach(route => {
-      const lot = String(Math.floor(parseInt(String(route.number ?? route.id), 10) / 1000));
+    // Agrupar FAMÍLIAS por milhar (1XXX, 2XXX, ...)
+    const lots = {}; // lot -> [number, number, ...]
+    families.forEach((variants, number) => {
+      const lot = String(Math.floor(parseInt(number, 10) / 1000));
       if (!lots[lot]) lots[lot] = [];
-      lots[lot].push(route);
+      lots[lot].push(number);
     });
 
     Object.keys(lots).sort().forEach(lot => {
-      const lotRoutes = lots[lot];
+      const lotNumbers = lots[lot];
       const lotLabel = `${lot}XXX`;
       const lotExpanded = this._unirExpanded.has(`lot_${lot}`);
 
@@ -287,37 +346,59 @@ export class RouteFilterBar {
       chipsEl.appendChild(lotBtn);
 
       if (lotExpanded) {
-        lotRoutes.forEach(route => this._appendChip(chipsEl, route));
+        lotNumbers.forEach(number => {
+          this._appendLineFamilyChip(chipsEl, number, families.get(number));
+        });
       }
     });
   }
 
-  /** Cria e adiciona um chip individual (comportamento igual ao render actual) */
-  _appendChip(chipsEl, route) {
-    const entry      = this.selected.get(route.number ?? route.id);
-    const isActive   = Boolean(entry);
-    const direction  = entry?.direction ?? 0;
-    const isCircular = CIRCULAR_LINES.has(String(route.number ?? route.id));
-    const night      = isNightLine(route.number ?? route.id);
+  /**
+   * Cria e adiciona o chip de uma LINHA (número), que pode ter uma ou mais
+   * variantes/percursos por baixo.
+   *
+   * Comportamento:
+   *  - Clicar no chip principal quando NENHUMA variante está activa activa
+   *    a 1.ª variante da lista.
+   *  - Clicar no chip principal quando já existe pelo menos uma variante
+   *    activa mantém/desliga essa variante (a primeira activa).
+   *  - Se existir mais do que uma variante, mostra "Ver outros percursos"
+   *    (apenas quando a linha está activa) para escolher/activar outras
+   *    variantes em simultâneo.
+   *  - Cada variante activa tem o seu próprio botão de direcção (ida/volta).
+   */
+  _appendLineFamilyChip(chipsEl, number, variants = []) {
+    const night = isNightLine(number);
+    const activeVariants = variants.filter(v => this.selected.has(this._routeId(v)));
+    const isActive = activeVariants.length > 0;
+    const primary = activeVariants[0] || variants[0];
+    const isCircular = CIRCULAR_LINES.has(String(number));
+
+    const wrap = document.createElement('div');
+    wrap.className = 'rfb-family';
+    wrap.dataset.line = String(number);
+    wrap.dataset.nightLine = night ? 'true' : 'false';
 
     const chip = document.createElement('div');
     chip.className    = `rfb-chip${isActive ? ' active' : ''}`;
-    chip.dataset.line = String(route.number ?? route.id);
+    chip.dataset.line = String(number);
     chip.dataset.nightLine = night ? 'true' : 'false';
 
     const mainBtn = document.createElement('button');
     mainBtn.className             = 'rfb-chip-main';
-    mainBtn.style.backgroundColor = route.color      || '#187EC2';
-    mainBtn.style.color           = route.text_color || '#FFFFFF';
-    mainBtn.title       = route.name || route.number;
-    mainBtn.textContent = route.number;
-    mainBtn.addEventListener('click', () => this._toggleRoute(route));
+    mainBtn.style.backgroundColor = primary?.color      || '#187EC2';
+    mainBtn.style.color           = primary?.text_color || '#FFFFFF';
+    mainBtn.title       = primary?.name || number;
+    mainBtn.textContent = number;
+    mainBtn.addEventListener('click', () => this._toggleRouteVariant(primary, variants));
     chip.appendChild(mainBtn);
 
-    if (isActive) {
+    if (isActive && primary) {
+      const primaryDirection = this.selected.get(this._routeId(primary))?.direction ?? 0;
+
       const dirBtn = document.createElement('button');
-      dirBtn.style.backgroundColor = this._darken(route.color || '#187EC2');
-      dirBtn.style.color           = route.text_color || '#FFFFFF';
+      dirBtn.style.backgroundColor = this._darken(primary.color || '#187EC2');
+      dirBtn.style.color           = primary.text_color || '#FFFFFF';
 
       if (isCircular) {
         dirBtn.className   = 'rfb-chip-dir rfb-chip-circular';
@@ -327,14 +408,75 @@ export class RouteFilterBar {
         dirBtn.tabIndex = -1;
       } else {
         dirBtn.className   = 'rfb-chip-dir';
-        dirBtn.title       = direction === 0 ? 'Mostrar volta (direção 1)' : 'Mostrar ida (direção 0)';
-        dirBtn.textContent = direction === 0 ? '\u2192' : '\u2190';
-        dirBtn.addEventListener('click', e => { e.stopPropagation(); this._toggleDirection(route); });
+        dirBtn.title       = primaryDirection === 0 ? 'Mostrar volta (direção 1)' : 'Mostrar ida (direção 0)';
+        dirBtn.textContent = primaryDirection === 0 ? '\u2192' : '\u2190';
+        dirBtn.addEventListener('click', e => { e.stopPropagation(); this._toggleDirectionVariant(primary); });
       }
       chip.appendChild(dirBtn);
     }
 
-    chipsEl.appendChild(chip);
+    wrap.appendChild(chip);
+
+    // "Ver outros percursos" — só quando há mais de uma variante e a linha está activa
+    if (variants.length > 1 && isActive) {
+      const isExpanded = this._expandedLineFamilies.has(String(number));
+
+      const moreBtn = document.createElement('button');
+      moreBtn.className   = 'rfb-family-more';
+      moreBtn.textContent = isExpanded ? 'Ocultar outros percursos' : 'Ver outros percursos';
+      moreBtn.title       = `${variants.length} percursos disponíveis para a linha ${number}`;
+      moreBtn.addEventListener('click', () => {
+        if (isExpanded) this._expandedLineFamilies.delete(String(number));
+        else this._expandedLineFamilies.add(String(number));
+        this._render();
+      });
+      wrap.appendChild(moreBtn);
+
+      if (isExpanded) {
+        const variantsEl = document.createElement('div');
+        variantsEl.className = 'rfb-family-variants';
+
+        variants.forEach(variant => {
+          const routeId    = this._routeId(variant);
+          const entry      = this.selected.get(routeId);
+          const isVarActive = Boolean(entry);
+
+          const row = document.createElement('div');
+          row.className = 'rfb-variant-row';
+
+          const btn = document.createElement('button');
+          btn.className   = `rfb-variant-btn${isVarActive ? ' active' : ''}`;
+          btn.textContent = variant.name || variant.route_long_name || `${number}`;
+          btn.title       = variant.name || variant.route_long_name || `${number}`;
+          btn.addEventListener('click', () => this._toggleRouteVariant(variant, variants));
+          row.appendChild(btn);
+
+          if (isVarActive) {
+            const varDirBtn = document.createElement('button');
+            varDirBtn.className = 'rfb-variant-dir-btn';
+
+            if (isCircular) {
+              varDirBtn.textContent = '\u25CB';
+              varDirBtn.title       = 'Linha circular — sentido único';
+              varDirBtn.setAttribute('aria-disabled', 'true');
+              varDirBtn.tabIndex = -1;
+            } else {
+              const dir = entry.direction ?? 0;
+              varDirBtn.textContent = dir === 0 ? '\u2192' : '\u2190';
+              varDirBtn.title       = dir === 0 ? 'Mostrar volta (direção 1)' : 'Mostrar ida (direção 0)';
+              varDirBtn.addEventListener('click', e => { e.stopPropagation(); this._toggleDirectionVariant(variant); });
+            }
+            row.appendChild(varDirBtn);
+          }
+
+          variantsEl.appendChild(row);
+        });
+
+        wrap.appendChild(variantsEl);
+      }
+    }
+
+    chipsEl.appendChild(wrap);
   }
 
   /**
@@ -346,20 +488,20 @@ export class RouteFilterBar {
     if (!chipsEl) return;
     const { showDay, showNight } = getLineVisibility(new Date());
 
-    chipsEl.querySelectorAll('.rfb-chip').forEach(chip => {
-      const night = chip.dataset.nightLine === 'true';
+    chipsEl.querySelectorAll('.rfb-family').forEach(family => {
+      const night = family.dataset.nightLine === 'true';
       const show  = night ? showNight : showDay;
-      chip.style.display = show ? '' : 'none';
+      family.style.display = show ? '' : 'none';
     });
 
-    // Se uma linha seleccionada ficou oculta, desse-lecciona-a silenciosamente
+    // Se uma variante seleccionada pertence a uma linha que ficou oculta,
+    // desse-lecciona-a silenciosamente.
     let changed = false;
-    for (const [num] of this.selected) {
-      const route = this.routes.find(r => String(r.number) === String(num));
-      if (!route) continue;
-      const night = isNightLine(num);
-      const show  = night ? showNight : showDay;
-      if (!show) { this.selected.delete(num); changed = true; }
+    for (const [routeId, entry] of Array.from(this.selected.entries())) {
+      const number = String(entry.route.number ?? entry.route.id ?? '');
+      const night  = isNightLine(number);
+      const show   = night ? showNight : showDay;
+      if (!show) { this.selected.delete(routeId); changed = true; }
     }
     if (changed) { this._render(); this._emit(); }
   }
@@ -368,39 +510,71 @@ export class RouteFilterBar {
   // Interacções
   // ---------------------------------------------------------------------------
 
-  _toggleRoute(route) {
-    if (this.selected.has(route.number ?? route.id)) {
-      this.selected.delete(route.number ?? route.id);
+  /**
+   * Alterna a activação de UMA variante/percurso específica.
+   * Se a variante já está activa, desactiva-a. Caso contrário, activa-a
+   * (sem desactivar outras variantes da mesma linha — permite múltiplas
+   * variantes activas em simultâneo, cada uma com a sua direcção).
+   *
+   * @param {Object} route     - variante a activar/desactivar
+   * @param {Array}  [variants] - todas as variantes da mesma linha (não usado
+   *                               para desactivar as outras; mantido para
+   *                               eventual lógica futura)
+   */
+  _toggleRouteVariant(route, variants = null) {
+    if (!route) return;
+    const routeId = this._routeId(route);
+    if (this.selected.has(routeId)) {
+      this.selected.delete(routeId);
     } else {
-      this.selected.set(route.number ?? route.id, { route, direction: 0 });
+      this.selected.set(routeId, { route, direction: 0 });
     }
     this._render();
     this._emit();
   }
 
-  _toggleDirection(route) {
-    const entry = this.selected.get(route.number ?? route.id);
+  _toggleDirectionVariant(route) {
+    if (!route) return;
+    const routeId = this._routeId(route);
+    const entry = this.selected.get(routeId);
     if (!entry) return;
     entry.direction = entry.direction === 0 ? 1 : 0;
-    this.selected.set(route.number ?? route.id, entry);
+    this.selected.set(routeId, entry);
     this._render();
     this._emit();
   }
 
   _clearAll() {
     this.selected.clear();
+    this._expandedLineFamilies.clear();
     this._render();
     this._emit();
   }
 
+  /**
+   * Emite o estado actual do filtro.
+   *  - selectedLineNumbers: Set<string> de NÚMEROS de linha com pelo menos
+   *    uma variante activa (usado para filtrar chegadas/veículos por linha).
+   *  - selectedRouteObjs: Array de VARIANTES activas, cada uma com routeId,
+   *    number e direction — usado para overlays de mapa e direcção por
+   *    percurso.
+   */
   _emit() {
     if (!this._onFilterChange) return;
-    const selectedSet = new Set(this.selected.keys());
-    const routeObjs   = Array.from(this.selected.values()).map(e => ({
+
+    const selectedRouteObjs = Array.from(this.selected.values()).map(e => ({
       ...e.route,
-      direction: e.direction
+      routeId: this._routeId(e.route),
+      id: this._routeId(e.route),
+      number: String(e.route.number ?? e.route.id),
+      direction: e.direction,
     }));
-    this._onFilterChange(selectedSet, routeObjs);
+
+    const selectedLineNumbers = new Set(
+        selectedRouteObjs.map(r => String(r.number))
+    );
+
+    this._onFilterChange(selectedLineNumbers, selectedRouteObjs);
   }
 
   // ---------------------------------------------------------------------------
