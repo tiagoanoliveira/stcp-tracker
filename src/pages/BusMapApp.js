@@ -28,7 +28,6 @@ import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
 import { wireFilterToggleButton } from '../ui/components/filterBarToggle.js';
 import routeOverlayService from '../services/routeOverlayService.js';
 import {getSetting, SETTINGS_KEYS} from "../config/filterSettings.js";
-import {getUnirLineColor} from "../../resources/busDesign/busColors.js";
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -701,7 +700,7 @@ export class BusMapApp {
     try {
       const arrivals = await plannedArrivalsService.getNextArrivals(
         stopId,
-        60,
+        3600,
         forceRefresh
       );
 

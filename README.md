@@ -277,7 +277,7 @@ clearCache()
 **Métodos**:
 
 ```javascript
-getNextArrivals(stopId, maxMinutes = 60)
+getNextArrivals(stopId, maxMinutes = 3600)
 ```
 - **Parâmetros**: Código da paragem, tempo máximo em minutos
 - **Retorna**: `Promise<Array>` - Chegadas ordenadas por tempo
@@ -374,7 +374,7 @@ fetchStopSchedule(stopId, routeId, serviceId)
    ↓
 6. Utilizador clica numa paragem:
    ↓
-7. ⭐ plannedArrivalsService.getNextArrivals(stopId, 60)
+7. ⭐ plannedArrivalsService.getNextArrivals(stopId, 3600)
    ↓
    7.1. apiService.fetchStopRealtime(stopId) → Tempo real
    ↓

@@ -222,7 +222,7 @@ function _merge(otpArr, realtimeArr) {
   return merged;
 }
 
-async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 120) {
+async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 3600) {
   const now       = new Date();
   const nowMs     = now.getTime();
   const windowMs  = maxMinutes * 60_000;
@@ -261,7 +261,6 @@ async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 120) {
     if (diffMs < 0 || diffMs > windowMs) continue;
 
     const diffSec = Math.round(diffMs / 1000);
-
     arrivals.push(_normalizeOne({
       route_short_name:  dep.route_short_name,
       trip_id:           dep.trip_id,
@@ -290,7 +289,7 @@ async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 120) {
 
 class PlannedArrivalsService {
 
-  async getNextArrivals(stopId, maxMinutes = 60, forceRefresh = false) {
+  async getNextArrivals(stopId, maxMinutes = 3600, forceRefresh = false) {
     const cacheKey = `${stopId}:${maxMinutes}`;
 
     const isUnir = _isUnirStop(stopId);
@@ -307,7 +306,7 @@ class PlannedArrivalsService {
       }
 
       try {
-        const result = await _getUnirArrivalsFromStopTimes(stopId, maxMinutes || 120);
+        const result = await _getUnirArrivalsFromStopTimes(stopId, maxMinutes || 3600);
         if (result.length > 0) {
           _cache.set(cacheKey, { data: result, ts: Date.now() });
         }

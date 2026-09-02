@@ -364,7 +364,7 @@ class VehicleService {
       // Buscar próximas chegadas para a paragem (com cache de 30s)
       const arrivals = await plannedArrivalsService.getNextArrivals(
           vehicle.nextStop,
-          10, // Apenas primeiras 10 chegadas
+          3600, // Apenas primeiras 10 chegadas
           false // Usar cache
       );
 

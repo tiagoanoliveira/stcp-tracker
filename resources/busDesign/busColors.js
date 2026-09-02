@@ -46,16 +46,16 @@ export function getUnirLineColor(lineStr) {
   if (isNaN(n)) return null;
 
   if (n >= 1000 && n <= 2999) return { busColor: '#de5b35', textColor: '#fff' };
-  if (n >= 3000 && n <= 3999) return { busColor: '#9eb0db', textColor: '#000' };
+  if (n >= 3000 && n <= 3999) return { busColor: '#9eb0db', textColor: '#fff' };
   if (
       (n >= 5000 && n <= 5999) ||
       (n >= 6000 && n <= 6599)
-  ) return { busColor: '#06d6a0', textColor: '#000' };
+  ) return { busColor: '#06d6a0', textColor: '#fff' };
   if (
       (n >= 6600 && n <= 6999) ||
       (n >= 7000 && n <= 8999)
-  ) return { busColor: '#fbb03a', textColor: '#000' };
-  if (n >= 9000 && n <= 9999) return { busColor: '#a4bf62', textColor: '#000' };
+  ) return { busColor: '#fbb03a', textColor: '#fff' };
+  if (n >= 9000 && n <= 9999) return { busColor: '#a4bf62', textColor: '#fff' };
 
   return null;
 }

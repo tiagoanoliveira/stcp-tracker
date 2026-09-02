@@ -563,7 +563,7 @@ export class StopsMapApp {
     try {
       const isUnirStop = stopService.getStopById(stopId)?.operator === 'unir' || String(stopId).startsWith('prg:');
       // forceRefresh=true: botão de refresh e intervalo de 5 s
-      const windowMinutes = isUnirStop ? 120 : 60;
+      const windowMinutes = isUnirStop ? 3600 : 60;
       const arrivals = await plannedArrivalsService.getNextArrivals(stopId, windowMinutes, forceRefresh);
 
       if (!arrivals || arrivals.length === 0) {
