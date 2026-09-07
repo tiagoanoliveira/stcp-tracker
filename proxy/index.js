@@ -6,6 +6,7 @@ import METROBUS_STOPS_DATA from '../resources/stops/metrobus-stops.json' with { 
 
 import METROBUS_STOP_TIMES from '../resources/metrobus/stop-times.json' with { type: 'json' };
 import METROBUS_SHAPES from '../resources/metrobus/shapes.json' with { type: 'json' };
+import {stopService} from "../src/services/stopService";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -524,6 +525,50 @@ async function handleStopRoutes(stopId) {
 
 async function handleStopRealtime(stopId, url) {
   const stop = getStop(stopId);
+
+  if (stop && stopService.isUnirStop(stopId)) {
+    const raw = await proxyRawRequest(
+        `https://unir.live/api/stops/${encodeURIComponent(stop.stop_code)}/arrivals`,
+        'realtime_unir'
+    );
+
+    if (!raw.ok) {
+      return errorResponse(`Erro ao obter tempo real UNIR da paragem ${stopId}`, raw.status);
+    }
+
+    const data = await raw.json();
+
+    const realtime = (Array.isArray(data?.arrivals) ? data.arrivals : []).map(item => {
+      const realtimeEpoch = Number(item.arrival ?? 0);
+      const delay = Number(item.arrivalDelay ?? 0);
+      const scheduledEpoch = realtimeEpoch - delay;
+
+      return {
+        trip_id: item.tripId ? String(item.tripId) : null,
+        vehicle_id: item.vehicleId ? String(item.vehicleId) : null,
+        stop_id: String(item.stopId ?? stop.stop_id ?? stopId),
+        stop_sequence: Number(item.stopSequence ?? 0),
+        delay,
+        is_realtime: true,
+        operator: 'unir',
+        source: 'unir',
+        realtime_arrival_epoch: realtimeEpoch,
+        scheduled_arrival_epoch: scheduledEpoch,
+        realtime_arrival: realtimeEpoch ? new Date(realtimeEpoch * 1000).toISOString() : null,
+        scheduled_arrival: scheduledEpoch ? new Date(scheduledEpoch * 1000).toISOString() : null,
+      };
+    });
+
+    return jsonResponse({
+      success: true,
+      stop_id: String(stop.stop_id ?? stopId),
+      stop_code: stop.stop_code,
+      operator: 'unir',
+      source: 'unir',
+      realtime,
+    }, 'realtime_unir', 'public, max-age=10');
+  }
+
   if (stop && stop.operator !== 'stcp') {
     return jsonResponse({
       success: true,

@@ -439,7 +439,6 @@ export const mqttVehicleService = {
       });
 
       client.on('reconnect', () => {
-        console.info('🔄 MQTT a reconectar…');
         eventBus.emit('mqtt:reconnecting');
       });
 
