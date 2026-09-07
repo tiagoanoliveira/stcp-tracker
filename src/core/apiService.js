@@ -203,7 +203,7 @@ class ApiService {
     try {
       // data.stops: [{ stop_id, stop_name, stop_lat, stop_lon, stop_sequence }]
       return await this.fetchWithRetry(
-          this.buildGtfsUrl(`/route/${encodeURIComponent(routeId)}/stops`, {
+          this.buildGtfsUrl(`/route/${routeId}/stops`, {
             direction: directionId,
           })
       );
@@ -338,17 +338,6 @@ class ApiService {
       );
     } catch (error) {
       console.error(`❌ Erro ao obter schedule de ${routeId} (${serviceId}) para ${stopId}:`, error);
-      return null;
-    }
-  }
-
-  async fetchStopScheduleUnir(stopId) {
-    try {
-      return await this.fetchWithRetry(
-          this.buildUrl(`/${encodeURIComponent(stopId)}/schedule`)
-      );
-    } catch (error) {
-      console.warn(`⚠️ fetchStopScheduleUnir(${stopId}) falhou`, error);
       return null;
     }
   }
