@@ -625,7 +625,7 @@ export class BusMapApp {
     this.nextArrivals.show(stop.stop_name, stop.stop_id, stop.stop_code);
     this.mapManager.map.closePopup();
 
-    const isUnirStop = stopService.isUnirStop(stop);
+    const isUnirStop = stopService.isUnirStop(stop.stop_id);
 
     let routes = stop.routes || [];
 
