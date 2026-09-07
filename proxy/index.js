@@ -533,7 +533,7 @@ async function handleStopRealtime(stopId, url) {
     );
 
     if (!raw.ok) {
-      return errorResponse(`Erro ao obter tempo real UNIR da paragem ${stopId}`, raw.status);
+      return errorResponse(`Erro ao obter tempo real UNIR da paragem ${stopCode} ${stopId}`, raw.status);
     }
 
     const data = await raw.json();
