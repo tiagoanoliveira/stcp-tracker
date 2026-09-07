@@ -215,7 +215,6 @@ function _startNoDataTimer() {
   _clearNoDataTimer();
   _noDataTimer = setTimeout(() => {
     if (!_hasReceivedData) {
-      console.warn('%c[MQTT] ⚠ Timeout de 15s sem dados', 'color:#964219;font-weight:bold');
       eventBus.emit('mqtt:noDataTimeout');
     }
   }, NO_DATA_TIMEOUT_MS);
@@ -269,7 +268,6 @@ async function loadProtobufLib() {
     try {
       await _loadScript(url);
       if (window.protobuf) {
-        console.info(`%c[MQTT] ✅ protobufjs carregado de: ${url}`, 'color:#437a22');
         return window.protobuf;
       }
       // Script carregou mas window.protobuf não foi definido
@@ -417,11 +415,6 @@ export const mqttVehicleService = {
     _hasReceivedData  = false;
     _onVehicleExpired = onVehicleExpired || null;
 
-    console.info(
-      '%c[MQTT] Para activar logs: localStorage.setItem(\'MQTT_DEBUG\', \'1\') e recarrega',
-      'color:#01696f;font-style:italic'
-    );
-
     try {
       await Promise.all([loadMqttLib(), loadProtoSchema()]);
 
@@ -433,11 +426,9 @@ export const mqttVehicleService = {
 
       client.on('connect', () => {
         _isConnected = true;
-        console.info('✅ MQTT ligado ao broker Porto Digital');
 
         client.subscribe(TOPIC, { qos: 0 }, (err) => {
           if (err) console.error('❌ Erro ao subscrever tópico MQTT:', err);
-          else     console.info(`📡 Subscrito: ${TOPIC}`);
         });
         mqttTripUpdateService.attach(client, _protoRoot);
         _startNoDataTimer();
@@ -515,10 +506,6 @@ export const mqttVehicleService = {
           _hasReceivedData = true;
           _clearNoDataTimer();
           eventBus.emit('mqtt:dataRestored');
-          console.info(
-              `%c[MQTT] ✅ primeiro veículo recebido: id=${vehicle.id} linha=${vehicle.displayLine}`,
-              'color:#437a22;font-weight:bold'
-          );
         }
 
         _stats.processed++;

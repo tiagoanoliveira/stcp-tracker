@@ -529,7 +529,7 @@ export class StopsMapApp {
       }
     } else {
       try {
-        const stopInfo = await apiService.fetchStopInfo(stop.stop_id);
+        const stopInfo = (stopService.isUnirStop(stop.stop_id) ? await apiService.fetchGtfsStopInfo(stop.stop_id) : await apiService.fetchStopInfo(stop.stop_id));
         if (stopInfo) {
           routes = stopInfo.routes || routes;
         }

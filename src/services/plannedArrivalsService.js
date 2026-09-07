@@ -85,7 +85,7 @@ async function _resolveStopCode(stopId) {
   const cached = stopService.getStopById(stopId);
   if (cached?.stop_code) return cached.stop_code;
   try {
-    const info = await apiService.fetchStopInfo(stopId);
+    const info = (stopService.isUnirStop(stopId) ? await apiService.fetchGtfsStopInfo(stopId) : await apiService.fetchStopInfo(stopId));
     if (info?.stop_code) return info.stop_code;
   } catch { /* silencioso */ }
   return stopId;

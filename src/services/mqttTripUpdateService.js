@@ -254,30 +254,8 @@ function _toLong(v) {
 
 function _startDiag() {
   _diagTimer = setTimeout(() => {
-    console.groupCollapsed(
-      `%c[TU DIAG] Relatório após ${DIAG_MS / 1000}s`, 'color:#01696f;font-weight:bold'
-    );
-    console.log('Mensagens /gtfsrt/tu/ recebidas:', _msgCountTu);
-    console.log('Total de mensagens no handler:',    _msgCountTotal);
-    console.log('Trips em memória:',                  _byTrip.size);
-    console.log('Paragens indexadas:',                _byStop.size);
-    console.log('Amostra de tópicos recebidos:',     [..._topicsSeen]);
-
     if (_msgCountTu === 0) {
-      console.warn(
-        '%c[TU DIAG] ⚠ Nenhuma mensagem /gtfsrt/tu/ recebida em ' + (DIAG_MS / 1000) + 's.\n' +
-        'O broker Porto Digital pode não publicar TripUpdates neste tópico.\n' +
-        'O fallback HTTP continuará a ser usado para chegadas previstas.\n' +
-        'Para diagnóstico manual: localStorage.setItem(\'MQTT_TU_DEBUG\', \'1\') e recarrega.',
-        'color:#964219;font-weight:bold'
-      );
       eventBus.emit('mqtt:tuNoData');
-    } else {
-      console.info(
-        `%c[TU DIAG] ✅ ${_msgCountTu} mensagens TripUpdate recebidas, ` +
-        `${_byTrip.size} trips, ${_byStop.size} paragens indexadas.`,
-        'color:#437a22;font-weight:bold'
-      );
     }
     console.groupEnd();
   }, DIAG_MS);
@@ -331,12 +309,6 @@ export const mqttTripUpdateService = {
         _isActive = false;
         return;
       }
-      console.info(
-        '%c📡 TripUpdate subscrito: ' + TOPIC_TU + '\n' +
-        'Se não chegarem mensagens em 30s, o broker pode não publicar /tu/.\n' +
-        'Diagnóstico automático em ' + (DIAG_MS / 1000) + 's.',
-        'color:#01696f'
-      );
       _startTtl();
       _startDiag();
     });

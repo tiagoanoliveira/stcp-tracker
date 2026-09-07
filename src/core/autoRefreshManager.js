@@ -70,7 +70,6 @@ class AutoRefreshManager {
    */
   async startMqtt(id, { onVehicleUpdate, onSnapshot } = {}) {
     if (this.refreshes[id]) {
-      console.warn(`⚠ Refresh '${id}' já existe`);
       return;
     }
 
@@ -85,7 +84,6 @@ class AutoRefreshManager {
       const snapshot = await apiService.fetchBusData();
       if (snapshot.length > 0) {
         onSnapshot?.(snapshot);
-        eventBus.emit(`refresh:complete:${id}`, { duration: 0, source: 'bootstrap' });
       }
     } catch (err) {
       console.error('❌ Snapshot inicial falhou:', err);
@@ -98,11 +96,8 @@ class AutoRefreshManager {
           onVehicleUpdate?.(vehicle);
           eventBus.emit(`refresh:complete:${id}`, { duration: 0, source: 'mqtt' });
         },
-        onConnected:    () => console.info('🟢 MQTT activo — atualizações em tempo real'),
-        onDisconnected: () => console.warn('🔴 MQTT desligado — aguardar reconexão…'),
       });
     } catch (err) {
-      console.error('❌ MQTT falhou ao iniciar. A recair em polling…', err);
       // Fallback para polling se o MQTT não estiver disponível
       this.stop(id);
       const pollCallback = async () => {
@@ -173,7 +168,6 @@ class AutoRefreshManager {
       return;
     }
     if (this.refreshes[id].mode === 'mqtt') {
-      console.info(`ℹ️  setInterval ignorado — refresh '${id}' está em modo MQTT`);
       return;
     }
     this.refreshes[id].interval = interval;
