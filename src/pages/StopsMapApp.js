@@ -134,12 +134,6 @@ export class StopsMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
-      
-      // Aviso temporário — 200
-      AnnouncementBanner.show(
-        'Foram detetados problemas nos dados recebidos relativamente às próximas chegadas em tempo real. Estamos a trabalhar para resolver o problema o mais rápido possível.',
-        { type: 'info', id: 'stops-warning', dismissible: false }
-      );
      
       await scheduleService.loadScheduleData();
 
