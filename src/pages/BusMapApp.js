@@ -631,14 +631,10 @@ export class BusMapApp {
 
     if (isUnirStop) {
       // UNIR via GTFS API
-      const unirStopId = String(stop.stop_id).startsWith('unir:')
-          ? String(stop.stop_id)
-          : `unir:${stop.stop_id}`;
-
       try {
         const [info, routesResp] = await Promise.all([
-          apiService.fetchGtfsStopInfo(unirStopId),
-          apiService.fetchGtfsStopRoutes(unirStopId, 'unir'),
+          apiService.fetchGtfsStopInfo(stop.stop_id),
+          apiService.fetchGtfsStopRoutes(stop.stop_id, 'unir'),
         ]);
 
         if (info) {
