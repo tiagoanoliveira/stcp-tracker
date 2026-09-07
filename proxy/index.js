@@ -562,7 +562,7 @@ async function handleStopRealtime(stopId, url) {
     return jsonResponse({
       success: true,
       stop_id: String(stopId),
-      stop_code: stop.stop_code,
+      stop_code: stopCode,
       operator: 'unir',
       source: 'unir',
       realtime,
