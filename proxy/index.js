@@ -6,7 +6,6 @@ import METROBUS_STOPS_DATA from '../resources/stops/metrobus-stops.json' with { 
 
 import METROBUS_STOP_TIMES from '../resources/metrobus/stop-times.json' with { type: 'json' };
 import METROBUS_SHAPES from '../resources/metrobus/shapes.json' with { type: 'json' };
-import {stopService} from "../src/services/stopService";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -147,6 +146,13 @@ function getRoute(routeId) {
 
 function getStop(stopId) {
   return STOP_BY_ID.get(String(stopId)) ?? null;
+}
+
+function isUnirStop(stopOrId) {
+  return (
+      stopOrId.includes('ut') ||
+      stopOrId.includes('unir')
+  );
 }
 
 function getMetrobusTrips(routeId) {
@@ -526,7 +532,7 @@ async function handleStopRoutes(stopId) {
 async function handleStopRealtime(stopId, url) {
   const stop = getStop(stopId);
 
-  if (stop && stopService.isUnirStop(stopId)) {
+  if (stop && this.isUnirStop(stopId)) {
     const raw = await proxyRawRequest(
         `https://unir.live/api/stops/${encodeURIComponent(stop.stop_code)}/arrivals`,
         'realtime_unir'
