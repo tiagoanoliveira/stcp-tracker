@@ -28,6 +28,7 @@ import { REALTIME_BUSES_ENABLED } from '../config/featureFlags.js';
 import { wireFilterToggleButton } from '../ui/components/filterBarToggle.js';
 import routeOverlayService from '../services/routeOverlayService.js';
 import {getSetting, SETTINGS_KEYS} from "../config/filterSettings.js";
+import {stopService} from "../services/stopService.js";
 
 export class BusMapApp {
   constructor(options = {}) {
@@ -257,15 +258,25 @@ export class BusMapApp {
           //    COM filtro activo: mostrar sempre todos os veículos da linha/direcção.
           if (activeFilter.size === 0) {
             const isRelevant = arrivals.some(a => {
-              const arrivalLine = String(a.route_short_name || '');
-              if (arrivalLine !== vehicleLine) return false;
-              if (typeof a.directionId === 'number' && typeof vehicle.direction === 'number') {
-                if (a.directionId !== vehicle.direction) return false;
-              } else if (typeof a.direction_id === 'number' && typeof vehicle.direction === 'number') {
-                if (a.direction_id !== vehicle.direction) return false;
+              if (!a.is_realtime) return false;
+
+              if (a.trip_id && vehicle.tripId) {
+                return vehicleService.tripIdsMatch(vehicle.tripId, a.trip_id);
               }
+              const arrivalLine = String(a.route_short_name || a.route_number || a.route_id || '');
+              if (arrivalLine !== vehicleLine) return false;
+
+              if (typeof a.directionId === 'number' && typeof vehicle.direction === 'number') {
+                return a.directionId === vehicle.direction;
+              }
+
+              if (typeof a.direction_id === 'number' && typeof vehicle.direction === 'number') {
+                return a.direction_id === vehicle.direction;
+              }
+
               return true;
             });
+
             if (!isRelevant) return;
           }
 
@@ -374,22 +385,33 @@ export class BusMapApp {
       const route = (this.routeFilterBar.routes || []).find(r => String(r.number) === String(lineNum));
       if (route) {
         const direction = isNaN(dir) ? 0 : dir;
-        this.routeFilterBar.selected.set(route.number, { route, direction });
+        const routeKey = String(route.routeId ?? route.id ?? route.number);
+        this.routeFilterBar.selected.set(routeKey, { route, direction });
         this.routeFilterBar._render();
-        await this._handleRouteFilterChange(new Set([route.number]), [{ ...route, direction }]);
+        await this._handleRouteFilterChange(new Set([String(route.number)]), [{ ...route, direction }]);
       }
     }
 
     if (stopId) {
       try {
-        const stopInfo = await apiService.fetchStopInfo(stopId);
+        const isUnirStop = stopService.isUnirStop(stopId);
+        const [stopInfo, routesResp] = await Promise.all([
+          isUnirStop
+              ? apiService.fetchGtfsStopInfo(stopId)
+              : apiService.fetchStopInfo(stopId),
+          isUnirStop
+              ? apiService.fetchGtfsStopRoutes(stopId, 'unir')
+              : Promise.resolve(null),
+        ]);
         const stop = {
           stop_id:   stopInfo?.stop_id   || stopId,
           stop_code: stopInfo?.stop_code || stopId,
           stop_name: stopInfo?.stop_name || `Paragem ${stopId}`,
           latitude:  stopInfo?.latitude  || 41.1579,
           longitude: stopInfo?.longitude || -8.6291,
-          routes:    stopInfo?.routes    || []
+          operator:  isUnirStop ? 'unir' : (stopInfo?.operator || 'stcp'),
+          source:    isUnirStop ? 'unir' : (stopInfo?.source || 'stcp'),
+          routes:    routesResp?.routes || stopInfo?.routes || []
         };
         this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
         await this._handleStopClick(stop);
@@ -600,13 +622,10 @@ export class BusMapApp {
     plannedArrivalsService.clearCache(stop.stop_id);
 
     this.mapManager.centerOn([stop.latitude, stop.longitude], 16);
-    this.nextArrivals.show(stop.stop_name, stop.stop_id);
+    this.nextArrivals.show(stop.stop_name, stop.stop_id, stop.stop_code);
     this.mapManager.map.closePopup();
 
-    const isUnirStop =
-        stop.operator === 'unir' ||
-        String(stop.stop_id).startsWith('prg:') ||
-        String(stop.stop_id).includes(':prg:');
+    const isUnirStop = stopService.isUnirStop(stop);
 
     let routes = stop.routes || [];
 
@@ -694,7 +713,7 @@ export class BusMapApp {
     try {
       const arrivals = await plannedArrivalsService.getNextArrivals(
         stopId,
-        1440,
+        720,
         forceRefresh
       );
 
@@ -774,8 +793,6 @@ export class BusMapApp {
 
     if (busesToShow.length > 0) {
       this.busMarkerManager.updateBusMarkers(busesToShow);
-    } else if (vehicles.length > 0 && activeFilter.size === 0) {
-      this.busMarkerManager.updateBusMarkers(vehicles.slice(0, 20));
     } else {
       this.busMarkerManager.clearAllMarkers();
     }

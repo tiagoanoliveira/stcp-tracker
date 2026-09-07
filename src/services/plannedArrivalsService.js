@@ -47,6 +47,40 @@ const _info = (...a) => console.info('%c[ARRIVALS]', 'color:#437a22;font-weight:
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+function _formatLocalYmd(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function _shiftDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function _extractServiceDateParts(scheduleDate, fallbackDate) {
+  if (/^\d{8}$/.test(scheduleDate || '')) {
+    return {
+      year: Number(scheduleDate.slice(0, 4)),
+      month: Number(scheduleDate.slice(4, 6)) - 1,
+      day: Number(scheduleDate.slice(6, 8)),
+    };
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(scheduleDate || '')) {
+    const [y, m, d] = scheduleDate.split('-').map(Number);
+    return { year: y, month: m - 1, day: d };
+  }
+
+  return {
+    year: fallbackDate.getFullYear(),
+    month: fallbackDate.getMonth(),
+    day: fallbackDate.getDate(),
+  };
+}
+
 async function _resolveStopCode(stopId) {
   const cached = stopService.getStopById(stopId);
   if (cached?.stop_code) return cached.stop_code;
@@ -55,12 +89,6 @@ async function _resolveStopCode(stopId) {
     if (info?.stop_code) return info.stop_code;
   } catch { /* silencioso */ }
   return stopId;
-}
-
-function _isUnirStop(stopId) {
-  const cached = stopService.getStopById(stopId);
-  if (cached?.operator === 'unir' || cached?.operator.includes('ut')) return true;
-  return false;
 }
 
 function _withTimeout(promise, ms) {
@@ -229,57 +257,70 @@ function _buildLocalServiceDate(year, month, day, timeStr) {
   return d;
 }
 
-async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 1440) {
-  const now       = new Date();
-  const nowMs     = now.getTime();
-  const windowMs  = maxMinutes * 60_000;
-  const arrivals  = [];
+async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 720) {
+  const now = new Date();
+  const nowMs = now.getTime();
+  const windowMs = maxMinutes * 60_000;
+  const serviceDates = [_shiftDays(now, -1), now, _shiftDays(now, 1)];
 
-  const schedule = await apiService.fetchGtfsStopSchedule(stopId, {
-    date: now.toISOString().slice(0, 10), // YYYY-MM-DD
-    limit: 5000,
-  });
+  const schedules = await Promise.all(
+      serviceDates.map(async serviceDate => ({
+        requestedDate: serviceDate,
+        schedule: await apiService.fetchGtfsStopSchedule(stopId, {
+          date: _formatLocalYmd(serviceDate),
+          limit: 5000,
+        }),
+      }))
+  );
 
-  if (!schedule?.departures || !Array.isArray(schedule.departures)) {
-    _info(`[ARRIVALS] UNIR GTFS schedule vazio para ${stopId}`);
-    return [];
-  }
+  const arrivals = [];
+  const seen = new Set();
 
-  const dateStr = schedule.date || now.toISOString().slice(0, 10); // YYYYMMDD ou YYYY-MM-DD
-  // Converter para componentes de data
-  let year = now.getFullYear(), month = now.getMonth(), day = now.getDate();
-  if (/^\\d{8}$/.test(dateStr)) {
-    year  = Number(dateStr.slice(0, 4));
-    month = Number(dateStr.slice(4, 6)) - 1;
-    day   = Number(dateStr.slice(6, 8));
-  } else if (/^\\d{4}-\\d{2}-\\d{2}$/.test(dateStr)) {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    year = y; month = m - 1; day = d;
-  }
+  for (const { requestedDate, schedule } of schedules) {
+    if (!Array.isArray(schedule?.departures)) continue;
 
-  for (const dep of schedule.departures) {
-    const timeStr = dep.arrival_time || dep.departure_time;
-    if (!timeStr) continue;
+    const { year, month, day } = _extractServiceDateParts(
+        schedule.date,
+        requestedDate
+    );
 
-    const d = _buildLocalServiceDate(year, month, day, timeStr);
-    const t = d.getTime();
-    const diffMs = t - nowMs;
-    if (diffMs < 0 || diffMs > windowMs) continue;
+    for (const dep of schedule.departures) {
+      const timeStr = dep.arrival_time || dep.departure_time;
+      if (!timeStr) continue;
 
-    const diffSec = Math.round(diffMs / 1000);
-    arrivals.push(_normalizeOne({
-      route_short_name:  dep.route_short_name,
-      trip_id:           dep.trip_id,
-      trip_headsign:     dep.trip_headsign || '',
-      scheduled_arrival: d.toISOString(),
-      realtime_arrival:  null,
-      delay:             null,
-      is_realtime:       false,
-      directionId:       dep.direction_id,
-      arrival_seconds:   diffSec,
-      arrival_minutes:   diffSec / 60,
-      _source:           'unir-gtfs-api',
-    }));
+      const arrivalDate = _buildLocalServiceDate(year, month, day, timeStr);
+      const diffMs = arrivalDate.getTime() - nowMs;
+
+      if (diffMs < 0 || diffMs > windowMs) continue;
+
+      const uniqueKey = [
+        dep.trip_id ?? '',
+        dep.route_id ?? dep.route_short_name ?? '',
+        timeStr,
+        year,
+        month,
+        day
+      ].join('|');
+
+      if (seen.has(uniqueKey)) continue;
+      seen.add(uniqueKey);
+
+      const diffSec = Math.round(diffMs / 1000);
+
+      arrivals.push(_normalizeOne({
+        route_short_name:  dep.route_short_name,
+        trip_id:           dep.trip_id,
+        trip_headsign:     dep.trip_headsign || '',
+        scheduled_arrival: arrivalDate.toISOString(),
+        realtime_arrival:  null,
+        delay:             null,
+        is_realtime:       false,
+        directionId:       dep.direction_id,
+        arrival_seconds:   diffSec,
+        arrival_minutes:   diffSec / 60,
+        _source:           'unir-gtfs-api',
+      }));
+    }
   }
 
   arrivals.sort((a, b) => {
@@ -295,10 +336,10 @@ async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 1440) {
 
 class PlannedArrivalsService {
 
-  async getNextArrivals(stopId, maxMinutes = 1440, forceRefresh = false) {
+  async getNextArrivals(stopId, maxMinutes = 720, forceRefresh = false) {
     const cacheKey = `${stopId}:${maxMinutes}`;
 
-    const isUnir = _isUnirStop(stopId);
+    const isUnir = stopService.isUnirStop(stopId);
 
     if (isUnir) {
       if (!forceRefresh) {
@@ -312,7 +353,7 @@ class PlannedArrivalsService {
       }
 
       try {
-        const result = await _getUnirArrivalsFromStopTimes(stopId, maxMinutes || 1440);
+        const result = await _getUnirArrivalsFromStopTimes(stopId, maxMinutes || 720);
         if (result.length > 0) {
           _cache.set(cacheKey, { data: result, ts: Date.now() });
         }

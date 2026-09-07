@@ -327,13 +327,13 @@ export class NextArrivals {
 
   // ─── Mostrar / Esconder ──────────────────────────────────────────────────────
 
-  show(stopName, stopId = null) {
+  show(stopName, stopId = null, stopCode = null) {
     if (!this.element) this.create();
     this.currentStopId = stopId;
     const titleEl = this.element.querySelector('#arrivals-stop-name');
     const codeEl  = this.element.querySelector('#arrivals-stop-code');
     if (titleEl && stopName) titleEl.textContent = normalizeDestinationText(stopName);
-    if (codeEl  && stopId)  codeEl.textContent  = `Código: ${stopId}`;
+    if (codeEl  && stopCode)  codeEl.textContent  = `Código: ${stopCode}`;
     this.showLoading();
     this.element.classList.add('visible');
     this.isVisible = true;
@@ -513,13 +513,13 @@ export class NextArrivals {
       if (seconds < 60) return 'A chegar';
       const m = Math.floor(seconds / 60);
       if (m < 60) return `${m} min`;
-      return clock ? `Às ${clock}` : `${m} min`;
+      return clock ? `${clock}` : `${m} min`;
     }
 
-    if (minutes === undefined || minutes === null) return clock ? `Às ${clock}` : 'N/A';
+    if (minutes === undefined || minutes === null) return clock ? `${clock}` : 'N/A';
     if (minutes < 1) return 'A chegar';
     if (minutes < 60) return `${Math.round(minutes)} min`;
-    return clock ? `Às ${clock}` : `${Math.round(minutes)} min`;
+    return clock ? `${clock}` : `${Math.round(minutes)} min`;
   }
 
   // ─── Favoritos ───────────────────────────────────────────────────────────────

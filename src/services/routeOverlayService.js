@@ -1,12 +1,15 @@
-// src/services/routeOverlayService.js
 import { routeService } from './routeService.js';
 
-function getRouteNumber(routeObj) {
+function getRouteId(routeObj) {
     return String(routeObj?.routeId ?? routeObj?.id ?? routeObj?.number ?? '');
 }
 
+function getRouteNumber(routeObj) {
+    return String(routeObj?.number ?? routeObj?.routeId ?? routeObj?.id ?? '');
+}
+
 function getRouteDirection(routeObj) {
-    return routeObj?.direction ?? 0;
+    return Number(routeObj?.direction ?? 0);
 }
 
 function getRouteColor(routeObj) {
@@ -19,7 +22,10 @@ function getRouteTextColor(routeObj) {
 
 function normalizeOverlay(routeObj, partial = {}) {
     return {
-        routeId: getRouteNumber(routeObj),
+        routeId: getRouteId(routeObj),
+        number: getRouteNumber(routeObj),
+        operator: routeObj?.operator ?? routeObj?.source ?? null,
+        source: routeObj?.source ?? routeObj?.operator ?? null,
         color: getRouteColor(routeObj),
         text_color: getRouteTextColor(routeObj),
         direction: getRouteDirection(routeObj),
@@ -29,14 +35,19 @@ function normalizeOverlay(routeObj, partial = {}) {
 }
 
 async function fetchRouteOverlay(routeObj) {
-    const routeId   = getRouteNumber(routeObj);
-    const direction = getRouteDirection(routeObj);
+    const routeId = getRouteId(routeObj);
 
     const overlay = await routeService.fetchRouteOverlay({
+        ...routeObj,
+        id: routeId,
         routeId,
-        direction,
-        color:      getRouteColor(routeObj),
+        number: getRouteNumber(routeObj),
+        direction: getRouteDirection(routeObj),
+        color: getRouteColor(routeObj),
         text_color: getRouteTextColor(routeObj),
+        textcolor: getRouteTextColor(routeObj),
+        operator: routeObj?.operator ?? routeObj?.source ?? null,
+        source: routeObj?.source ?? routeObj?.operator ?? null,
     });
 
     if (!overlay) return normalizeOverlay(routeObj);
@@ -51,7 +62,10 @@ async function fetchRouteOverlay(routeObj) {
             ? overlay.stops
             : [];
 
-    return normalizeOverlay(routeObj, { shapes: shapesForOverlay, stops: stopsForOverlay });
+    return normalizeOverlay(routeObj, {
+        shapes: shapesForOverlay,
+        stops: stopsForOverlay,
+    });
 }
 
 export async function buildOverlays(routeObjs = []) {

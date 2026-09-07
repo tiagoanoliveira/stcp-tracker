@@ -19,6 +19,25 @@ class StopService {
     this.allStopsCache = new Map(CUSTOM_STOPS_MAP);
   }
 
+  isUnirStop(stopOrId) {
+    const rawId = String(
+        typeof stopOrId === 'string'
+            ? stopOrId
+            : stopOrId?.stop_id ?? stopOrId?.stop_code ?? ''
+    ).toLowerCase();
+
+    const cached = typeof stopOrId === 'string' ? this.getStopById(stopOrId) : stopOrId;
+    const operator = String(cached?.operator ?? cached?.source ?? '').toLowerCase();
+
+    return (
+        operator === 'unir' ||
+        operator.includes('ut') ||
+        rawId.startsWith('prg:') ||
+        rawId.startsWith('unir:') ||
+        rawId.includes(':prg:')
+    );
+  }
+
   /**
    * PRINCIPAL: Obtém paragens próximas via API.
    * Paragens custom próximas do raio pedido são injectadas no resultado.

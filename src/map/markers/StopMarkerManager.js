@@ -98,7 +98,7 @@ export class StopMarkerManager {
   createPopupContent(stop, showDistance) {
     let content = `<div class="stop-popup">
       <strong>${normalizeDestinationText(stop.stop_name)}</strong>
-      Código: ${stop.stop_id}`;
+      Código: ${stop.stop_code}`;
     if (showDistance && stop.distance !== undefined) {
       content += `<br>Distância: ${Math.round(stop.distance)}m`;
     }
