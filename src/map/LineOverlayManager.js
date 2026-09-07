@@ -12,6 +12,7 @@
  *                     "Próximos autocarros" no popup de uma paragem
  */
 import {normalizeDestinationText} from "../services/vehicleService.js";
+import {stopService} from "../services/stopService.js";
 
 export class LineOverlayManager {
   constructor(map) {
@@ -124,10 +125,14 @@ export class LineOverlayManager {
   }
 
   _buildStopPopup(stop, lineColor) {
+    let stopCode;
+    if (stopService.isUnirStop(stop.stop_code)) {
+      stopCode = String(stop.stop_code ?? '').replace(/^ut1:/i, '').replace(/^ut2:/i, '').replace(/^ut3:/i, '').replace(/^ut4:/i, '').replace(/^ut5:/i, '').replace(/^ut6:/i, '').replace(/^unir:/i, '');
+    }
     return `
       <div class="popup-line-stop" style="font-family:inherit;min-width:150px;padding:2px 0">
         <strong style="color:${lineColor};font-size:13px">${normalizeDestinationText(stop.stop_name)}</strong><br>
-        <small style="color:#777">${stop.stop_code || stop.stop_id}</small><br>
+        <small style="color:#777">${stopCode || stop.stop_code || stop.stop_id}</small><br>
          <button class="stop-popup-arrivals-btn" style="
           margin-top:8px;
           width:100%;

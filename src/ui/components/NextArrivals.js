@@ -12,6 +12,7 @@ import { LoadingSpinner }    from './LoadingSpinner.js';
 import { routeFilterState }  from '../../services/routeFilterState.js';
 import { getUnirLineColor } from '../../../resources/busDesign/busColors.js';
 import { iconCache } from '../design/iconCache.js';
+import {stopService} from "../../services/stopService.js";
 
 function isNightLine(number) { return /M$/i.test(String(number)); }
 
@@ -333,6 +334,7 @@ export class NextArrivals {
     const titleEl = this.element.querySelector('#arrivals-stop-name');
     const codeEl  = this.element.querySelector('#arrivals-stop-code');
     if (titleEl && stopName) titleEl.textContent = normalizeDestinationText(stopName);
+    if (stopService.isUnirStop(stopCode)) stopCode = String(stopCode ?? '').replace(/^ut1:/i, '').replace(/^ut2:/i, '').replace(/^ut3:/i, '').replace(/^ut4:/i, '').replace(/^ut5:/i, '').replace(/^ut6:/i, '').replace(/^unir:/i, '');
     if (codeEl  && stopCode)  codeEl.textContent  = `Código: ${stopCode}`;
     this.showLoading();
     this.element.classList.add('visible');
