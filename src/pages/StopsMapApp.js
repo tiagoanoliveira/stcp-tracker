@@ -129,12 +129,6 @@ export class StopsMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
-      
-      // Aviso temporário — STCP
-      AnnouncementBanner.show(
-        'Por motivos desconhecidos a linha 200 não está a apresentar dados em tempo real - verifique o horário planeado nas próximas chegadas.',
-        { type: 'warning', id: 'stcp-warning', dismissible: false }
-      );
      
       await scheduleService.loadScheduleData();
 
