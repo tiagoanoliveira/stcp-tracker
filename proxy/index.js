@@ -546,7 +546,7 @@ async function handleStopRealtime(stopId, url) {
       return {
         trip_id: item.tripId ? String(item.tripId) : null,
         vehicle_id: item.vehicleId ? String(item.vehicleId) : null,
-        stop_id: String(item.stopId ?? stopId),
+        stop_id: String(stopId),
         stop_sequence: Number(item.stopSequence ?? 0),
         delay,
         is_realtime: true,
@@ -561,7 +561,7 @@ async function handleStopRealtime(stopId, url) {
 
     return jsonResponse({
       success: true,
-      stop_id: String(stop.stop_id ?? stopId),
+      stop_id: String(stopId),
       stop_code: stop.stop_code,
       operator: 'unir',
       source: 'unir',
