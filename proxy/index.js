@@ -148,13 +148,6 @@ function getStop(stopId) {
   return STOP_BY_ID.get(String(stopId)) ?? null;
 }
 
-function isUnirStop(stopOrId) {
-  return (
-      stopOrId.includes('ut') ||
-      stopOrId.includes('unir')
-  );
-}
-
 function getMetrobusTrips(routeId) {
   return METROBUS_STOP_TIMES.find(r => String(r.route_id) === String(routeId))?.trips ?? [];
 }
@@ -532,7 +525,7 @@ async function handleStopRoutes(stopId) {
 async function handleStopRealtime(stopId, url) {
   const stop = getStop(stopId);
 
-  if (stop && this.isUnirStop(stopId)) {
+  if (stop && (stopId.includes('ut') || stopId.includes('unir'))) {
     const raw = await proxyRawRequest(
         `https://unir.live/api/stops/${encodeURIComponent(stop.stop_code)}/arrivals`,
         'realtime_unir'
