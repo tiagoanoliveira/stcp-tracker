@@ -526,7 +526,7 @@ async function handleStopRealtime(stopId, url) {
   const stop = getStop(stopId);
 
   if (stopId.includes('ut') || stopId.includes('unir')) {
-    const stopCode = String(stop?.stop_id ?? '').replace(/^ut1:/i, '').replace(/^ut2:/i, '').replace(/^ut3:/i, '').replace(/^ut4:/i, '').replace(/^ut5:/i, '').replace(/^ut6:/i, '').replace(/^unir:/i, '');
+    const stopCode = String(stopId ?? '').replace(/^ut1:/i, '').replace(/^ut2:/i, '').replace(/^ut3:/i, '').replace(/^ut4:/i, '').replace(/^ut5:/i, '').replace(/^ut6:/i, '').replace(/^unir:/i, '');
     const raw = await proxyRawRequest(
         `https://unir.live/api/stops/${encodeURIComponent(stopCode)}/arrivals`,
         'realtime_unir'
