@@ -79,6 +79,12 @@ export class BusMapApp {
           { type: 'warning', id: 'rt-unavailable', dismissible: false }
         );
       }
+
+      // Aviso temporário
+      AnnouncementBanner.show(
+        'Uma nova versão com UNIR, widgets para adicionar ao ecrã inicial, layout otimizado e personalização ao gosto do utilizador está a caminho!',
+        { type: 'info', id: 'new-version', dismissible: true }
+      );
       
       await scheduleService.loadScheduleData();
 
