@@ -126,6 +126,7 @@ function _normalizeOne(a) {
     delay: a.delay
         ?? a.delay_seconds
         ?? (a.delay_minutes != null ? Number(a.delay_minutes) * 60 : null),
+    status: a.status || null,
     is_realtime:       Boolean(a.is_realtime),
     directionId:       a.directionId ?? a.direction_id ?? null,
     _source:           a._source || 'unknown',
