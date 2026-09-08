@@ -30,6 +30,7 @@
 import { otpService }  from './otpService.js';
 import { stopService } from './stopService.js';
 import { apiService }  from '../core/apiService.js';
+import { vehicleService } from './vehicleService.js';
 
 const _cache              = new Map();
 const CACHE_TTL           = 4_000;  // ms
@@ -104,19 +105,30 @@ function _withTimeout(promise, ms) {
  * Normaliza uma chegada para campos canónicos.
  */
 function _normalizeOne(a) {
+  const scheduledIso =
+      a.scheduled_arrival ||
+      a.arrival_time ||
+      (a.scheduled_arrival_epoch ? new Date(a.scheduled_arrival_epoch * 1000).toISOString() : null);
+
+  const realtimeIso =
+      a.realtime_arrival ||
+      (a.realtime_arrival_epoch ? new Date(a.realtime_arrival_epoch * 1000).toISOString() : null) ||
+      null;
+
   return {
     ...a,
-    route_short_name:  a.route_short_name  || a.route_number || '',
-    trip_id:           a.trip_id           || null,
-    headsign:          a.headsign          || a.trip_headsign || '',
-    scheduled_arrival: a.scheduled_arrival || a.arrival_time  || null,
-    realtime_arrival:  a.realtime_arrival  || null,
+    route_short_name:  a.route_short_name || a.route_number || '',
+    trip_id:           a.trip_id || null,
+    vehicle_id:        a.vehicle_id || null,
+    headsign:          a.headsign || a.trip_headsign || '',
+    scheduled_arrival: scheduledIso,
+    realtime_arrival:  realtimeIso,
     delay: a.delay
         ?? a.delay_seconds
         ?? (a.delay_minutes != null ? Number(a.delay_minutes) * 60 : null),
     is_realtime:       Boolean(a.is_realtime),
-    directionId:       a.directionId       ?? a.direction_id  ?? null,
-    _source:           a._source           || 'unknown',
+    directionId:       a.directionId ?? a.direction_id ?? null,
+    _source:           a._source || 'unknown',
   };
 }
 
@@ -127,8 +139,9 @@ function _normalize(arrivals) {
 
 function _extractRealtimeArrivals(response) {
   if (!response) return [];
-  if (Array.isArray(response))          return response;
+  if (Array.isArray(response)) return response;
   if (Array.isArray(response.arrivals)) return response.arrivals;
+  if (Array.isArray(response.realtime)) return response.realtime;
   return [];
 }
 
@@ -257,6 +270,61 @@ function _buildLocalServiceDate(year, month, day, timeStr) {
   return d;
 }
 
+function _recomputeArrivalDelta(arrival) {
+  const targetMs = _toEpoch(arrival.realtime_arrival || arrival.scheduled_arrival);
+  if (targetMs == null) return arrival;
+
+  const diffSec = Math.round((targetMs - Date.now()) / 1000);
+
+  return {
+    ...arrival,
+    arrival_seconds: diffSec,
+    arrival_minutes: diffSec / 60,
+  };
+}
+
+function _mergeUnirPlannedWithRealtime(plannedArrivals, realtimeArrivals) {
+  if (!plannedArrivals.length && !realtimeArrivals.length) return [];
+  if (!realtimeArrivals.length) {
+    return plannedArrivals.map(a => _recomputeArrivalDelta(a));
+  }
+
+  const usedRt = new Set();
+
+  const merged = plannedArrivals.map(planned => {
+    const rtIndex = realtimeArrivals.findIndex((rt, idx) => {
+      if (usedRt.has(idx)) return false;
+      if (!planned.trip_id || !rt.trip_id) return false;
+      return vehicleService.tripIdsMatch(planned.trip_id, rt.trip_id);
+    });
+
+    if (rtIndex === -1) {
+      return _recomputeArrivalDelta({ ...planned, _source: planned._source || 'unir-gtfs-api' });
+    }
+
+    usedRt.add(rtIndex);
+    const rt = realtimeArrivals[rtIndex];
+
+    return _recomputeArrivalDelta(_normalizeOne({
+      ...planned,
+      vehicle_id: rt.vehicle_id ?? planned.vehicle_id ?? null,
+      scheduled_arrival: rt.scheduled_arrival || planned.scheduled_arrival,
+      realtime_arrival: rt.realtime_arrival || planned.realtime_arrival,
+      delay: rt.delay ?? planned.delay,
+      is_realtime: true,
+      _source: 'unir-gtfs+rt',
+    }));
+  });
+
+  merged.sort((a, b) => {
+    const tA = _toEpoch(a.realtime_arrival || a.scheduled_arrival);
+    const tB = _toEpoch(b.realtime_arrival || b.scheduled_arrival);
+    return (tA ?? Infinity) - (tB ?? Infinity);
+  });
+
+  return merged;
+}
+
 async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 720) {
   const now = new Date();
   const nowMs = now.getTime();
@@ -353,13 +421,24 @@ class PlannedArrivalsService {
       }
 
       try {
-        const result = await _getUnirArrivalsFromStopTimes(stopId, maxMinutes || 720);
+        const [planned, rtResp] = await Promise.all([
+          _getUnirArrivalsFromStopTimes(stopId, maxMinutes || 720),
+          _withTimeout(apiService.fetchStopRealtime(stopId), REALTIME_TIMEOUT_MS).catch(() => null),
+        ]);
+
+        const rtArrivals = _normalize(
+            _extractRealtimeArrivals(rtResp).map(a => ({ ...a, _source: 'unir-rt' }))
+        );
+
+        const result = _mergeUnirPlannedWithRealtime(planned, rtArrivals);
+
         if (result.length > 0) {
           _cache.set(cacheKey, { data: result, ts: Date.now() });
         }
+
         return result;
       } catch (err) {
-        console.warn('[ARRIVALS] UNIR stop_times falhou:', err);
+        console.warn('[ARRIVALS] UNIR stop_times/realtime falhou:', err);
         return [];
       }
     }

@@ -382,9 +382,7 @@ export class NextArrivals {
     listContainer.innerHTML = '';
     filtered.forEach(arrival => {
       // Match: tentar tripId exacto → sem prefixo feed → por linha+direcção
-      const vehicle = arrival.is_realtime
-        ? this._matchVehicle(arrival)
-        : null;
+      const vehicle = this._matchVehicle(arrival);
       listContainer.appendChild(this._createArrivalElement(arrival, vehicle));
     });
   }
@@ -433,14 +431,17 @@ export class NextArrivals {
     const status      = arrival.status || 'SCHEDULED';
     const delayS      = arrival.delay || 0;
 
-    const hasLocation = isRealtime && vehicle &&
-      vehicleService.extractVehicleLocation(vehicle) !== null;
+    const hasLocation = Boolean(
+        vehicle && vehicleService.extractVehicleLocation(vehicle) !== null
+    );
     const locationIcon = hasLocation ? this.getActiveLocationIcon() : this.getInactiveLocationIcon();
 
     // ── Status line — label SEMPRE a preto, só o delay como badge colorido ───
     let statusHtml = '';
     if (!isRealtime) {
-      statusHtml = '<span class="delay-label">Planeado - localização desconhecida</span>';
+      statusHtml = hasLocation
+          ? '<span class="delay-label">Planeado — localização do veículo disponível</span>'
+          : '<span class="delay-label">Planeado - localização desconhecida</span>';
     } else if (status === 'ON_TIME') {
       statusHtml = '<span class="delay-label">No horário previsto</span>';
     } else if (status === 'EARLY') {

@@ -257,7 +257,7 @@ class RouteService {
 
     try {
       let payload;
-      if (String(operatorHint).toLowerCase() === 'unir') {
+      if (String(operatorHint).toLowerCase() === 'unir' || String(operatorHint).toLowerCase().includes('ut')) {
         payload = await apiService.fetchGtfsRouteStops(routeId, directionId);
       } else {
         payload = await apiService.fetchRouteStops(routeId, directionId);

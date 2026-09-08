@@ -686,15 +686,15 @@ export class StopsMapApp {
       if (v.tripId) vehiclesByTripId.set(v.tripId, v);
     }
 
-    const realtimeTripIds = arrivals
-      .filter(a => a.is_realtime && a.trip_id)
-      .map(a => a.trip_id);
+    const arrivalTripIds = arrivals
+        .filter(a => a.trip_id)
+        .map(a => a.trip_id);
     const mqttDirect = REALTIME_BUSES_ENABLED
-      ? mqttVehicleService.getVehiclesByTripIds(realtimeTripIds)
+      ? mqttVehicleService.getVehiclesByTripIds(arrivalTripIds)
       : [];
     const mqttByTripId = new Map(mqttDirect.map(v => [v.tripId, v]));
 
-    _log(`updateBusMap: ${realtimeTripIds.length} chegadas RT, ${mqttDirect.length} veículos MQTT por tripId`);
+    _log(`updateBusMap: ${arrivalTripIds.length} chegadas RT, ${mqttDirect.length} veículos MQTT por tripId`);
 
     let matched = 0, notFound = 0;
     const newAllowedTripIds = new Set();
