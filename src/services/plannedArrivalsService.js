@@ -295,7 +295,8 @@ function _mergeUnirPlannedWithRealtime(plannedArrivals, realtimeArrivals) {
     const rtIndex = realtimeArrivals.findIndex((rt, idx) => {
       if (usedRt.has(idx)) return false;
       if (!planned.trip_id || !rt.trip_id) return false;
-      return vehicleService.tripIdsMatch(planned.trip_id, rt.trip_id);
+      const plannedTripIdNormalized = String(planned.trip_id).replace(/^ut1:/i, '').replace(/^ut2:/i, '').replace(/^ut3:/i, '').replace(/^ut4:/i, '').replace(/^ut5:/i, '').replace(/^ut6:/i, '').replace(/^unir:/i, '')
+      return vehicleService.tripIdsMatch(plannedTripIdNormalized, rt.trip_id);
     });
 
     if (rtIndex === -1) {

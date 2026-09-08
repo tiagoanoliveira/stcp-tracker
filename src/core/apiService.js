@@ -311,7 +311,7 @@ class ApiService {
 
   async fetchStopRealtime(stopId) {
     try {
-      return await this.fetchWithRetry(this.buildUrl(`/${encodeURIComponent(stopId)}/realtime`));
+      return await this.fetchWithRetry(this.buildUrl(`/${stopId}/realtime`));
     } catch (error) {
       console.warn(`⚠️ fetchStopRealtime(${stopId}) falhou`, error);
       return null;
