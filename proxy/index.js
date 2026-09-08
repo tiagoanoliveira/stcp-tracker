@@ -542,6 +542,7 @@ async function handleStopRealtime(stopId, url) {
       const realtimeEpoch = Number(item.arrival ?? 0);
       const delay = Number(item.arrivalDelay ?? 0);
       const scheduledEpoch = realtimeEpoch - delay;
+      const status = item.status ?? (delay > 0 ? 'DELAYED' : (delay < 0 ? 'EARLY' : 'ON_TIME'));
 
       return {
         trip_id: item.tripId ? String(item.tripId) : null,
@@ -549,6 +550,7 @@ async function handleStopRealtime(stopId, url) {
         stop_id: String(stopId),
         stop_sequence: Number(item.stopSequence ?? 0),
         delay,
+        status,
         is_realtime: true,
         operator: 'unir',
         source: 'unir',
