@@ -383,6 +383,7 @@ async function _getUnirArrivalsFromStopTimes(stopId, maxMinutes = 720) {
         scheduled_arrival: arrivalDate.toISOString(),
         realtime_arrival:  null,
         delay:             null,
+        status:            null,
         is_realtime:       false,
         directionId:       dep.direction_id,
         arrival_seconds:   diffSec,

@@ -388,7 +388,7 @@ export class NextArrivals {
   }
 
   /**
-   * Tenta associar uma chegada OTP a um veículo MQTT.
+   * Tenta associar uma chegada a um veículo.
    *
    * Estratégia (por ordem de precisão):
    *   1. trip_id exacto
